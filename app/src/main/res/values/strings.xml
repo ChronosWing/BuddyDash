@@ -43,6 +43,7 @@
     <string name="status_error">Error</string>
     <string name="status_offline">Offline</string>
     <string name="status_busy">Busy</string>
+    <string name="plate_in_use_chip">Plate in use</string>
     <string name="plate_clear_chip">Plate clear</string>
     <string name="plate_not_clear_chip">Plate not clear</string>
     <string name="print_cover">Print cover image</string>

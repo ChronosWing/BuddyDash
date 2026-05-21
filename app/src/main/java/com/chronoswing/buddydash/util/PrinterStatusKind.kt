@@ -12,6 +12,7 @@ enum class PrinterActivityKind {
 }
 
 enum class PlateIndicatorKind {
+    InUse,
     Clear,
     NotClear,
 }
@@ -35,10 +36,16 @@ fun PrinterStatus.resolveActivityKind(): PrinterActivityKind {
     return PrinterActivityKind.Busy
 }
 
-fun PrinterStatus.resolvePlateKind(): PlateIndicatorKind? =
-    awaitingPlateClear?.let { awaiting ->
+fun PrinterStatus.resolvePlateKind(): PlateIndicatorKind? {
+    if (!connected) return null
+    val raw = rawState?.uppercase()
+    if (raw == "RUNNING" || raw == "PAUSE") {
+        return PlateIndicatorKind.InUse
+    }
+    return awaitingPlateClear?.let { awaiting ->
         if (awaiting) PlateIndicatorKind.NotClear else PlateIndicatorKind.Clear
     }
+}
 
 fun PrinterActivityKind.progressSuffix(progress: Float?): String? {
     if (this != PrinterActivityKind.Printing) return null

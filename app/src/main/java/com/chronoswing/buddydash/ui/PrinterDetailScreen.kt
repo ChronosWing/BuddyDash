@@ -376,12 +376,6 @@ private fun ActivePrintStatusTab(
             label = stringResource(R.string.connection),
             value = labels.connection,
         )
-        labels.plateStatus?.let { plate ->
-            SecondaryNote(
-                label = stringResource(R.string.plate_status),
-                value = plate,
-            )
-        }
         if (labels.showPlateClearAction) {
             PlateClearButton(
                 labels = labels,
