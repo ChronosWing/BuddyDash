@@ -6,6 +6,7 @@ import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.BambuddyApiClient
+import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -41,6 +42,8 @@ enum class PlateClearSnackbar {
 enum class ControlSnackbar {
     Success,
     Failed,
+    StopSuccess,
+    StopFailed,
 }
 
 class PrinterDetailViewModel(
@@ -192,7 +195,10 @@ class PrinterDetailViewModel(
         apiClient.resumePrint(it.serverUrl, it.apiKey, printerId)
     }
 
-    fun stopPrint() = runControl {
+    fun stopPrint() = runControl(
+        successSnackbar = ControlSnackbar.StopSuccess,
+        failureSnackbar = ControlSnackbar.StopFailed,
+    ) {
         apiClient.stopPrint(it.serverUrl, it.apiKey, printerId)
     }
 
@@ -204,7 +210,21 @@ class PrinterDetailViewModel(
         }
     }
 
-    private fun runControl(block: suspend (PrinterDetailUiState) -> Result<Unit>) {
+    /** Bed up (toward nozzle) — negative Z per Bambuddy API. */
+    fun jogBedUp() = jogBed(-BED_JOG_STEP_MM)
+
+    /** Bed down (away from nozzle) — positive Z per Bambuddy API. */
+    fun jogBedDown() = jogBed(BED_JOG_STEP_MM)
+
+    private fun jogBed(distanceMm: Float) = runControl {
+        apiClient.bedJog(it.serverUrl, it.apiKey, printerId, distanceMm)
+    }
+
+    private fun runControl(
+        successSnackbar: ControlSnackbar = ControlSnackbar.Success,
+        failureSnackbar: ControlSnackbar = ControlSnackbar.Failed,
+        block: suspend (PrinterDetailUiState) -> Result<Unit>,
+    ) {
         if (printerId < 0) return
         val state = _uiState.value
         if (!state.hasCredentials || state.isControlBusy) return
@@ -216,7 +236,7 @@ class PrinterDetailViewModel(
                     _uiState.update {
                         it.copy(
                             isControlBusy = false,
-                            controlSnackbar = ControlSnackbar.Success,
+                            controlSnackbar = successSnackbar,
                         )
                     }
                     loadStatus(showLoading = false)
@@ -225,7 +245,7 @@ class PrinterDetailViewModel(
                     _uiState.update {
                         it.copy(
                             isControlBusy = false,
-                            controlSnackbar = ControlSnackbar.Failed,
+                            controlSnackbar = failureSnackbar,
                         )
                     }
                 },

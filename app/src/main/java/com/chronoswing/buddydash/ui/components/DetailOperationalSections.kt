@@ -6,21 +6,29 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.SingleBed
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DoorFront
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +42,7 @@ import com.chronoswing.buddydash.util.PrintSpeedMode
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.formatAmsHumidityCompact
 import com.chronoswing.buddydash.util.formatAmsTempCompact
+import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
 import com.chronoswing.buddydash.util.formatFanPercentCompact
 import com.chronoswing.buddydash.util.maintenanceDisplayLines
 
@@ -244,6 +253,129 @@ fun FilamentAmsEnvironmentSection(labels: PrinterDetailLabels) {
             AmsEnvironmentUnitRow(unit)
         }
     }
+}
+
+@Composable
+fun BedAdjustControl(
+    enabled: Boolean,
+    actionsEnabled: Boolean,
+    onOpenOptions: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        OutlinedButton(
+            onClick = onOpenOptions,
+            enabled = enabled && actionsEnabled,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SingleBed,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(stringResource(R.string.adjust_bed))
+            }
+        }
+        if (!enabled) {
+            Text(
+                text = stringResource(R.string.adjust_bed_unavailable),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+            )
+        }
+    }
+}
+
+@Composable
+fun BedAdjustOptionsDialog(
+    visible: Boolean,
+    stepMm: Float,
+    onDismiss: () -> Unit,
+    onRaiseBed: () -> Unit,
+    onLowerBed: () -> Unit,
+) {
+    if (!visible) return
+    val stepLabel = stepMm.toInt().toString()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.adjust_bed_dialog_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(R.string.adjust_bed_dialog_message, stepLabel),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(
+                    onClick = {
+                        onRaiseBed()
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.raise_bed, stepLabel),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+                TextButton(
+                    onClick = {
+                        onLowerBed()
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.lower_bed, stepLabel),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+fun ChamberLightControlChip(
+    isOn: Boolean,
+    enabled: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FilterChip(
+        selected = isOn,
+        onClick = { if (enabled) onToggle() },
+        enabled = enabled,
+        modifier = modifier,
+        label = {
+            Text(
+                stringResource(
+                    if (isOn) R.string.light_on else R.string.light_off,
+                ),
+            )
+        },
+        leadingIcon = if (isOn) {
+            {
+                Icon(
+                    imageVector = Icons.Default.Lightbulb,
+                    contentDescription = null,
+                )
+            }
+        } else {
+            null
+        },
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

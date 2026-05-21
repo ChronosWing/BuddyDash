@@ -244,6 +244,20 @@ class BambuddyApiClient {
         on: Boolean,
     ): Result<Unit> = postPrinterAction(serverUrl, apiKey, BambuddyApi.chamberLightPath(printerId, on))
 
+    suspend fun bedJog(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+        distanceMm: Float,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasBedJogEndpoint) {
+            return@withContext Result.failure(
+                UnsupportedOperationException("Bed jog endpoint not found"),
+            )
+        }
+        postPrinterAction(serverUrl, apiKey, BambuddyApi.bedJogPath(printerId, distanceMm))
+    }
+
     private suspend fun postPrinterAction(
         serverUrl: String,
         apiKey: String,
