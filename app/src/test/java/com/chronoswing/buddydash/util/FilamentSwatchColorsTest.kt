@@ -35,4 +35,12 @@ class FilamentSwatchColorsTest {
         assertEquals(1f, parseRgbaAlpha("FF0000FF"), 0.01f)
         assertTrue(parseRgbaAlpha("FF000080") < 0.6f)
     }
+
+    @Test
+    fun fromTrayColor_opaqueBlack() {
+        val swatch = FilamentSwatchColors.fromTrayColor("000000")
+        assertEquals(listOf("#000000"), swatch.colorHexes)
+        assertFalse(swatch.isTranslucent)
+        assertEquals(1f, swatch.alpha, 0.01f)
+    }
 }

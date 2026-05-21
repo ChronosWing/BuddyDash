@@ -1,16 +1,18 @@
 package com.chronoswing.buddydash.util
 
-/** Bambu / Bambuddy colors are RRGGBB or RRGGBBAA; use the first six hex digits as RGB. */
+/**
+ * Bambuddy filament colors: 6 hex digits = opaque RRGGBB (alpha FF), 8 = RRGGBBAA.
+ * Returns #RRGGBB for display; alpha/translucency is handled separately via [parseRgbaAlpha].
+ */
 fun normalizeTrayColor(raw: String?): String? {
     val trimmed = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     if (trimmed.equals("null", ignoreCase = true)) return null
-    val hex = trimmed.removePrefix("#")
+    val hex = trimmed.removePrefix("#").filter { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
     val rgb = when {
         hex.length >= 8 -> hex.substring(0, 6)
-        hex.length >= 6 -> hex.substring(0, 6)
+        hex.length == 6 -> hex
         else -> return null
     }
-    if (rgb.all { it == '0' }) return null
     return "#$rgb"
 }
 

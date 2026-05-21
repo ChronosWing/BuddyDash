@@ -24,8 +24,11 @@ data class FilamentSwatchColors(
     }
 }
 
+/** Full opacity for 6-digit RGB; reads AA from 8-digit RRGGBBAA only. */
 fun parseRgbaAlpha(raw: String?): Float {
-    val hex = raw?.trim()?.removePrefix("#") ?: return 1f
+    val hex = raw?.trim()?.removePrefix("#")
+        ?.filter { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
+        ?: return 1f
     if (hex.length < 8) return 1f
     return try {
         (hex.substring(6, 8).toInt(16) / 255f).coerceIn(0f, 1f)
@@ -36,7 +39,8 @@ fun parseRgbaAlpha(raw: String?): Float {
 
 fun isTranslucentEffect(effectType: String?, alpha: Float): Boolean {
     if (effectType.equals("translucent", ignoreCase = true)) return true
-    return alpha < 0.92f
+    if (effectType.equals("transparent", ignoreCase = true)) return true
+    return alpha < 255f / 255f - 1e-3f
 }
 
 fun parseExtraColorStops(extraColors: String?): List<String> {
