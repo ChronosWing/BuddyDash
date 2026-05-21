@@ -39,7 +39,7 @@ import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
-import com.chronoswing.buddydash.ui.components.FilamentChipRow
+import com.chronoswing.buddydash.ui.components.FilamentHomeGroupsRow
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterCoverImage
@@ -298,7 +298,10 @@ private fun GlancePrinterCard(
                 )
             }
 
-            FilamentChipRow(slots = labels.filamentSlots, compact = true)
+            FilamentHomeGroupsRow(
+                slots = labels.filamentSlots,
+                activeKey = labels.activeFilamentSlot,
+            )
         }
     }
 }

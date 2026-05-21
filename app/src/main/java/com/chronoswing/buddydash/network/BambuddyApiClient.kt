@@ -14,6 +14,7 @@ import com.chronoswing.buddydash.util.EXTERNAL_AMS_ID
 import com.chronoswing.buddydash.util.externalInventoryTrayId
 import com.chronoswing.buddydash.util.formatAmsSlotLabel
 import com.chronoswing.buddydash.util.formatAmsUnitLabel
+import com.chronoswing.buddydash.util.resolveActiveFilamentSlot
 import com.chronoswing.buddydash.util.isTrayLoaded
 import com.chronoswing.buddydash.util.normalizeFilamentType
 import com.chronoswing.buddydash.util.normalizeTrayColor
@@ -286,6 +287,7 @@ class BambuddyApiClient {
 
         val amsUnits = parseAmsUnits(json)
         val operational = parseOperationalFields(json, temperatures)
+        val filament = parseFilamentSlots(json, inventoryBySlot)
 
         return PrinterStatus(
             connected = json.optBoolean("connected", false),
@@ -309,7 +311,8 @@ class BambuddyApiClient {
             chamberTemp = operational.chamberTemp,
             hmsErrorCount = hmsErrors?.length() ?: 0,
             awaitingPlateClear = awaitingPlateClear,
-            filamentSlots = parseFilamentSlots(json, inventoryBySlot),
+            filamentSlots = filament.slots,
+            activeFilamentSlot = filament.activeKey,
             amsUnits = amsUnits,
             wifiSignalDbm = operational.wifiSignalDbm,
             wiredNetwork = operational.wiredNetwork,
@@ -448,10 +451,15 @@ class BambuddyApiClient {
         return PrinterMaintenanceOverview(items = items)
     }
 
+    private data class FilamentParseResult(
+        val slots: List<FilamentSlot>,
+        val activeKey: SlotInventoryKey?,
+    )
+
     private fun parseFilamentSlots(
         json: JSONObject,
         inventoryBySlot: Map<SlotInventoryKey, SlotInventoryInfo>,
-    ): List<FilamentSlot> {
+    ): FilamentParseResult {
         val printerName = json.optString("name", "")
         if (DEBUG_LOG_FILAMENT_RAW) {
             val printerId = json.optInt("id", -1)
@@ -507,12 +515,18 @@ class BambuddyApiClient {
                 )
             }
         }
-        return applyInventoryToSlots(
+        val enriched = applyInventoryToSlots(
             slots = slots,
             inventoryBySlot = inventoryBySlot,
             printerName = printerName.ifBlank { "printer ${json.optInt("id", -1)}" },
             logColors = DEBUG_LOG_FILAMENT_RAW,
         )
+        val activeKey = resolveActiveFilamentSlot(
+            statusJson = json,
+            slots = enriched,
+            logRaw = DEBUG_LOG_FILAMENT_RAW,
+        )
+        return FilamentParseResult(slots = enriched, activeKey = activeKey)
     }
 
     private fun parseTray(
@@ -533,6 +547,11 @@ class BambuddyApiClient {
                 "tray $label ams=$amsId tray=$trayId loaded=$loaded type=$type remainRaw=${trayJson.opt("remain")}",
             )
         }
+        val mqttTrayId = if (trayJson.has("id") && !trayJson.isNull("id")) {
+            trayJson.getInt("id")
+        } else {
+            null
+        }
         return FilamentSlot(
             label = label,
             filamentType = type,
@@ -545,6 +564,7 @@ class BambuddyApiClient {
             isLoaded = loaded,
             amsId = amsId,
             trayId = trayId,
+            mqttTrayId = mqttTrayId,
         )
     }
 
