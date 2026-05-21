@@ -9,4 +9,6 @@ data class MaintenanceItem(
 
 data class PrinterMaintenanceOverview(
     val items: List<MaintenanceItem> = emptyList(),
+    /** Lifetime print hours from Bambuddy maintenance overview. */
+    val totalPrintHours: Double? = null,
 )

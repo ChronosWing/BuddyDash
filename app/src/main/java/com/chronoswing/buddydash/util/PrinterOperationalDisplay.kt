@@ -36,6 +36,35 @@ fun formatPrintSpeedLevel(level: Int?): String? =
 fun formatChamberTempCompact(tempC: Double?): String? =
     tempC?.let { "${it.roundToInt()}°" }
 
+/** Compact lifetime print time from Bambuddy `total_print_hours`, e.g. 3h 12m or 2d 4h. */
+fun formatTotalPrintTimeCompact(hours: Double?): String? {
+    if (hours == null || hours <= 0.0) return null
+    val totalMinutes = (hours * 60.0).roundToInt()
+    if (totalMinutes < 1) return null
+    val days = totalMinutes / (24 * 60)
+    val hoursPart = (totalMinutes % (24 * 60)) / 60
+    val minutesPart = totalMinutes % 60
+    return when {
+        days > 0 -> if (hoursPart > 0) "${days}d ${hoursPart}h" else "${days}d"
+        hoursPart > 0 -> if (minutesPart > 0) "${hoursPart}h ${minutesPart}m" else "${hoursPart}h"
+        else -> "${minutesPart}m"
+    }
+}
+
+/** Parse API nozzle_diameter string to display form, e.g. "0.4 mm". */
+fun formatNozzleDiameterDisplay(raw: String?): String? {
+    val cleaned = raw?.trim()?.removeSuffix("mm")?.trim() ?: return null
+    if (cleaned.isBlank()) return null
+    val value = cleaned.toDoubleOrNull() ?: return null
+    if (value <= 0.0) return null
+    val numeric = if (value == value.toLong().toDouble()) {
+        value.toLong().toString()
+    } else {
+        "%.2f".format(value).trimEnd('0').trimEnd('.')
+    }
+    return "$numeric mm"
+}
+
 fun formatAmsTempCompact(tempC: Double?): String? =
     tempC?.let { "${it.roundToInt()}°" }
 
@@ -95,11 +124,13 @@ fun maintenanceDisplayLines(items: List<MaintenanceItem>): List<MaintenanceLine>
             MaintenanceLine(name = shortenMaintenanceName(item.name), kind = kind)
         }
 
-fun PrinterStatus.hasConnectivitySection(): Boolean =
+fun PrinterStatus.hasConnectivitySection(totalPrintHours: Double? = null): Boolean =
     formatWifiCompact(wifiSignalDbm, wiredNetwork) != null ||
         formatDoorState(doorOpen) != null ||
         !firmwareVersion.isNullOrBlank() ||
-        chamberTemp != null
+        chamberTemp != null ||
+        formatTotalPrintTimeCompact(totalPrintHours) != null ||
+        !nozzleDiameterDisplay.isNullOrBlank()
 
 fun PrinterStatus.hasFansSection(): Boolean =
     partFanPercent != null || auxFanPercent != null || chamberFanPercent != null

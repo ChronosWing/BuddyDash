@@ -14,6 +14,7 @@ import com.chronoswing.buddydash.util.EXTERNAL_AMS_ID
 import com.chronoswing.buddydash.util.externalInventoryTrayId
 import com.chronoswing.buddydash.util.formatAmsSlotLabel
 import com.chronoswing.buddydash.util.formatAmsUnitLabel
+import com.chronoswing.buddydash.util.formatNozzleDiameterDisplay
 import com.chronoswing.buddydash.util.resolveActiveFilamentSlot
 import com.chronoswing.buddydash.util.isTrayLoaded
 import com.chronoswing.buddydash.util.normalizeFilamentType
@@ -288,6 +289,7 @@ class BambuddyApiClient {
         val amsUnits = parseAmsUnits(json)
         val operational = parseOperationalFields(json, temperatures)
         val filament = parseFilamentSlots(json, inventoryBySlot)
+        val metadata = parsePrinterMetadata(json)
 
         return PrinterStatus(
             connected = json.optBoolean("connected", false),
@@ -323,7 +325,50 @@ class BambuddyApiClient {
             chamberFanPercent = operational.chamberFanPercent,
             speedLevel = operational.speedLevel,
             chamberLightOn = operational.chamberLightOn,
+            nozzleDiameterDisplay = metadata.nozzleDiameterDisplay,
         )
+    }
+
+    private data class PrinterMetadataFields(
+        val nozzleDiameterDisplay: String?,
+    )
+
+    private fun parsePrinterMetadata(json: JSONObject): PrinterMetadataFields {
+        val activeExtruder = json.optInt("active_extruder", 0)
+        val nozzleDiameterDisplay = parseNozzleDiameterFromStatus(json, activeExtruder)
+
+        if (DEBUG_LOG_DETAIL_RAW) {
+            Log.d(
+                TAG_DETAIL,
+                "metadata active_extruder=$activeExtruder " +
+                    "nozzles=${json.optJSONArray("nozzles")?.length() ?: 0} " +
+                    "nozzle_rack=${json.optJSONArray("nozzle_rack")?.length() ?: 0} " +
+                    "nozzleDiameter=$nozzleDiameterDisplay",
+            )
+        }
+
+        return PrinterMetadataFields(nozzleDiameterDisplay = nozzleDiameterDisplay)
+    }
+
+    private fun parseNozzleDiameterFromStatus(json: JSONObject, activeExtruder: Int): String? {
+        parseNozzleDiameterFromArray(json.optJSONArray("nozzles"), activeExtruder)
+            ?.let { return it }
+        return parseNozzleDiameterFromArray(json.optJSONArray("nozzle_rack"), activeExtruder)
+    }
+
+    private fun parseNozzleDiameterFromArray(array: JSONArray?, activeExtruder: Int): String? {
+        if (array == null || array.length() == 0) return null
+        val indices = buildList {
+            add(activeExtruder)
+            for (i in 0 until array.length()) {
+                if (i != activeExtruder) add(i)
+            }
+        }
+        for (index in indices) {
+            val entry = array.optJSONObject(index) ?: continue
+            formatNozzleDiameterDisplay(entry.optString("nozzle_diameter"))?.let { return it }
+        }
+        return null
     }
 
     private data class OperationalFields(
@@ -445,10 +490,19 @@ class BambuddyApiClient {
                 enabled = item.optBoolean("enabled", true),
             )
         }
+        val totalPrintHours = json.optDouble("total_print_hours")
+            .takeIf { json.has("total_print_hours") && !json.isNull("total_print_hours") && it > 0.0 }
         if (DEBUG_LOG_DETAIL_RAW) {
-            Log.d(TAG_DETAIL, "maintenance items=${items.size} due=${json.optInt("due_count")} warn=${json.optInt("warning_count")}")
+            Log.d(
+                TAG_DETAIL,
+                "maintenance items=${items.size} due=${json.optInt("due_count")} " +
+                    "warn=${json.optInt("warning_count")} total_print_hours=$totalPrintHours",
+            )
         }
-        return PrinterMaintenanceOverview(items = items)
+        return PrinterMaintenanceOverview(
+            items = items,
+            totalPrintHours = totalPrintHours,
+        )
     }
 
     private data class FilamentParseResult(
