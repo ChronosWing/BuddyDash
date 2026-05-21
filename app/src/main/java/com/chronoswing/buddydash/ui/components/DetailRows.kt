@@ -31,6 +31,7 @@ fun CompactIconStat(
     modifier: Modifier = Modifier,
     iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    microLabel: String? = null,
 ) {
     Row(
         modifier = modifier,
@@ -43,6 +44,14 @@ fun CompactIconStat(
             modifier = Modifier.size(18.dp),
             tint = iconTint,
         )
+        microLabel?.let { tag ->
+            Text(
+                text = tag,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium,
+            )
+        }
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,

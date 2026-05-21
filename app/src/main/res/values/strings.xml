@@ -92,9 +92,11 @@
     <string name="light_off">Light off</string>
     <string name="control_success">Command sent</string>
     <string name="control_failed">Command failed</string>
-    <string name="maintenance_ok_suffix">OK</string>
-    <string name="maintenance_soon_suffix">soon</string>
     <string name="maintenance_due_suffix">due</string>
+    <string name="firmware_compact">FW %1$s</string>
+    <string name="fan_tag_part">P</string>
+    <string name="fan_tag_aux">A</string>
+    <string name="fan_tag_chamber">C</string>
     <string name="cd_wifi">Wi-Fi signal %1$s</string>
     <string name="cd_door">Door %1$s</string>
     <string name="cd_firmware">Firmware %1$s</string>
