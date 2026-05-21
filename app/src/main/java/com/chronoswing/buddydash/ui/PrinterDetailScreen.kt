@@ -59,8 +59,7 @@ import com.chronoswing.buddydash.ui.components.PrintSpeedControlChips
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.ErrorContent
-import com.chronoswing.buddydash.ui.components.FilamentChipRow
-import com.chronoswing.buddydash.ui.components.FilamentSlotDetailHeader
+import com.chronoswing.buddydash.ui.components.FilamentDetailGroups
 import com.chronoswing.buddydash.ui.components.HighlightValue
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.PrintFileHighlight
@@ -73,7 +72,6 @@ import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildPrintHeadline
-import com.chronoswing.buddydash.util.normalizeFilamentType
 import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
 import com.chronoswing.buddydash.util.toDetailLabels
 
@@ -491,29 +489,11 @@ private fun FilamentTab(labels: PrinterDetailLabels) {
         return
     }
     FilamentAmsEnvironmentSection(labels)
-    FilamentChipRow(slots = slots, compact = false, modifier = Modifier.fillMaxWidth())
-    slots.forEach { slot ->
-        val typeLabel = if (slot.isLoaded) {
-            normalizeFilamentType(slot.filamentType)?.uppercase()
-                ?: stringResource(R.string.filament_unknown)
-        } else {
-            stringResource(R.string.filament_empty)
-        }
-        DetailInfoCard {
-            FilamentSlotDetailHeader(slot = slot, typeLabel = typeLabel)
-            if (slot.isLoaded) {
-                slot.remainPercent?.let { remain ->
-                    CompactLabelValue(
-                        label = stringResource(R.string.filament_remaining),
-                        value = "$remain%",
-                    )
-                }
-                slot.metadata?.let { meta ->
-                    CompactLabelValue(label = stringResource(R.string.filament_metadata), value = meta)
-                }
-            }
-        }
-    }
+    FilamentDetailGroups(
+        slots = slots,
+        activeKey = labels.activeFilamentSlot,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable

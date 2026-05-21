@@ -1,5 +1,7 @@
 package com.chronoswing.buddydash.data.model
 
+import com.chronoswing.buddydash.util.SlotInventoryKey
+
 data class Printer(
     val id: Int,
     val name: String,
@@ -20,6 +22,8 @@ data class PrinterStatus(
     /** Present only when the API includes `awaiting_plate_clear`; do not infer. */
     val awaitingPlateClear: Boolean? = null,
     val filamentSlots: List<FilamentSlot> = emptyList(),
+    /** Active toolhead tray from `tray_now` when matched to a known slot; null if unknown. */
+    val activeFilamentSlot: SlotInventoryKey? = null,
     val amsUnits: List<AmsUnitInfo> = emptyList(),
     val wifiSignalDbm: Int? = null,
     val wiredNetwork: Boolean? = null,

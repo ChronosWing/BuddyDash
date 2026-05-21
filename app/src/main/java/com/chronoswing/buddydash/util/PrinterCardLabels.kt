@@ -25,6 +25,7 @@ data class PrinterCardLabels(
     val nozzleTemp: String,
     val bedTemp: String,
     val filamentSlots: List<FilamentSlot>,
+    val activeFilamentSlot: SlotInventoryKey? = null,
 )
 
 fun Printer.toCardLabels(): PrinterCardLabels {
@@ -52,6 +53,7 @@ fun Printer.toCardLabels(): PrinterCardLabels {
             nozzleTemp = "—",
             bedTemp = "—",
             filamentSlots = emptyList(),
+            activeFilamentSlot = null,
         )
     }
     val detail = status.toDetailLabels()
@@ -110,5 +112,6 @@ fun Printer.toCardLabels(): PrinterCardLabels {
         nozzleTemp = detail.nozzleTemp,
         bedTemp = detail.bedTemp,
         filamentSlots = status.filamentSlots,
+        activeFilamentSlot = status.activeFilamentSlot,
     )
 }
