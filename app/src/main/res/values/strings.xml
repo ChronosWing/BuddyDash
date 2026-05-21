@@ -18,6 +18,11 @@
     <string name="close_search">Close search</string>
     <string name="clear_search">Clear search</string>
     <string name="no_printers_match_search">No printers found</string>
+    <string name="filter_all">All</string>
+    <string name="filter_active">Active</string>
+    <string name="filter_needs_attention">Needs attention</string>
+    <string name="no_active_printers">No active printers</string>
+    <string name="no_printers_need_attention">No printers need attention</string>
     <string name="online">Online</string>
     <string name="offline">Offline</string>
     <string name="printer_status_label">Status: %1$s</string>
