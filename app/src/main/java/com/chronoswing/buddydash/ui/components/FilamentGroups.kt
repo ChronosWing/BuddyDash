@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -370,12 +372,10 @@ private fun LoadedFilamentSlotChip(
                     }
                 }
                 if (compact) {
-                    slot.remainPercent?.let { remain ->
-                        Text(
-                            text = "$remain%",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = muted.copy(alpha = 0.58f),
-                            fontWeight = FontWeight.Normal,
+                    slot.remainPercent?.takeIf { slot.isLoaded }?.let { remain ->
+                        FilamentRemainMiniBar(
+                            remainPercent = remain,
+                            modifier = Modifier.padding(top = 2.dp),
                         )
                     }
                 }
@@ -606,6 +606,50 @@ private fun DrawScope.drawActiveFilamentGlow(
             size = Size(size.width + spreadPx * 2, size.height + spreadPx * 2),
             cornerRadius = CornerRadius(cornerPx + spreadPx),
         )
+    }
+}
+
+/** Thin remaining-filament bar for Home compact chips only. */
+@Composable
+private fun FilamentRemainMiniBar(
+    remainPercent: Int,
+    modifier: Modifier = Modifier,
+) {
+    val fraction = remainPercent.coerceIn(0, 100) / 100f
+    val fillColor = filamentRemainBarColor(remainPercent)
+    val trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
+    val barHeight = 3.dp
+    val barWidth = 44.dp
+    val shape = RoundedCornerShape(barHeight / 2)
+
+    Box(
+        modifier = modifier
+            .width(barWidth)
+            .height(barHeight)
+            .clip(shape)
+            .background(trackColor),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(fraction)
+                .clip(shape)
+                .background(fillColor),
+        )
+    }
+}
+
+private fun filamentRemainBarColor(percent: Int): Color {
+    val green = Color(0xFF5CB85C)
+    val amber = Color(0xFFFFB74D)
+    val orange = Color(0xFFFF8A50)
+    val red = Color(0xFFEF5350)
+    val p = percent.coerceIn(0, 100)
+    return when {
+        p >= 70 -> green
+        p >= 30 -> lerp(amber, green, (p - 30) / 40f)
+        p >= 10 -> lerp(orange, amber, (p - 10) / 20f)
+        else -> lerp(red, orange, p / 10f)
     }
 }
 
