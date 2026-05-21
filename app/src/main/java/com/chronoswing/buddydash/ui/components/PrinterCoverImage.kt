@@ -2,6 +2,9 @@ package com.chronoswing.buddydash.ui.components
 
 import android.util.Log
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -10,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -23,6 +28,12 @@ import com.chronoswing.buddydash.network.printerCoverUrl
 /** Temporary: log cover URL and load failures. Set false before release. */
 private const val DEBUG_LOG_COVER = true
 private const val TAG_COVER = "BuddyDash/Cover"
+
+private val CoverScrimGradient = Brush.verticalGradient(
+    0f to Color.Transparent,
+    0.5f to Color.Transparent,
+    1f to Color.Black.copy(alpha = 0.38f),
+)
 
 @Composable
 fun PrinterCoverImage(
@@ -77,18 +88,25 @@ fun PrinterCoverImage(
         loading = { },
         error = { },
         success = { state ->
-            val imageModifier = when {
+            val frameModifier = when {
                 height != null -> Modifier
                     .fillMaxWidth()
                     .height(height)
                 else -> Modifier.size(size!!)
             }
-            Image(
-                painter = state.painter,
-                contentDescription = stringResource(R.string.print_cover),
-                modifier = imageModifier.clip(shape),
-                contentScale = ContentScale.Crop,
-            )
+            Box(modifier = frameModifier.clip(shape)) {
+                Image(
+                    painter = state.painter,
+                    contentDescription = stringResource(R.string.print_cover),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(CoverScrimGradient),
+                )
+            }
         },
     )
 }

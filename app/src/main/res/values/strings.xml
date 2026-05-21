@@ -30,6 +30,8 @@
     <string name="eta">ETA</string>
     <string name="nozzle_temp">Nozzle temp</string>
     <string name="bed_temp">Bed temp</string>
+    <string name="nozzle_temp_value">Nozzle %1$s</string>
+    <string name="bed_temp_value">Bed %1$s</string>
     <string name="connection">Connection</string>
     <string name="hms_health">HMS health</string>
     <string name="last_print_result_short">Last print</string>

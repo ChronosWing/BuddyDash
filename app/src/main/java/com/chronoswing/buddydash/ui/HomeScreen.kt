@@ -40,6 +40,8 @@ import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentChipRow
+import com.chronoswing.buddydash.ui.components.PrintFileNameText
+import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterCoverImage
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
@@ -245,11 +247,9 @@ private fun GlancePrinterCard(
                             )
                         }
                         labels.fileLine?.let { file ->
-                            Text(
-                                text = file,
+                            PrintFileNameText(
+                                fileName = file,
                                 style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                         labels.etaLine?.let { eta ->
@@ -280,20 +280,18 @@ private fun GlancePrinterCard(
                 }
 
                 labels.fileLine?.let { file ->
-                    Text(
-                        text = file,
+                    PrintFileNameText(
+                        fileName = file,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
 
-            labels.tempsLine?.let { temps ->
-                Text(
-                    text = temps,
-                    style = MaterialTheme.typography.labelMedium,
+            if (labels.tempsLine != null) {
+                PrintTempsRow(
+                    nozzleTemp = labels.nozzleTemp,
+                    bedTemp = labels.bedTemp,
                 )
             }
 
