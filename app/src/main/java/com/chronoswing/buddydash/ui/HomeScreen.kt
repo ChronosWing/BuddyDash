@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -56,6 +55,7 @@ import com.chronoswing.buddydash.ui.components.PrinterCoverImage
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.LoadingContent
+import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
 import com.chronoswing.buddydash.util.HOME_PRINTER_SEARCH_MIN_COUNT
 import com.chronoswing.buddydash.util.PrinterCardLabels
 import com.chronoswing.buddydash.util.HomePrinterSearchFilter
@@ -93,6 +93,7 @@ fun HomeScreen(
         onPullRefresh = {
             viewModel.loadPrinters(showLoading = false, fromPull = true)
         },
+        lastUpdatedAtMillis = uiState.lastUpdatedAtMillis,
         onPrinterClick = onPrinterClick,
     )
 }
@@ -109,6 +110,7 @@ private fun HomeScreenContent(
     cameraToken: String,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
+    lastUpdatedAtMillis: Long?,
     onPrinterClick: (Printer) -> Unit,
 ) {
     val showPrinterSearch = printers.size >= HOME_PRINTER_SEARCH_MIN_COUNT
@@ -136,7 +138,27 @@ private fun HomeScreenContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
+                title = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.app_name),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        StatusLastUpdatedIndicator(
+                            lastUpdatedAtMillis = lastUpdatedAtMillis,
+                            isRefreshing = isRefreshing,
+                            enabled = hasCredentials && !isLoading,
+                            onRefresh = onRefresh,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                },
                 actions = {
                     if (showPrinterSearch) {
                         IconButton(
@@ -156,9 +178,6 @@ private fun HomeScreenContent(
                                 ),
                             )
                         }
-                    }
-                    IconButton(onClick = onRefresh, enabled = hasCredentials && !isLoading) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                     }
                 },
             )
