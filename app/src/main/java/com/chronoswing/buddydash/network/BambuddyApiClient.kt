@@ -3,6 +3,7 @@ package com.chronoswing.buddydash.network
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.util.FilamentSwatchColors
 import com.chronoswing.buddydash.util.SlotInventoryInfo
 import com.chronoswing.buddydash.util.SlotInventoryKey
 import com.chronoswing.buddydash.util.applyInventoryToSlots
@@ -300,9 +301,9 @@ class BambuddyApiClient {
     ): FilamentSlot {
         val trayJson = tray ?: JSONObject()
         val type = normalizeFilamentType(trayJson.optString("tray_type"))
-        val color = normalizeTrayColor(trayJson.optString("tray_color"))
+        val traySwatch = FilamentSwatchColors.fromTrayColor(trayJson.optString("tray_color"))
         val meta = trayJson.optString("tray_id_name").takeIf { it.isNotBlank() }
-        val loaded = isTrayLoaded(type, color, remainPercent = null, meta)
+        val loaded = isTrayLoaded(type, traySwatch.colorHexes.firstOrNull(), remainPercent = null, meta)
         if (DEBUG_LOG_FILAMENT_RAW) {
             Log.d(
                 TAG_FILAMENT,
@@ -312,7 +313,9 @@ class BambuddyApiClient {
         return FilamentSlot(
             label = label,
             filamentType = type,
-            colorHex = color,
+            swatchColorHexes = traySwatch.colorHexes,
+            isTranslucent = traySwatch.isTranslucent,
+            colorAlpha = traySwatch.alpha,
             remainPercent = null,
             metadata = meta,
             isExternal = isExternal,

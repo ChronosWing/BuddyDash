@@ -16,7 +16,7 @@ data class SlotInventoryKey(
 
 data class SlotInventoryInfo(
     val remainPercent: Int?,
-    val colorHex: String?,
+    val swatch: FilamentSwatchColors,
     val spoolId: Int,
     val spoolName: String,
 )
@@ -65,13 +65,15 @@ fun spoolDisplayName(spool: JSONObject): String {
     return label.ifBlank { if (id >= 0) "spool#$id" else "spool" }
 }
 
-fun parseSlotInventoryInfo(spool: JSONObject): SlotInventoryInfo =
-    SlotInventoryInfo(
+fun parseSlotInventoryInfo(spool: JSONObject): SlotInventoryInfo {
+    val swatch = parseFilamentSwatchFromSpool(spool)
+    return SlotInventoryInfo(
         remainPercent = inventoryFillPercentFromSpool(spool),
-        colorHex = normalizeInventoryColor(spool.optString("rgba")),
+        swatch = swatch,
         spoolId = spool.optInt("id", -1),
         spoolName = spoolDisplayName(spool),
     )
+}
 
 fun parseInventoryByPrinter(assignments: JSONArray): Map<Int, Map<SlotInventoryKey, SlotInventoryInfo>> {
     val byPrinter = mutableMapOf<Int, MutableMap<SlotInventoryKey, SlotInventoryInfo>>()
@@ -95,22 +97,28 @@ fun applyInventoryToSlots(
     logColors: Boolean = true,
 ): List<FilamentSlot> =
     slots.map { slot ->
-        val trayColor = slot.colorHex
         val key = slot.inventoryKey
         val inventory = key?.let { inventoryBySlot[it] }
-        val displayColor = inventory?.colorHex ?: trayColor
+        val swatch = inventory?.swatch ?: FilamentSwatchColors(
+            colorHexes = slot.swatchColorHexes,
+            isTranslucent = slot.isTranslucent,
+            alpha = slot.colorAlpha,
+        )
         if (logColors) {
             Log.d(
                 TAG_FILAMENT_COLOR,
                 "printer=$printerName slot=${slot.label} " +
-                    "trayType=${slot.filamentType} trayColor=$trayColor " +
+                    "trayType=${slot.filamentType} " +
                     "inventorySpool=${inventory?.spoolName ?: "none"} " +
                     "inventorySpoolId=${inventory?.spoolId?.takeIf { it >= 0 } ?: "n/a"} " +
-                    "inventoryColor=${inventory?.colorHex} displayedColor=$displayColor",
+                    "colors=${swatch.colorHexes} " +
+                    "translucent=${swatch.isTranslucent} alpha=${swatch.alpha}",
             )
         }
         slot.copy(
-            colorHex = displayColor,
+            swatchColorHexes = swatch.colorHexes,
+            isTranslucent = swatch.isTranslucent,
+            colorAlpha = swatch.alpha,
             remainPercent = inventory?.remainPercent ?: slot.remainPercent,
         )
     }
