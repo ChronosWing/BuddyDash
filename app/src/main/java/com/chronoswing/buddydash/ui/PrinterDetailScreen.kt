@@ -62,6 +62,7 @@ import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentDetailGroups
+import com.chronoswing.buddydash.ui.components.FilamentUsageText
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
 import com.chronoswing.buddydash.ui.components.DetailPrintQueueSection
 import com.chronoswing.buddydash.ui.components.DetailStatusHeroImage
@@ -111,6 +112,7 @@ fun PrinterDetailScreen(
         maintenanceItems = uiState.maintenanceItems,
         totalPrintHours = uiState.totalPrintHours,
         printerModel = uiState.printerModel ?: printerModel,
+        activePrintFilamentUsage = uiState.activePrintFilamentUsage,
     )
 
     PrinterDetailScreenContent(
@@ -447,6 +449,12 @@ private fun ActivePrintStatusTab(
         }
         if (labels.showEta) {
             CompactLabelValue(label = stringResource(R.string.eta), value = labels.eta)
+        }
+        labels.filamentUsageCompact?.let { usage ->
+            FilamentUsageText(
+                text = usage,
+                modifier = Modifier.padding(top = 2.dp),
+            )
         }
         if (labels.tempsLine != null) {
             PrintTempsRow(

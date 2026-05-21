@@ -1,6 +1,7 @@
 package com.chronoswing.buddydash.util
 
 import com.chronoswing.buddydash.data.model.AmsUnitInfo
+import com.chronoswing.buddydash.data.model.FilamentUsage
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.PrinterStatus
@@ -30,6 +31,8 @@ data class PrinterDetailLabels(
     val plateClearEndpointAvailable: Boolean,
     val showEta: Boolean,
     val eta: String,
+    /** Compact filament usage near ETA, e.g. "🧵 86g • 28.4m". */
+    val filamentUsageCompact: String?,
     val tempsLine: String?,
     val hmsSummary: String,
     val nozzleTemp: String,
@@ -72,6 +75,7 @@ fun PrinterStatus.toDetailLabels(
     maintenanceItems: List<MaintenanceItem> = emptyList(),
     totalPrintHours: Double? = null,
     printerModel: String? = null,
+    activePrintFilamentUsage: FilamentUsage? = null,
 ): PrinterDetailLabels {
     val raw = rawState?.uppercase()
     val isPrinting = raw == "RUNNING"
@@ -109,6 +113,12 @@ fun PrinterStatus.toDetailLabels(
     }
 
     val activityKind = resolveActivityKind()
+    val resolvedFilamentUsage = filamentUsage ?: activePrintFilamentUsage
+    val filamentUsageCompact = if (isActivePrint) {
+        formatFilamentUsageCompact(resolvedFilamentUsage)
+    } else {
+        null
+    }
     return PrinterDetailLabels(
         isActivePrint = isActivePrint,
         activityKind = activityKind,
@@ -130,6 +140,7 @@ fun PrinterStatus.toDetailLabels(
         plateClearEndpointAvailable = BambuddyApi.hasClearPlateEndpoint,
         showEta = isActivePrint && formatEta(remainingTimeSeconds) != null,
         eta = formatEta(remainingTimeSeconds).orEmpty(),
+        filamentUsageCompact = filamentUsageCompact,
         tempsLine = if (isActivePrint) formatPrintTempsLine(nozzleTemp, bedTemp) else null,
         hmsSummary = formatHmsSummary(hmsErrorCount),
         nozzleTemp = formatTemp(nozzleTemp),

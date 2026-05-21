@@ -1,6 +1,6 @@
 package com.chronoswing.buddydash.data.model
 
-/** Upcoming queued print (read-only); excludes the job currently printing on the printer. */
+/** Queued or in-progress print job (read-only). */
 data class PrintQueueJob(
     val id: Int,
     val position: Int,
@@ -18,4 +18,6 @@ data class PrintQueueJob(
     /** Bambuddy `plate_id` — 1-based plate index for plate-thumbnail endpoints. */
     val plateId: Int? = null,
     val estimatedDurationSeconds: Int? = null,
+    /** From OpenAPI `filament_used_grams` or other documented usage fields when present. */
+    val filamentUsage: FilamentUsage? = null,
 )

@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.util
 
+import com.chronoswing.buddydash.data.model.FilamentUsage
 import com.chronoswing.buddydash.data.model.PrintQueueJob
 import com.chronoswing.buddydash.network.BambuddyApi
 import org.json.JSONObject
@@ -53,6 +54,11 @@ val QUEUE_DURATION_KEYS = listOf(
     "duration_seconds",
     "remaining_time_seconds",
 )
+
+/** Re-export for queue parsing / debug logs. */
+val QUEUE_FILAMENT_USAGE_WEIGHT_KEYS = FILAMENT_USAGE_WEIGHT_GRAMS_KEYS
+
+val QUEUE_FILAMENT_USAGE_LENGTH_KEYS = FILAMENT_USAGE_LENGTH_METERS_KEYS
 
 /** Matches Bambuddy web queue thumbnail routing (QueuePage.tsx). */
 enum class QueueThumbnailSource {
@@ -154,6 +160,24 @@ fun queueDurationFieldCandidates(json: JSONObject): Map<String, String?> =
     QUEUE_DURATION_KEYS.associateWith { key ->
         if (!json.has(key) || json.isNull(key)) null else json.opt(key)?.toString()
     }
+
+fun queueFilamentUsageFieldCandidates(json: JSONObject): Map<String, String?> =
+    filamentUsageWeightFieldCandidates(json) + filamentUsageLengthFieldCandidates(json)
+
+fun resolveQueueFilamentUsage(json: JSONObject): FilamentUsage? =
+    resolveFilamentUsageFromJson(json)
+
+/** Duration + filament on one line, e.g. "44m • 🧵 12g". */
+fun formatQueueDurationAndFilament(durationSeconds: Int?, usage: FilamentUsage?): String? {
+    val duration = formatQueueDuration(durationSeconds)
+    val filament = formatFilamentUsageCompact(usage)
+    return when {
+        duration != null && filament != null -> "$duration • $filament"
+        duration != null -> duration
+        filament != null -> filament
+        else -> null
+    }
+}
 
 /** Same routing as Bambuddy web `SortableQueueItem` in QueuePage.tsx. */
 fun resolveQueueThumbnailSource(job: PrintQueueJob): QueueThumbnailResolution {

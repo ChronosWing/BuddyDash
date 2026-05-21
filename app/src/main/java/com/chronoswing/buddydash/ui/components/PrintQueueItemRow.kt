@@ -31,7 +31,7 @@ import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.PrintQueueJob
 import com.chronoswing.buddydash.network.queueJobThumbnailUrl
 import com.chronoswing.buddydash.util.QUEUE_DISPLAY_NAME_FALLBACK
-import com.chronoswing.buddydash.util.formatQueueDuration
+import com.chronoswing.buddydash.util.formatQueueDurationAndFilament
 
 private const val DEBUG_LOG_QUEUE_THUMB = true
 private const val TAG_QUEUE_THUMB = "BuddyDash/Queue"
@@ -44,7 +44,7 @@ fun PrintQueueItemRow(
     cameraToken: String,
     modifier: Modifier = Modifier,
 ) {
-    val duration = formatQueueDuration(job.estimatedDurationSeconds)
+    val metaLine = formatQueueDurationAndFilament(job.estimatedDurationSeconds, job.filamentUsage)
     val thumbResult = remember(serverUrl, cameraToken, job) {
         queueJobThumbnailUrl(serverUrl, cameraToken, job)
     }
@@ -60,7 +60,7 @@ fun PrintQueueItemRow(
         LaunchedEffect(job.id, thumbResult, displayName) {
             Log.d(
                 TAG_QUEUE_THUMB,
-                "jobId=${job.id} name=$displayName duration=$duration " +
+                "jobId=${job.id} name=$displayName meta=$metaLine " +
                     "source=${thumbResult.source} finalUrl=${redactToken(thumbUrl.orEmpty())}",
             )
         }
@@ -92,12 +92,8 @@ fun PrintQueueItemRow(
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
-            duration?.let { dur ->
-                Text(
-                    text = dur,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                )
+            metaLine?.let { line ->
+                FilamentUsageText(text = line)
             }
         }
     }

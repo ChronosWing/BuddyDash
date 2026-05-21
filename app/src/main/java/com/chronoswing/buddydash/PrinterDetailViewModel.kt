@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.MaintenanceItem
+import com.chronoswing.buddydash.data.model.FilamentUsage
 import com.chronoswing.buddydash.data.model.PrintQueueJob
+import com.chronoswing.buddydash.data.model.PrinterQueueSnapshot
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
@@ -41,6 +43,8 @@ data class PrinterDetailUiState(
     /** Epoch millis of last successful status fetch (for passive refresh indicator). */
     val lastStatusUpdatedAtMillis: Long? = null,
     val queueUpcoming: List<PrintQueueJob> = emptyList(),
+    /** Filament for active print: status JSON, else queue job with status=printing. */
+    val activePrintFilamentUsage: FilamentUsage? = null,
 )
 
 enum class PlateClearSnackbar {
@@ -136,14 +140,18 @@ class PrinterDetailViewModel(
                     apiClient.fetchMaintenance(state.serverUrl, state.apiKey, printerId).getOrNull()
                 }
                 val queueDeferred = async {
-                    apiClient.fetchPrintQueue(state.serverUrl, state.apiKey, printerId).getOrNull()
-                        .orEmpty()
+                    apiClient.fetchPrinterQueueSnapshot(state.serverUrl, state.apiKey, printerId)
+                        .getOrNull()
+                        ?: PrinterQueueSnapshot()
                 }
                 Triple(statusDeferred.await(), maintenanceDeferred.await(), queueDeferred.await())
             }
 
             statusResult.first.fold(
                 onSuccess = { status ->
+                    val queueSnapshot = statusResult.third
+                    val activeFilament = status.filamentUsage
+                        ?: queueSnapshot.printing?.filamentUsage
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -151,7 +159,8 @@ class PrinterDetailViewModel(
                             status = status,
                             maintenanceItems = statusResult.second?.items.orEmpty(),
                             totalPrintHours = statusResult.second?.totalPrintHours,
-                            queueUpcoming = statusResult.third,
+                            queueUpcoming = queueSnapshot.upcoming,
+                            activePrintFilamentUsage = activeFilament,
                             error = null,
                             lastStatusUpdatedAtMillis = System.currentTimeMillis(),
                         )
@@ -166,6 +175,7 @@ class PrinterDetailViewModel(
                             maintenanceItems = emptyList(),
                             totalPrintHours = null,
                             queueUpcoming = emptyList(),
+                            activePrintFilamentUsage = null,
                             error = error.message ?: "Failed to load printer status",
                         )
                     }
