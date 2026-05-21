@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -89,12 +88,13 @@ fun SpoolInventoryRow(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        LinearProgressIndicator(
-                            progress = { percent / 100f },
+                        FilamentRemainingBar(
+                            remainPercent = percent,
                             modifier = Modifier
                                 .weight(1f)
                                 .padding(top = 2.dp),
-                            trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f),
+                            height = 4.dp,
+                            barWidth = null,
                         )
                         Text(
                             text = stringResource(R.string.spool_remain_percent, percent),
