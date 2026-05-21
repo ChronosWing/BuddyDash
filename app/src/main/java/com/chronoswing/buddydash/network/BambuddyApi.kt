@@ -38,6 +38,12 @@ object BambuddyApi {
     /** GET — list print queue (OpenAPI: list_queue_api_v1_queue__get). */
     const val QUEUE_PATH = "/api/v1/queue/"
 
+    /** GET — list archives (operationId: list_archives_api_v1_archives__get). */
+    const val ARCHIVES_PATH = "/api/v1/archives/"
+
+    /** GET — single archive (operationId: get_archive_api_v1_archives__archive_id__get). */
+    const val ARCHIVE_DETAIL_PATH = "/api/v1/archives/{archive_id}"
+
     const val ARCHIVE_THUMBNAIL_PATH = "/api/v1/archives/{archive_id}/thumbnail"
     const val ARCHIVE_PLATE_THUMBNAIL_PATH =
         "/api/v1/archives/{archive_id}/plate-thumbnail/{plate_index}"
@@ -56,6 +62,7 @@ object BambuddyApi {
     val hasCameraEndpoint: Boolean = true
     val hasFilesEndpoint: Boolean = true
     val hasSpoolInventoryEndpoint: Boolean = true
+    val hasArchivesEndpoint: Boolean = true
 
     fun inventoryAssignmentsPath(printerId: Int? = null): String =
         if (printerId != null) {
@@ -105,6 +112,18 @@ object BambuddyApi {
     }
 
     fun queuePath(printerId: Int): String = "$QUEUE_PATH?printer_id=$printerId"
+
+    fun archivesPath(limit: Int = 50, offset: Int = 0, printerId: Int? = null): String {
+        val params = buildList {
+            add("limit=$limit")
+            add("offset=$offset")
+            printerId?.let { add("printer_id=$it") }
+        }
+        return "$ARCHIVES_PATH?${params.joinToString("&")}"
+    }
+
+    fun archiveDetailPath(archiveId: Int): String =
+        ARCHIVE_DETAIL_PATH.replace("{archive_id}", archiveId.toString())
 
     fun inventorySpoolsPath(includeArchived: Boolean = false): String =
         if (includeArchived) {
