@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,11 +31,8 @@ import com.chronoswing.buddydash.PrinterDetailViewModel
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.LoadingContent
-import com.chronoswing.buddydash.util.formatConnection
-import com.chronoswing.buddydash.util.formatEta
-import com.chronoswing.buddydash.util.formatHmsHealth
-import com.chronoswing.buddydash.util.formatProgress
-import com.chronoswing.buddydash.util.formatTemp
+import com.chronoswing.buddydash.util.PrinterDetailLabels
+import com.chronoswing.buddydash.util.toDetailLabels
 
 @Composable
 fun PrinterDetailScreen(
@@ -48,22 +46,17 @@ fun PrinterDetailScreen(
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val labels = uiState.status?.toDetailLabels()
 
     PrinterDetailScreenContent(
         title = uiState.printerName.ifBlank { printerName },
         isLoading = uiState.isLoading,
         error = uiState.error,
-        connected = uiState.status?.connected ?: false,
-        state = uiState.status?.state,
-        progress = uiState.status?.progress,
-        fileName = uiState.status?.fileName,
-        eta = formatEta(uiState.status?.remainingTimeSeconds),
-        nozzleTemp = formatTemp(uiState.status?.nozzleTemp),
-        bedTemp = formatTemp(uiState.status?.bedTemp),
-        hmsHealth = formatHmsHealth(uiState.status?.hmsErrorCount ?: 0),
-        hmsHasErrors = (uiState.status?.hmsErrorCount ?: 0) > 0,
+        labels = labels,
+        isClearingPlate = uiState.isClearingPlate,
         onBack = onBack,
         onRetry = viewModel::loadStatus,
+        onMarkPlateClear = viewModel::markPlateClear,
     )
 }
 
@@ -73,17 +66,11 @@ private fun PrinterDetailScreenContent(
     title: String,
     isLoading: Boolean,
     error: String?,
-    connected: Boolean,
-    state: String?,
-    progress: Float?,
-    fileName: String?,
-    eta: String,
-    nozzleTemp: String,
-    bedTemp: String,
-    hmsHealth: String,
-    hmsHasErrors: Boolean,
+    labels: PrinterDetailLabels?,
+    isClearingPlate: Boolean,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onMarkPlateClear: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -107,6 +94,7 @@ private fun PrinterDetailScreenContent(
                 onRetry = onRetry,
                 modifier = Modifier.padding(innerPadding),
             )
+            labels == null -> Unit
             else -> {
                 Column(
                     modifier = Modifier
@@ -116,50 +104,93 @@ private fun PrinterDetailScreenContent(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    val progressFraction = (progress ?: 0f).coerceIn(0f, 100f) / 100f
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = stringResource(R.string.print_progress, formatProgress(progress)),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        LinearProgressIndicator(
-                            progress = { progressFraction },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-
                     StatusCard(
                         label = stringResource(R.string.connection),
-                        value = formatConnection(connected),
+                        value = labels.connection,
                     )
                     StatusCard(
-                        label = stringResource(R.string.print_state),
-                        value = state ?: "—",
+                        label = stringResource(R.string.current_activity),
+                        value = labels.currentActivity,
+                    )
+                    labels.lastPrintResult?.let { result ->
+                        StatusCard(
+                            label = stringResource(R.string.last_print_result),
+                            value = result,
+                        )
+                    }
+                    if (labels.plateStatus != null) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatusCard(
+                                label = stringResource(R.string.plate_status),
+                                value = labels.plateStatus,
+                            )
+                            if (labels.showPlateClearAction) {
+                                val endpointMissing = !labels.plateClearEndpointAvailable
+                                Button(
+                                    onClick = onMarkPlateClear,
+                                    enabled = !isClearingPlate && !endpointMissing,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(
+                                        when {
+                                            endpointMissing ->
+                                                stringResource(R.string.plate_clear_endpoint_not_found)
+                                            isClearingPlate ->
+                                                stringResource(R.string.marking_plate_clear)
+                                            else ->
+                                                stringResource(R.string.mark_plate_clear)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (labels.showProgress) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = stringResource(
+                                    R.string.progress_label,
+                                    labels.progressTitle,
+                                    labels.progressValue,
+                                ),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            labels.progressFraction?.let { fraction ->
+                                LinearProgressIndicator(
+                                    progress = { fraction },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
+                    }
+                    if (labels.showFile) {
+                        StatusCard(
+                            label = labels.fileLabel,
+                            value = labels.fileName.ifBlank { "—" },
+                        )
+                    }
+                    if (labels.showEta) {
+                        StatusCard(
+                            label = stringResource(R.string.eta),
+                            value = labels.eta,
+                        )
+                    }
+                    StatusCard(
+                        label = stringResource(R.string.nozzle_temp),
+                        value = labels.nozzleTemp,
+                    )
+                    StatusCard(
+                        label = stringResource(R.string.bed_temp),
+                        value = labels.bedTemp,
                     )
                     StatusCard(
                         label = stringResource(R.string.hms_health),
-                        value = hmsHealth,
-                        valueColor = if (hmsHasErrors) {
+                        value = labels.hmsHealth,
+                        valueColor = if (labels.hmsHasErrors) {
                             MaterialTheme.colorScheme.error
                         } else {
                             MaterialTheme.colorScheme.primary
                         },
-                    )
-                    StatusCard(
-                        label = stringResource(R.string.current_file),
-                        value = fileName ?: "—",
-                    )
-                    StatusCard(
-                        label = stringResource(R.string.eta),
-                        value = eta,
-                    )
-                    StatusCard(
-                        label = stringResource(R.string.nozzle_temp),
-                        value = nozzleTemp,
-                    )
-                    StatusCard(
-                        label = stringResource(R.string.bed_temp),
-                        value = bedTemp,
                     )
                 }
             }

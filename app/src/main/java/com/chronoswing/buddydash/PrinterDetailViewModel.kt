@@ -20,6 +20,7 @@ data class PrinterDetailUiState(
     val serverUrl: String = "",
     val apiKey: String = "",
     val hasCredentials: Boolean = false,
+    val isClearingPlate: Boolean = false,
 )
 
 class PrinterDetailViewModel(
@@ -65,7 +66,7 @@ class PrinterDetailViewModel(
         loadStatus()
     }
 
-    fun loadStatus() {
+    fun loadStatus(showLoading: Boolean = true) {
         if (printerId < 0) return
         val state = _uiState.value
         if (!state.hasCredentials) {
@@ -79,7 +80,7 @@ class PrinterDetailViewModel(
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = showLoading, error = null) }
 
             apiClient.fetchPrinterStatus(state.serverUrl, state.apiKey, printerId).fold(
                 onSuccess = { status ->
@@ -93,6 +94,30 @@ class PrinterDetailViewModel(
                             isLoading = false,
                             status = null,
                             error = error.message ?: "Failed to load printer status",
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    fun markPlateClear() {
+        if (printerId < 0) return
+        val state = _uiState.value
+        if (!state.hasCredentials) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isClearingPlate = true, error = null) }
+            apiClient.clearPlate(state.serverUrl, state.apiKey, printerId).fold(
+                onSuccess = {
+                    _uiState.update { it.copy(isClearingPlate = false) }
+                    loadStatus(showLoading = false)
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isClearingPlate = false,
+                            error = error.message ?: "Failed to mark plate clear",
                         )
                     }
                 },

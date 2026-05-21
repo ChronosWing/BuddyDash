@@ -17,8 +17,13 @@
     <string name="printer_status_label">Status: %1$s</string>
     <string name="printer_model_label">Model: %1$s</string>
     <string name="print_progress">Progress: %1$s</string>
-    <string name="print_state">Print state</string>
-    <string name="current_file">Current file</string>
+    <string name="current_activity">Current activity</string>
+    <string name="last_print_result">Last print result</string>
+    <string name="plate_status">Plate status</string>
+    <string name="progress_label">%1$s: %2$s</string>
+    <string name="mark_plate_clear">Mark plate clear</string>
+    <string name="plate_clear_endpoint_not_found">Plate clear endpoint not found</string>
+    <string name="marking_plate_clear">Marking plate clear…</string>
     <string name="eta">ETA</string>
     <string name="nozzle_temp">Nozzle temp</string>
     <string name="bed_temp">Bed temp</string>

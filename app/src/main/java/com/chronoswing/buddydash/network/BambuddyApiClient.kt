@@ -7,8 +7,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -55,7 +57,7 @@ class BambuddyApiClient {
 
     suspend fun fetchPrinters(serverUrl: String, apiKey: String): Result<List<Printer>> =
         withContext(Dispatchers.IO) {
-            runApiCall(serverUrl, apiKey, "/api/v1/printers/") { body ->
+            runApiCall(serverUrl, apiKey, BambuddyApi.LIST_PRINTERS_PATH) { body ->
                 val array = JSONArray(body)
                 List(array.length()) { index ->
                     parsePrinterFromConfig(array.getJSONObject(index))
@@ -84,7 +86,7 @@ class BambuddyApiClient {
         printerId: Int,
     ): Result<PrinterStatus> =
         withContext(Dispatchers.IO) {
-            runApiCall(serverUrl, apiKey, "/api/v1/printers/$printerId/status") { body ->
+            runApiCall(serverUrl, apiKey, BambuddyApi.printerStatusPath(printerId)) { body ->
                 parsePrinterStatus(JSONObject(body))
             }
         }
@@ -93,6 +95,7 @@ class BambuddyApiClient {
         serverUrl: String,
         apiKey: String,
         path: String,
+        method: String = "GET",
         parse: (String) -> T,
     ): Result<T> {
         val baseUrl = normalizeBaseUrl(serverUrl)
@@ -104,11 +107,14 @@ class BambuddyApiClient {
             return Result.failure(IllegalArgumentException("API key is required"))
         }
 
-        val request = Request.Builder()
+        val requestBuilder = Request.Builder()
             .url("$baseUrl$path")
             .header("X-API-Key", trimmedKey)
-            .get()
-            .build()
+
+        val request = when (method) {
+            "POST" -> requestBuilder.post("".toRequestBody("application/json".toMediaType())).build()
+            else -> requestBuilder.get().build()
+        }
 
         return runCatching {
             client.newCall(request).execute().use { response ->
@@ -148,7 +154,7 @@ class BambuddyApiClient {
         val displayStatus = when {
             status.hmsErrorCount > 0 -> "HMS error"
             !status.connected -> "Offline"
-            else -> formatStateLabel(status.state)
+            else -> formatStateLabel(status.rawState)
         }
         return printer.copy(
             status = displayStatus,
@@ -156,13 +162,31 @@ class BambuddyApiClient {
         )
     }
 
+    suspend fun clearPlate(serverUrl: String, apiKey: String, printerId: Int): Result<String> =
+        withContext(Dispatchers.IO) {
+            if (!BambuddyApi.hasClearPlateEndpoint) {
+                return@withContext Result.failure(
+                    UnsupportedOperationException("Plate clear endpoint not found"),
+                )
+            }
+            runApiCall(serverUrl, apiKey, BambuddyApi.clearPlatePath(printerId), method = "POST") { body ->
+                JSONObject(body).optString("message", "Plate marked clear")
+            }
+        }
+
     private fun parsePrinterStatus(json: JSONObject): PrinterStatus {
         val temperatures = json.optJSONObject("temperatures")
         val hmsErrors = json.optJSONArray("hms_errors")
 
+        val awaitingPlateClear = if (json.has("awaiting_plate_clear") && !json.isNull("awaiting_plate_clear")) {
+            json.getBoolean("awaiting_plate_clear")
+        } else {
+            null
+        }
+
         return PrinterStatus(
             connected = json.optBoolean("connected", false),
-            state = json.optString("state").takeIf { it.isNotBlank() },
+            rawState = json.optString("state").takeIf { it.isNotBlank() },
             progress = json.optDouble("progress")
                 .takeIf { json.has("progress") && !json.isNull("progress") }
                 ?.toFloat(),
@@ -172,6 +196,7 @@ class BambuddyApiClient {
             nozzleTemp = temperatures?.optDouble("nozzle"),
             bedTemp = temperatures?.optDouble("bed"),
             hmsErrorCount = hmsErrors?.length() ?: 0,
+            awaitingPlateClear = awaitingPlateClear,
         )
     }
 
