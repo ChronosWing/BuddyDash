@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.util
 
+import android.util.Log
 import com.chronoswing.buddydash.data.model.ArchiveResultKind
 import com.chronoswing.buddydash.data.model.FilamentUsage
 import com.chronoswing.buddydash.data.model.PrintArchive
@@ -13,6 +14,11 @@ const val ARCHIVE_DISPLAY_NAME_FALLBACK = "Unnamed print"
 const val DEBUG_LOG_ARCHIVES = true
 
 const val TAG_ARCHIVES = "BuddyDash/Archives"
+
+/** Temporary: archive detail config + field mapping. Set false before release. */
+const val DEBUG_LOG_ARCHIVE_DETAIL = true
+
+const val TAG_ARCHIVE_DETAIL = "BuddyDash/ArchiveDetail"
 
 const val ARCHIVES_LIST_DEFAULT_LIMIT = 200
 
@@ -83,20 +89,64 @@ fun parsePrintArchive(
         printerModel = printerId?.let { printerModelsById[it] },
         statusRaw = statusRaw,
         resultKind = parseArchiveResultKind(statusRaw),
-        startedAtIso = json.optString("started_at").takeIf { it.isNotBlank() },
-        completedAtIso = json.optString("completed_at").takeIf { it.isNotBlank() },
-        createdAtIso = json.optString("created_at").takeIf { it.isNotBlank() },
+        startedAtIso = jsonOptionalString(json, "started_at"),
+        completedAtIso = jsonOptionalString(json, "completed_at"),
+        createdAtIso = jsonOptionalString(json, "created_at"),
         statsCompletedAtMillis = resolveArchiveStatsCompletedMillis(json),
         durationSeconds = resolveArchiveDurationSeconds(json),
         filamentUsage = filamentUsage,
-        filamentType = json.optString("filament_type").takeIf { it.isNotBlank() },
-        filamentColor = json.optString("filament_color").takeIf { it.isNotBlank() },
-        failureReason = json.optString("failure_reason").takeIf { it.isNotBlank() },
+        filamentType = jsonOptionalString(json, "filament_type"),
+        filamentColor = jsonOptionalString(json, "filament_color"),
+        failureReason = jsonOptionalString(json, "failure_reason"),
         totalLayers = json.optInt("total_layers", -1).takeIf { it > 0 },
         quantity = json.optInt("quantity", -1).takeIf { it > 0 },
-        projectName = json.optString("project_name").takeIf { it.isNotBlank() },
-        slicedForModel = json.optString("sliced_for_model").takeIf { it.isNotBlank() },
-        notes = json.optString("notes").takeIf { it.isNotBlank() },
+        projectName = jsonOptionalString(json, "project_name"),
+        slicedForModel = jsonOptionalString(json, "sliced_for_model"),
+        notes = jsonOptionalString(json, "notes"),
+    )
+}
+
+private fun jsonOptionalString(json: JSONObject, key: String): String? =
+    json.optString(key).trim().takeIf { isMeaningfulArchiveField(it) }
+
+/** Non-empty text that is not the literal string "null". */
+fun isMeaningfulArchiveField(value: String?): Boolean {
+    val trimmed = value?.trim() ?: return false
+    return trimmed.isNotBlank() && !trimmed.equals("null", ignoreCase = true)
+}
+
+fun shouldShowArchiveFailureReason(archive: PrintArchive): Boolean {
+    if (!isMeaningfulArchiveField(archive.failureReason)) return false
+    return when (archive.resultKind) {
+        ArchiveResultKind.Failed,
+        ArchiveResultKind.Cancelled,
+        -> true
+        ArchiveResultKind.Other -> {
+            val status = archive.statusRaw.trim().lowercase()
+            status.contains("fail") || status.contains("error") || status.contains("cancel")
+        }
+        ArchiveResultKind.Success -> false
+    }
+}
+
+/** Material type label for detail (no raw hex). */
+fun formatArchiveDetailMaterialType(archive: PrintArchive): String? {
+    val type = archive.filamentType?.trim()?.takeIf { isMeaningfulArchiveField(it) }
+    return type?.let { normalizeFilamentType(it)?.uppercase() ?: type.uppercase() }
+}
+
+fun archiveFilamentColorHexes(archive: PrintArchive): List<String> {
+    val color = archive.filamentColor?.trim()?.takeIf { isMeaningfulArchiveField(it) } ?: return emptyList()
+    return listOfNotNull(color)
+}
+
+fun logArchiveDetailFieldMapping(archive: PrintArchive) {
+    if (!DEBUG_LOG_ARCHIVE_DETAIL) return
+    Log.d(
+        TAG_ARCHIVE_DETAIL,
+        "detailFields id=${archive.id} failure=${archive.failureReason} project=${archive.projectName} " +
+            "notes=${archive.notes} material=${archive.filamentType}/${archive.filamentColor} " +
+            "showFailure=${shouldShowArchiveFailureReason(archive)}",
     )
 }
 

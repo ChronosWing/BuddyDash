@@ -1,13 +1,17 @@
 package com.chronoswing.buddydash
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.ArchiveReprintPrinter
+import com.chronoswing.buddydash.util.DEBUG_LOG_ARCHIVE_DETAIL
+import com.chronoswing.buddydash.util.TAG_ARCHIVE_DETAIL
 import com.chronoswing.buddydash.util.defaultArchiveReprintPrinterId
 import com.chronoswing.buddydash.util.defaultArchiveReprintQuantity
+import com.chronoswing.buddydash.util.logArchiveDetailFieldMapping
 import com.chronoswing.buddydash.util.resolveArchiveReprintPrinters
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +44,7 @@ data class ArchiveDetailUiState(
     val serverUrl: String = "",
     val apiKey: String = "",
     val cameraToken: String = "",
+    val settingsReady: Boolean = false,
     val hasCredentials: Boolean = false,
     val reprintSheet: ArchiveReprintSheetState = ArchiveReprintSheetState(),
     val reprintSnackbar: ArchiveReprintSnackbar? = null,
@@ -70,46 +75,77 @@ class ArchiveDetailViewModel(
             ) { url, key, cameraToken ->
                 Triple(url, key, cameraToken)
             }.collect { (url, key, cameraToken) ->
+                val hasCredentials = url.isNotBlank() && key.isNotBlank()
+                if (DEBUG_LOG_ARCHIVE_DETAIL) {
+                    Log.d(
+                        TAG_ARCHIVE_DETAIL,
+                        "settingsReady urlSet=${url.isNotBlank()} keySet=${key.isNotBlank()} " +
+                            "hasCredentials=$hasCredentials archiveId=$archiveId",
+                    )
+                }
                 _uiState.update {
                     it.copy(
                         serverUrl = url,
                         apiKey = key,
                         cameraToken = cameraToken,
-                        hasCredentials = url.isNotBlank() && key.isNotBlank(),
+                        hasCredentials = hasCredentials,
+                        settingsReady = true,
                     )
                 }
+                maybeLoadArchive()
             }
         }
     }
 
     fun init(archiveId: Int) {
         this.archiveId = archiveId
-        loadArchive()
+        _uiState.update { it.copy(error = null) }
+        maybeLoadArchive()
     }
 
     fun loadArchive() {
-        if (archiveId < 0) return
+        maybeLoadArchive(force = true)
+    }
+
+    private fun maybeLoadArchive(force: Boolean = false) {
         val state = _uiState.value
+        if (archiveId < 0) return
+        if (!state.settingsReady) {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            return
+        }
+        if (!force && state.archive != null) return
+
         if (!state.hasCredentials) {
-            _uiState.update { it.copy(error = "Configure server URL and API key in Settings") }
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    error = "Configure server URL and API key in Settings",
+                )
+            }
             return
         }
 
         fetchJob?.cancel()
         fetchJob = viewModelScope.launch {
+            val creds = _uiState.value
             _uiState.update { it.copy(isLoading = it.archive == null, error = null) }
             val result = apiClient.fetchArchive(
-                serverUrl = state.serverUrl,
-                apiKey = state.apiKey,
+                serverUrl = creds.serverUrl,
+                apiKey = creds.apiKey,
                 archiveId = archiveId,
             )
             result.fold(
                 onSuccess = { archive ->
+                    logArchiveDetailFieldMapping(archive)
                     _uiState.update {
                         it.copy(isLoading = false, archive = archive, error = null)
                     }
                 },
                 onFailure = { error ->
+                    if (DEBUG_LOG_ARCHIVE_DETAIL) {
+                        Log.e(TAG_ARCHIVE_DETAIL, "fetchArchive failed id=$archiveId", error)
+                    }
                     _uiState.update {
                         it.copy(
                             isLoading = false,
