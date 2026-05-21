@@ -12,7 +12,16 @@ object BambuddyApi {
 
     const val LIST_PRINTERS_PATH = "/api/v1/printers/"
 
+    const val INVENTORY_ASSIGNMENTS_PATH = "/api/v1/inventory/assignments"
+
     val hasClearPlateEndpoint: Boolean = true
+
+    fun inventoryAssignmentsPath(printerId: Int? = null): String =
+        if (printerId != null) {
+            "$INVENTORY_ASSIGNMENTS_PATH?printer_id=$printerId"
+        } else {
+            INVENTORY_ASSIGNMENTS_PATH
+        }
 
     fun clearPlatePath(printerId: Int): String =
         CLEAR_PLATE_PATH.replace("{printer_id}", printerId.toString())

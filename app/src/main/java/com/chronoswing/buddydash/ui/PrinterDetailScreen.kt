@@ -10,22 +10,24 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Tab
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -33,10 +35,21 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chronoswing.buddydash.PlateClearSnackbar
 import com.chronoswing.buddydash.PrinterDetailViewModel
 import com.chronoswing.buddydash.R
+import com.chronoswing.buddydash.data.model.FilamentSlot
+import com.chronoswing.buddydash.ui.components.CompactLabelValue
+import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.ErrorContent
+import com.chronoswing.buddydash.ui.components.FilamentChipRow
+import com.chronoswing.buddydash.ui.components.HighlightValue
+import com.chronoswing.buddydash.ui.components.InlineProgress
 import com.chronoswing.buddydash.ui.components.LoadingContent
+import com.chronoswing.buddydash.ui.components.SecondaryNote
+import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.util.PrinterDetailLabels
+import com.chronoswing.buddydash.util.normalizeFilamentType
 import com.chronoswing.buddydash.util.toDetailLabels
+
+private val detailTabs = listOf("Status", "Filament", "Controls")
 
 @Composable
 fun PrinterDetailScreen(
@@ -61,6 +74,7 @@ fun PrinterDetailScreen(
         plateClearSnackbar = uiState.plateClearSnackbar,
         onBack = onBack,
         onRetry = viewModel::loadStatus,
+        onRefresh = { viewModel.loadStatus(showLoading = false) },
         onMarkPlateClear = viewModel::markPlateClear,
         onPlateClearSnackbarShown = viewModel::onPlateClearSnackbarShown,
     )
@@ -77,12 +91,14 @@ private fun PrinterDetailScreenContent(
     plateClearSnackbar: PlateClearSnackbar?,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onRefresh: () -> Unit,
     onMarkPlateClear: () -> Unit,
     onPlateClearSnackbarShown: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val plateClearSuccessMessage = stringResource(R.string.plate_clear_success)
     val plateClearFailedMessage = stringResource(R.string.plate_clear_failed)
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(plateClearSnackbar) {
         val message = when (plateClearSnackbar) {
@@ -122,99 +138,39 @@ private fun PrinterDetailScreenContent(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding)
-                        .padding(16.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                        .padding(innerPadding),
                 ) {
-                    StatusCard(
-                        label = stringResource(R.string.connection),
-                        value = labels.connection,
-                    )
-                    StatusCard(
-                        label = stringResource(R.string.current_activity),
-                        value = labels.currentActivity,
-                    )
-                    labels.lastPrintResult?.let { result ->
-                        StatusCard(
-                            label = stringResource(R.string.last_print_result),
-                            value = result,
-                        )
-                    }
-                    if (labels.plateStatus != null) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            StatusCard(
-                                label = stringResource(R.string.plate_status),
-                                value = labels.plateStatus,
+                    PrimaryTabRow(selectedTabIndex = selectedTab) {
+                        detailTabs.forEachIndexed { index, tabTitle ->
+                            Tab(
+                                selected = selectedTab == index,
+                                onClick = { selectedTab = index },
+                                text = { Text(tabTitle) },
                             )
-                            if (labels.showPlateClearAction) {
-                                val endpointMissing = !labels.plateClearEndpointAvailable
-                                Button(
-                                    onClick = onMarkPlateClear,
-                                    enabled = !isClearingPlate && !endpointMissing,
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text(
-                                        when {
-                                            endpointMissing ->
-                                                stringResource(R.string.plate_clear_endpoint_not_found)
-                                            isClearingPlate ->
-                                                stringResource(R.string.marking_plate_clear)
-                                            else ->
-                                                stringResource(R.string.mark_plate_clear)
-                                        },
-                                    )
-                                }
-                            }
                         }
                     }
-                    if (labels.showProgress) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = stringResource(
-                                    R.string.progress_label,
-                                    labels.progressTitle,
-                                    labels.progressValue,
-                                ),
-                                style = MaterialTheme.typography.titleMedium,
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        when (selectedTab) {
+                            0 -> StatusTab(
+                                labels = labels,
+                                isClearingPlate = isClearingPlate,
+                                onMarkPlateClear = onMarkPlateClear,
                             )
-                            labels.progressFraction?.let { fraction ->
-                                LinearProgressIndicator(
-                                    progress = { fraction },
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
+                            1 -> FilamentTab(slots = labels.filamentSlots)
+                            2 -> ControlsTab(
+                                labels = labels,
+                                isClearingPlate = isClearingPlate,
+                                onRefresh = onRefresh,
+                                onMarkPlateClear = onMarkPlateClear,
+                            )
                         }
                     }
-                    if (labels.showFile) {
-                        StatusCard(
-                            label = labels.fileLabel,
-                            value = labels.fileName.ifBlank { "—" },
-                        )
-                    }
-                    if (labels.showEta) {
-                        StatusCard(
-                            label = stringResource(R.string.eta),
-                            value = labels.eta,
-                        )
-                    }
-                    StatusCard(
-                        label = stringResource(R.string.nozzle_temp),
-                        value = labels.nozzleTemp,
-                    )
-                    StatusCard(
-                        label = stringResource(R.string.bed_temp),
-                        value = labels.bedTemp,
-                    )
-                    StatusCard(
-                        label = stringResource(R.string.hms_health),
-                        value = labels.hmsHealth,
-                        valueColor = if (labels.hmsHasErrors) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        },
-                    )
                 }
             }
         }
@@ -222,31 +178,171 @@ private fun PrinterDetailScreenContent(
 }
 
 @Composable
-private fun StatusCard(
-    label: String,
-    value: String,
-    valueColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+private fun StatusTab(
+    labels: PrinterDetailLabels,
+    isClearingPlate: Boolean,
+    onMarkPlateClear: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyLarge,
-                color = valueColor,
+    DetailInfoCard {
+        SectionHeader(stringResource(R.string.section_overview))
+        HighlightValue(
+            label = stringResource(R.string.current_activity),
+            value = labels.currentActivity,
+        )
+        CompactLabelValue(
+            label = stringResource(R.string.connection),
+            value = labels.connection,
+        )
+        labels.plateStatus?.let { plate ->
+            CompactLabelValue(
+                label = stringResource(R.string.plate_status),
+                value = plate,
             )
         }
+        if (labels.showPlateClearAction) {
+            PlateClearButton(
+                labels = labels,
+                isClearingPlate = isClearingPlate,
+                onClick = onMarkPlateClear,
+            )
+        }
+    }
+
+    val hasPrintSection = labels.showProgress ||
+        labels.showFile ||
+        labels.showEta ||
+        labels.lastPrintResult != null
+
+    if (hasPrintSection) {
+        DetailInfoCard {
+            SectionHeader(stringResource(R.string.section_print))
+            labels.lastPrintResult?.let { result ->
+                SecondaryNote(
+                    label = stringResource(R.string.last_print_result_short),
+                    value = result,
+                )
+            }
+            if (labels.showProgress) {
+                labels.progressFraction?.let { fraction ->
+                    InlineProgress(
+                        label = labels.progressTitle,
+                        value = labels.progressValue,
+                        fraction = fraction,
+                    )
+                }
+            }
+            if (labels.showFile) {
+                CompactLabelValue(
+                    label = labels.fileLabel,
+                    value = labels.fileName.ifBlank { "—" },
+                )
+            }
+            if (labels.showEta) {
+                CompactLabelValue(label = stringResource(R.string.eta), value = labels.eta)
+            }
+        }
+    }
+
+    DetailInfoCard {
+        SectionHeader(stringResource(R.string.section_environment))
+        CompactLabelValue(label = stringResource(R.string.nozzle_temp), value = labels.nozzleTemp)
+        CompactLabelValue(label = stringResource(R.string.bed_temp), value = labels.bedTemp)
+        CompactLabelValue(
+            label = stringResource(R.string.hms_health),
+            value = labels.hmsHealth,
+            valueColor = if (labels.hmsHasErrors) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.primary
+            },
+        )
+    }
+}
+
+@Composable
+private fun FilamentTab(slots: List<FilamentSlot>) {
+    if (slots.isEmpty()) {
+        Text(
+            text = stringResource(R.string.no_filament_data),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    FilamentChipRow(slots = slots, compact = false, modifier = Modifier.fillMaxWidth())
+    slots.forEach { slot ->
+        DetailInfoCard {
+            CompactLabelValue(label = stringResource(R.string.slot_label), value = slot.label)
+            if (slot.isLoaded) {
+                CompactLabelValue(
+                    label = stringResource(R.string.filament_type),
+                    value = normalizeFilamentType(slot.filamentType)?.uppercase()
+                        ?: stringResource(R.string.filament_unknown),
+                )
+                slot.remainPercent?.let { remain ->
+                    CompactLabelValue(
+                        label = stringResource(R.string.filament_remaining),
+                        value = "$remain%",
+                    )
+                }
+                slot.metadata?.let { meta ->
+                    CompactLabelValue(label = stringResource(R.string.filament_metadata), value = meta)
+                }
+            } else {
+                CompactLabelValue(
+                    label = stringResource(R.string.filament_type),
+                    value = stringResource(R.string.filament_empty),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ControlsTab(
+    labels: PrinterDetailLabels,
+    isClearingPlate: Boolean,
+    onRefresh: () -> Unit,
+    onMarkPlateClear: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.refresh_status))
+        }
+        if (labels.showPlateClearAction) {
+            PlateClearButton(
+                labels = labels,
+                isClearingPlate = isClearingPlate,
+                onClick = onMarkPlateClear,
+            )
+        }
+        OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.pause_print_placeholder))
+        }
+        OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.cancel_print_placeholder))
+        }
+    }
+}
+
+@Composable
+private fun PlateClearButton(
+    labels: PrinterDetailLabels,
+    isClearingPlate: Boolean,
+    onClick: () -> Unit,
+) {
+    val endpointMissing = !labels.plateClearEndpointAvailable
+    Button(
+        onClick = onClick,
+        enabled = !isClearingPlate && !endpointMissing,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            when {
+                endpointMissing -> stringResource(R.string.plate_clear_endpoint_not_found)
+                isClearingPlate -> stringResource(R.string.marking_plate_clear)
+                else -> stringResource(R.string.mark_plate_clear)
+            },
+        )
     }
 }

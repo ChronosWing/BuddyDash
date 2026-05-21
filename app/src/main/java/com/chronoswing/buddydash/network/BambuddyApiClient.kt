@@ -1,7 +1,17 @@
 package com.chronoswing.buddydash.network
 
+import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.util.SlotInventoryKey
+import com.chronoswing.buddydash.util.applyInventoryFill
+import com.chronoswing.buddydash.util.EXTERNAL_AMS_ID
+import com.chronoswing.buddydash.util.externalInventoryTrayId
+import com.chronoswing.buddydash.util.formatAmsSlotLabel
+import com.chronoswing.buddydash.util.isTrayLoaded
+import com.chronoswing.buddydash.util.normalizeFilamentType
+import com.chronoswing.buddydash.util.normalizeTrayColor
+import com.chronoswing.buddydash.util.parseInventoryFillByPrinter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -11,11 +21,18 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class BambuddyApiClient {
+
+    companion object {
+        /** Temporary: log raw AMS / vt_tray JSON from status responses. Set false before release. */
+        private const val DEBUG_LOG_FILAMENT_RAW = true
+        private const val TAG_FILAMENT = "BuddyDash/Filament"
+    }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -69,10 +86,17 @@ class BambuddyApiClient {
     suspend fun fetchPrintersWithStatus(serverUrl: String, apiKey: String): Result<List<Printer>> =
         withContext(Dispatchers.IO) {
             fetchPrinters(serverUrl, apiKey).mapCatching { printers ->
+                val inventoryByPrinter = fetchInventoryFillByPrinter(serverUrl, apiKey, printerId = null)
+                    .getOrElse { emptyMap() }
                 coroutineScope {
                     printers.map { printer ->
                         async {
-                            val statusResult = fetchPrinterStatus(serverUrl, apiKey, printer.id)
+                            val statusResult = fetchPrinterStatus(
+                                serverUrl = serverUrl,
+                                apiKey = apiKey,
+                                printerId = printer.id,
+                                inventoryFill = inventoryByPrinter[printer.id],
+                            )
                             mergePrinterWithStatus(printer, statusResult.getOrNull())
                         }
                     }.awaitAll()
@@ -84,11 +108,24 @@ class BambuddyApiClient {
         serverUrl: String,
         apiKey: String,
         printerId: Int,
+        inventoryFill: Map<SlotInventoryKey, Int>? = null,
     ): Result<PrinterStatus> =
         withContext(Dispatchers.IO) {
+            val fill = inventoryFill ?: fetchInventoryFillByPrinter(serverUrl, apiKey, printerId)
+                .getOrElse { emptyMap() }
+                .getOrElse(printerId) { emptyMap() }
             runApiCall(serverUrl, apiKey, BambuddyApi.printerStatusPath(printerId)) { body ->
-                parsePrinterStatus(JSONObject(body))
+                parsePrinterStatus(JSONObject(body), fill)
             }
+        }
+
+    private fun fetchInventoryFillByPrinter(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int?,
+    ): Result<Map<Int, Map<SlotInventoryKey, Int>>> =
+        runApiCall(serverUrl, apiKey, BambuddyApi.inventoryAssignmentsPath(printerId)) { body ->
+            parseInventoryFillByPrinter(JSONArray(body))
         }
 
     private inline fun <T> runApiCall(
@@ -145,22 +182,10 @@ class BambuddyApiClient {
         id = json.getInt("id"),
         name = json.optString("name", "Printer ${json.getInt("id")}"),
         model = json.optString("model").takeIf { it.isNotBlank() },
-        status = null,
-        isOnline = null,
     )
 
-    private fun mergePrinterWithStatus(printer: Printer, status: PrinterStatus?): Printer {
-        if (status == null) return printer
-        val displayStatus = when {
-            status.hmsErrorCount > 0 -> "HMS error"
-            !status.connected -> "Offline"
-            else -> formatStateLabel(status.rawState)
-        }
-        return printer.copy(
-            status = displayStatus,
-            isOnline = status.connected,
-        )
-    }
+    private fun mergePrinterWithStatus(printer: Printer, status: PrinterStatus?): Printer =
+        printer.copy(liveStatus = status)
 
     suspend fun clearPlate(serverUrl: String, apiKey: String, printerId: Int): Result<String> =
         withContext(Dispatchers.IO) {
@@ -174,7 +199,10 @@ class BambuddyApiClient {
             }
         }
 
-    private fun parsePrinterStatus(json: JSONObject): PrinterStatus {
+    private fun parsePrinterStatus(
+        json: JSONObject,
+        inventoryFill: Map<SlotInventoryKey, Int> = emptyMap(),
+    ): PrinterStatus {
         val temperatures = json.optJSONObject("temperatures")
         val hmsErrors = json.optJSONArray("hms_errors")
 
@@ -197,6 +225,94 @@ class BambuddyApiClient {
             bedTemp = temperatures?.optDouble("bed"),
             hmsErrorCount = hmsErrors?.length() ?: 0,
             awaitingPlateClear = awaitingPlateClear,
+            filamentSlots = parseFilamentSlots(json, inventoryFill),
+        )
+    }
+
+    private fun parseFilamentSlots(
+        json: JSONObject,
+        inventoryFill: Map<SlotInventoryKey, Int>,
+    ): List<FilamentSlot> {
+        if (DEBUG_LOG_FILAMENT_RAW) {
+            val printerId = json.optInt("id", -1)
+            val printerName = json.optString("name", "")
+            Log.d(
+                TAG_FILAMENT,
+                "status printer=$printerId ($printerName) ams=${json.optJSONArray("ams")}",
+            )
+            Log.d(
+                TAG_FILAMENT,
+                "status printer=$printerId ($printerName) vt_tray=${json.optJSONArray("vt_tray")}",
+            )
+        }
+        val slots = mutableListOf<FilamentSlot>()
+        json.optJSONArray("ams")?.let { amsArray ->
+            for (unitIndex in 0 until amsArray.length()) {
+                val unit = amsArray.optJSONObject(unitIndex) ?: continue
+                val amsId = unit.optInt("id", unitIndex)
+                val trays = unit.optJSONArray("tray") ?: continue
+                val isAmsHt = trays.length() == 1
+                for (trayIndex in 0 until trays.length()) {
+                    val trayJson = trays.optJSONObject(trayIndex) ?: continue
+                    val trayId = trayJson.optInt("id", trayIndex)
+                    slots.add(
+                        parseTray(
+                            tray = trayJson,
+                            label = formatAmsSlotLabel(amsId, trayId, isAmsHt, isExternal = false),
+                            amsId = amsId,
+                            trayId = trayId,
+                        ),
+                    )
+                }
+            }
+        }
+        json.optJSONArray("vt_tray")?.let { vtArray ->
+            for (i in 0 until vtArray.length()) {
+                val trayJson = vtArray.optJSONObject(i) ?: continue
+                val globalId = trayJson.optInt("id", 254 + i)
+                val trayId = externalInventoryTrayId(globalId, i)
+                slots.add(
+                    parseTray(
+                        tray = trayJson,
+                        label = formatAmsSlotLabel(EXTERNAL_AMS_ID, trayId, isAmsHt = false, isExternal = true),
+                        amsId = EXTERNAL_AMS_ID,
+                        trayId = trayId,
+                        isExternal = true,
+                    ),
+                )
+            }
+        }
+        return applyInventoryFill(slots, inventoryFill)
+    }
+
+    private fun parseTray(
+        tray: JSONObject?,
+        label: String,
+        amsId: Int,
+        trayId: Int,
+        isExternal: Boolean = false,
+    ): FilamentSlot {
+        val trayJson = tray ?: JSONObject()
+        val type = normalizeFilamentType(trayJson.optString("tray_type"))
+        val color = normalizeTrayColor(trayJson.optString("tray_color"))
+        val meta = trayJson.optString("tray_id_name").takeIf { it.isNotBlank() }
+        val loaded = isTrayLoaded(type, color, remainPercent = null, meta)
+        if (DEBUG_LOG_FILAMENT_RAW) {
+            Log.d(
+                TAG_FILAMENT,
+                "tray $label ams=$amsId tray=$trayId loaded=$loaded type=$type remainRaw=${trayJson.opt("remain")}",
+            )
+        }
+        return FilamentSlot(
+            label = label,
+            filamentType = type,
+            colorHex = color,
+            remainPercent = null,
+            metadata = meta,
+            isExternal = isExternal,
+            isLoaded = loaded,
+            amsId = amsId,
+            trayId = trayId,
         )
     }
 
@@ -209,8 +325,4 @@ class BambuddyApiClient {
         return null
     }
 
-    private fun formatStateLabel(state: String?): String? {
-        if (state.isNullOrBlank()) return null
-        return state.lowercase().replaceFirstChar { it.uppercase() }
-    }
 }

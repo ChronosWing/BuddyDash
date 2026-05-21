@@ -7,6 +7,14 @@ import java.io.File
 class BambuddyOpenApiTest {
 
     @Test
+    fun inventoryAssignmentsEndpoint_matchesOpenApiSpec() {
+        val spec = findOpenApiSpec().readText()
+        assertTrue(
+            spec.contains("\"${BambuddyApi.INVENTORY_ASSIGNMENTS_PATH}\""),
+        )
+    }
+
+    @Test
     fun clearPlateEndpoint_matchesOpenApiSpec() {
         val spec = findOpenApiSpec().readText()
 
