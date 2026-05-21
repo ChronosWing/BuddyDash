@@ -533,11 +533,19 @@ class BambuddyApiClient {
             val daysUntilDue = item.optDouble("days_until_due").takeIf {
                 item.has("days_until_due") && !item.isNull("days_until_due")
             }
+            val intervalHours = item.optDouble("interval_hours").takeIf {
+                item.has("interval_hours") && !item.isNull("interval_hours")
+            }
+            val hoursSinceMaintenance = item.optDouble("hours_since_maintenance").takeIf {
+                item.has("hours_since_maintenance") && !item.isNull("hours_since_maintenance")
+            }
+            val intervalType = item.optString("interval_type").takeIf { it.isNotBlank() }
             if (DEBUG_LOG_DETAIL_RAW) {
                 Log.d(
                     TAG_DETAIL,
                     "maintenance raw id=${item.optInt("id")} name=${item.optString("maintenance_type_name")} " +
-                        "is_due=$isDue is_warning=$isWarning hours_until_due=$hoursUntilDue days_until_due=$daysUntilDue",
+                        "is_due=$isDue is_warning=$isWarning hours_until_due=$hoursUntilDue days_until_due=$daysUntilDue " +
+                        "interval_hours=$intervalHours hours_since=$hoursSinceMaintenance interval_type=$intervalType",
                 )
             }
             MaintenanceItem(
@@ -548,6 +556,9 @@ class BambuddyApiClient {
                 enabled = item.optBoolean("enabled", true),
                 hoursUntilDue = hoursUntilDue,
                 daysUntilDue = daysUntilDue,
+                intervalHours = intervalHours,
+                hoursSinceMaintenance = hoursSinceMaintenance,
+                intervalType = intervalType,
             )
         }
         val totalPrintHours = json.optDouble("total_print_hours")

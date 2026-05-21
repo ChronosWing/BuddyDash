@@ -2,6 +2,7 @@ package com.chronoswing.buddydash.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -34,6 +35,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -188,62 +190,94 @@ private fun MaintenanceStatusRow(
 ) {
     val dueSoonTint = Color(0xFFFBBF24)
     val icon: ImageVector
-    val tint: Color
-    val label: String
-    val textColor: Color
+    val accentColor: Color
+    val nameColor: Color
+    val remainingColor: Color
     when (line.kind) {
         MaintenanceLineKind.Ok -> {
             icon = Icons.Default.CheckCircle
-            tint = MaterialTheme.colorScheme.primary
-            label = line.name
-            textColor = MaterialTheme.colorScheme.onSurface
+            accentColor = MaterialTheme.colorScheme.primary
+            nameColor = MaterialTheme.colorScheme.onSurface
+            remainingColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
         }
         MaintenanceLineKind.DueSoon -> {
             icon = Icons.Default.Warning
-            tint = dueSoonTint
-            label = "${line.name} ${stringResource(R.string.maintenance_soon_suffix)}"
-            textColor = dueSoonTint
+            accentColor = dueSoonTint
+            nameColor = MaterialTheme.colorScheme.onSurface
+            remainingColor = dueSoonTint
         }
         MaintenanceLineKind.Due -> {
             icon = Icons.Default.Build
-            tint = MaterialTheme.colorScheme.error
-            label = "${line.name} ${stringResource(R.string.maintenance_due_suffix)}"
-            textColor = MaterialTheme.colorScheme.error
+            accentColor = MaterialTheme.colorScheme.error
+            nameColor = MaterialTheme.colorScheme.onSurface
+            remainingColor = MaterialTheme.colorScheme.error
         }
     }
-    Row(
+    val progressTrack = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+    val progressColor = when (line.kind) {
+        MaintenanceLineKind.Ok -> accentColor.copy(alpha = 0.45f)
+        MaintenanceLineKind.DueSoon -> accentColor.copy(alpha = 0.75f)
+        MaintenanceLineKind.Due -> accentColor
+    }
+
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = stringResource(R.string.cd_maintenance_item, label),
-            modifier = Modifier.size(16.dp),
-            tint = tint,
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = textColor,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .weight(1f, fill = false)
-                .padding(end = if (onResetClick != null) 4.dp else 0.dp),
-        )
-        if (onResetClick != null) {
-            TextButton(
-                onClick = onResetClick,
-                enabled = !resetBusy,
-                modifier = Modifier.heightIn(max = 32.dp),
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-            ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = stringResource(R.string.cd_maintenance_item, line.name),
+                modifier = Modifier.size(16.dp),
+                tint = accentColor,
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = line.name,
+                style = MaterialTheme.typography.bodySmall,
+                color = nameColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .padding(end = 6.dp),
+            )
+            line.remainingText?.let { remaining ->
                 Text(
-                    text = stringResource(R.string.maintenance_reset),
+                    text = remaining,
                     style = MaterialTheme.typography.labelSmall,
+                    color = remainingColor,
+                    maxLines = 1,
+                    modifier = Modifier.padding(end = if (onResetClick != null) 4.dp else 0.dp),
                 )
             }
+            if (onResetClick != null) {
+                TextButton(
+                    onClick = onResetClick,
+                    enabled = !resetBusy,
+                    modifier = Modifier.heightIn(max = 32.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.maintenance_reset),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+        }
+        line.progressFraction?.let { fraction ->
+            LinearProgressIndicator(
+                progress = { fraction.coerceIn(0f, 1f) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 22.dp)
+                    .height(2.dp),
+                color = progressColor,
+                trackColor = progressTrack,
+            )
         }
     }
 }
@@ -283,7 +317,7 @@ fun DetailMaintenanceCard(
 
     DetailInfoCard {
         SectionHeader(stringResource(R.string.section_maintenance))
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             lines.forEach { line ->
                 MaintenanceStatusRow(
                     line = line,
