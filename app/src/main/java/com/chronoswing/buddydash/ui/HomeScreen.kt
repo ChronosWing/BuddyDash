@@ -230,9 +230,11 @@ private fun GlancePrinterCard(
 
             if (labels.isActivePrint) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(
                         modifier = Modifier.weight(1f),
@@ -264,7 +266,8 @@ private fun GlancePrinterCard(
                         serverUrl = serverUrl,
                         cameraToken = cameraToken,
                         printerId = printerId,
-                        size = 56.dp,
+                        modifier = Modifier.padding(start = 4.dp, end = 2.dp),
+                        size = 64.dp,
                     )
                 }
             } else {
