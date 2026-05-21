@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chronoswing.buddydash.ControlSnackbar
@@ -226,7 +227,27 @@ private fun PrinterDetailScreenContent(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(title) },
+                title = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = title,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        StatusLastUpdatedIndicator(
+                            lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
+                            isRefreshing = isRefreshing,
+                            enabled = !isClearingPlate && !isControlBusy,
+                            onRefresh = onRefresh,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -260,20 +281,6 @@ private fun PrinterDetailScreenContent(
                                 text = { Text(tabTitle) },
                             )
                         }
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        StatusLastUpdatedIndicator(
-                            lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
-                            isRefreshing = isRefreshing,
-                            enabled = !isClearingPlate && !isControlBusy,
-                            onRefresh = onRefresh,
-                        )
                     }
                     PullToRefreshBox(
                         isRefreshing = isRefreshing,
