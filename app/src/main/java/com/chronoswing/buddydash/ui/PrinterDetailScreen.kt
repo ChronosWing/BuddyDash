@@ -61,14 +61,14 @@ import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentDetailGroups
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
-import com.chronoswing.buddydash.ui.components.MicroMotionThumbnailFrame
+import com.chronoswing.buddydash.ui.components.DetailStatusHeroImage
 import com.chronoswing.buddydash.ui.components.HighlightValue
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
-import com.chronoswing.buddydash.ui.components.PrintFileHighlight
+import com.chronoswing.buddydash.ui.components.PrintFileHighlightWithCover
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.ui.components.PrintTempsRow
-import com.chronoswing.buddydash.ui.components.PrinterCoverImage
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
+import com.chronoswing.buddydash.network.printerCoverUrl
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
@@ -367,17 +367,14 @@ private fun ActivePrintStatusTab(
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
 ) {
-    MicroMotionThumbnailFrame(
+    var cameraHeroActive by remember { mutableStateOf(false) }
+    DetailStatusHeroImage(
+        serverUrl = serverUrl,
+        cameraToken = cameraToken,
+        printerId = printerId,
         motion = labels.cardMicroMotion,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        PrinterCoverImage(
-            serverUrl = serverUrl,
-            cameraToken = cameraToken,
-            printerId = printerId,
-            height = 160.dp,
-        )
-    }
+        onCameraHeroActive = { cameraHeroActive = it },
+    )
     DetailInfoCard {
         SectionHeader(stringResource(R.string.section_print))
         PrinterQuickStatusRow(
@@ -398,9 +395,13 @@ private fun ActivePrintStatusTab(
             )
         }
         if (labels.showFile) {
-            PrintFileHighlight(
+            PrintFileHighlightWithCover(
                 label = labels.fileLabel,
                 fileName = labels.fileName,
+                serverUrl = serverUrl,
+                cameraToken = cameraToken,
+                printerId = printerId,
+                showCoverThumbnail = cameraHeroActive,
             )
         }
         if (labels.showEta) {
@@ -440,11 +441,12 @@ private fun IdleStatusTab(
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
 ) {
-    PrinterCoverImage(
+    var cameraHeroActive by remember { mutableStateOf(false) }
+    DetailStatusHeroImage(
         serverUrl = serverUrl,
         cameraToken = cameraToken,
         printerId = printerId,
-        height = 160.dp,
+        onCameraHeroActive = { cameraHeroActive = it },
     )
     DetailInfoCard {
         SectionHeader(stringResource(R.string.section_overview))
@@ -489,17 +491,28 @@ private fun IdleStatusTab(
                 )
             }
             if (labels.showFile) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = labels.fileLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                if (cameraHeroActive && printerCoverUrl(serverUrl, printerId, cameraToken) != null) {
+                    PrintFileHighlightWithCover(
+                        label = labels.fileLabel,
+                        fileName = labels.fileName,
+                        serverUrl = serverUrl,
+                        cameraToken = cameraToken,
+                        printerId = printerId,
+                        showCoverThumbnail = true,
                     )
-                    PrintFileNameText(
-                        fileName = labels.fileName.ifBlank { "—" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = labels.fileLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        PrintFileNameText(
+                            fileName = labels.fileName.ifBlank { "—" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
                 }
             }
         }

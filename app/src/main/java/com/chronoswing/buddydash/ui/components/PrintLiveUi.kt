@@ -3,6 +3,7 @@ package com.chronoswing.buddydash.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -11,6 +12,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
+import com.chronoswing.buddydash.network.printerCoverUrl
 import com.chronoswing.buddydash.util.formatFilenameForDisplay
 
 @Composable
@@ -64,6 +67,43 @@ fun PrintFileHighlight(
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
         )
+    }
+}
+
+@Composable
+fun PrintFileHighlightWithCover(
+    label: String,
+    fileName: String,
+    serverUrl: String,
+    cameraToken: String,
+    printerId: Int,
+    showCoverThumbnail: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val coverAvailable = remember(serverUrl, printerId, cameraToken) {
+        printerCoverUrl(serverUrl, printerId, cameraToken) != null
+    }
+    if (showCoverThumbnail && coverAvailable) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            PrinterCoverImage(
+                serverUrl = serverUrl,
+                cameraToken = cameraToken,
+                printerId = printerId,
+                size = 52.dp,
+                cornerRadius = 8.dp,
+            )
+            PrintFileHighlight(
+                label = label,
+                fileName = fileName,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    } else {
+        PrintFileHighlight(label = label, fileName = fileName, modifier = modifier)
     }
 }
 
