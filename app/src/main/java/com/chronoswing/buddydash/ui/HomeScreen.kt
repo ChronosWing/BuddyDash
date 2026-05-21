@@ -1,15 +1,19 @@
 package com.chronoswing.buddydash.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -27,8 +31,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chronoswing.buddydash.HomeViewModel
@@ -36,9 +42,13 @@ import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
+import com.chronoswing.buddydash.ui.components.FilamentChipRow
+import com.chronoswing.buddydash.ui.components.InlineProgress
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.theme.OnlineGreen
 import com.chronoswing.buddydash.ui.theme.OfflineRed
+import com.chronoswing.buddydash.util.PrinterCardLabels
+import com.chronoswing.buddydash.util.toCardLabels
 
 @Composable
 fun HomeScreen(
@@ -119,8 +129,8 @@ private fun HomeScreenContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     if (error != null) {
                         item {
@@ -132,7 +142,10 @@ private fun HomeScreenContent(
                         }
                     }
                     items(printers, key = { it.id }) { printer ->
-                        PrinterCard(printer = printer, onClick = { onPrinterClick(printer) })
+                        GlancePrinterCard(
+                            labels = printer.toCardLabels(),
+                            onClick = { onPrinterClick(printer) },
+                        )
                     }
                 }
             }
@@ -141,8 +154,8 @@ private fun HomeScreenContent(
 }
 
 @Composable
-private fun PrinterCard(
-    printer: Printer,
+private fun GlancePrinterCard(
+    labels: PrinterCardLabels,
     onClick: () -> Unit,
 ) {
     Card(
@@ -154,45 +167,123 @@ private fun PrinterCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = printer.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                printer.isOnline?.let { online ->
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (online) {
-                            stringResource(R.string.online)
-                        } else {
-                            stringResource(R.string.offline)
-                        },
-                        color = if (online) OnlineGreen else OfflineRed,
+                        text = labels.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    labels.subtitle?.let { subtitle ->
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    val dotColor = if (labels.isConnected) OnlineGreen else OfflineRed
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(dotColor),
+                    )
+                    Text(
+                        text = labels.connection,
                         style = MaterialTheme.typography.labelMedium,
+                        color = dotColor,
                     )
                 }
             }
-            printer.status?.let { status ->
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    text = stringResource(R.string.printer_status_label, status),
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = labels.currentActivity,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                labels.plateStatus?.let { plate ->
+                    Text(
+                        text = plate,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (labels.showLastPrint && labels.lastPrintResult != null) {
+                Text(
+                    text = stringResource(
+                        R.string.last_print_line,
+                        labels.lastPrintResult,
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            printer.model?.let { model ->
+
+            if (labels.progressText != null && labels.progressFraction != null) {
+                InlineProgress(
+                    label = stringResource(R.string.printing),
+                    value = labels.progressText,
+                    fraction = labels.progressFraction,
+                )
+            }
+
+            labels.fileLine?.let { file ->
                 Text(
-                    text = stringResource(R.string.printer_model_label, model),
+                    text = file,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = stringResource(R.string.nozzle_short, labels.nozzleTemp),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Text(
+                    text = stringResource(R.string.bed_short, labels.bedTemp),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Text(
+                    text = stringResource(R.string.hms_short, labels.hmsHealth),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (labels.hmsHasErrors) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+
+            FilamentChipRow(slots = labels.filamentSlots, compact = true)
         }
     }
 }

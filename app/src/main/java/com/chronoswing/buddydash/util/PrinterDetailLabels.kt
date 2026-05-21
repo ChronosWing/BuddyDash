@@ -1,15 +1,17 @@
 package com.chronoswing.buddydash.util
 
+import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.BambuddyApi
 
 // DEBUG: Set to false before release — keeps "Mark plate clear" visible for testing.
-private const val DEBUG_ALWAYS_SHOW_CLEAR_BUTTON = true
+private const val DEBUG_ALWAYS_SHOW_CLEAR_BUTTON = false
 
 data class PrinterDetailLabels(
     val connection: String,
     val currentActivity: String,
     val lastPrintResult: String?,
+    val showLastPrintOnCard: Boolean,
     val showFile: Boolean,
     val fileLabel: String,
     val fileName: String,
@@ -26,6 +28,7 @@ data class PrinterDetailLabels(
     val bedTemp: String,
     val hmsHealth: String,
     val hmsHasErrors: Boolean,
+    val filamentSlots: List<FilamentSlot>,
 )
 
 fun PrinterStatus.toDetailLabels(): PrinterDetailLabels {
@@ -33,44 +36,20 @@ fun PrinterStatus.toDetailLabels(): PrinterDetailLabels {
     val isPrinting = raw == "RUNNING"
     val isPaused = raw == "PAUSE"
     val isActivePrint = isPrinting || isPaused
-
-    val currentActivity = when {
-        !connected -> "Offline"
-        hmsErrorCount > 0 && !isActivePrint -> "Error"
-        isPrinting -> "Printing"
-        isPaused -> "Paused"
-        raw == "FAILED" -> "Error"
-        raw == "FINISH" || raw == "IDLE" || raw.isNullOrBlank() -> "Idle"
-        else -> formatStateLabel(raw) ?: "—"
-    }
-
-    val lastPrintResult = when (raw) {
-        "FINISH" -> if (awaitingPlateClear == true) "Finished" else null
-        "FAILED" -> "Failed"
-        "STOP", "STOPPED", "CANCEL", "CANCELLED" -> "Cancelled"
-        else -> null
-    }
+    val state = toStateDisplay()
 
     val showFile = isActivePrint || (
-        lastPrintResult != null && !fileName.isNullOrBlank()
+        state.lastPrintResult != null && !fileName.isNullOrBlank()
     )
     val fileLabel = if (isActivePrint) "Current file" else "Last file"
 
-    val showProgress = isActivePrint || (raw == "FINISH" && awaitingPlateClear == true)
-    val progressTitle = when {
-        isActivePrint -> "Progress"
-        raw == "FINISH" -> "Last print progress"
-        else -> "Progress"
-    }
-    val progressValue = when {
-        isActivePrint -> formatProgress(progress)
-        raw == "FINISH" -> "Completed"
-        else -> formatProgress(progress)
-    }
-    val progressFraction = when {
-        isActivePrint -> (progress ?: 0f).coerceIn(0f, 100f) / 100f
-        raw == "FINISH" -> 1f
-        else -> null
+    val showProgress = isActivePrint
+    val progressTitle = "Progress"
+    val progressValue = formatProgress(progress)
+    val progressFraction = if (isActivePrint) {
+        (progress ?: 0f).coerceIn(0f, 100f) / 100f
+    } else {
+        null
     }
 
     val plateStatus = awaitingPlateClear?.let { awaiting ->
@@ -79,8 +58,9 @@ fun PrinterStatus.toDetailLabels(): PrinterDetailLabels {
 
     return PrinterDetailLabels(
         connection = formatConnection(connected),
-        currentActivity = currentActivity,
-        lastPrintResult = lastPrintResult,
+        currentActivity = state.currentActivity,
+        lastPrintResult = state.lastPrintResult,
+        showLastPrintOnCard = state.showLastPrintOnCard,
         showFile = showFile,
         fileLabel = fileLabel,
         fileName = fileName.orEmpty(),
@@ -97,8 +77,6 @@ fun PrinterStatus.toDetailLabels(): PrinterDetailLabels {
         bedTemp = formatTemp(bedTemp),
         hmsHealth = formatHmsHealth(hmsErrorCount),
         hmsHasErrors = hmsErrorCount > 0,
+        filamentSlots = filamentSlots,
     )
 }
-
-private fun formatStateLabel(state: String): String? =
-    state.lowercase().replaceFirstChar { it.uppercase() }

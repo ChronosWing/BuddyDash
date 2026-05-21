@@ -31,4 +31,23 @@
     <string name="bed_temp">Bed temp</string>
     <string name="connection">Connection</string>
     <string name="hms_health">HMS health</string>
+    <string name="last_print_result_short">Last print</string>
+    <string name="last_print_line">Last print: %1$s</string>
+    <string name="printing">Printing</string>
+    <string name="nozzle_short">Nozzle %1$s</string>
+    <string name="bed_short">Bed %1$s</string>
+    <string name="hms_short">HMS %1$s</string>
+    <string name="no_filament_data">No filament data from printer</string>
+    <string name="slot_label">Slot</string>
+    <string name="filament_type">Filament type</string>
+    <string name="filament_remaining">Remaining</string>
+    <string name="filament_metadata">Spool</string>
+    <string name="refresh_status">Refresh printer status</string>
+    <string name="pause_print_placeholder">Pause print (coming soon)</string>
+    <string name="cancel_print_placeholder">Cancel print (coming soon)</string>
+    <string name="section_overview">Overview</string>
+    <string name="section_print">Print</string>
+    <string name="section_environment">Temperatures &amp; health</string>
+    <string name="filament_unknown">Unknown</string>
+    <string name="filament_empty">Empty</string>
 </resources>
