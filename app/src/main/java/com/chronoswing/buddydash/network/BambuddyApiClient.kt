@@ -150,6 +150,7 @@ class BambuddyApiClient {
         apiKey: String,
         path: String,
         method: String = "GET",
+        postBody: String? = null,
         parse: (String) -> T,
     ): Result<T> {
         val baseUrl = normalizeBambuddyBaseUrl(serverUrl)
@@ -166,7 +167,10 @@ class BambuddyApiClient {
             .header("X-API-Key", trimmedKey)
 
         val request = when (method) {
-            "POST" -> requestBuilder.post("".toRequestBody("application/json".toMediaType())).build()
+            "POST" -> {
+                val body = (postBody ?: "{}").toRequestBody("application/json".toMediaType())
+                requestBuilder.post(body).build()
+            }
             else -> requestBuilder.get().build()
         }
 
@@ -207,6 +211,32 @@ class BambuddyApiClient {
                 JSONObject(body).optString("message", "Plate marked clear")
             }
         }
+
+    suspend fun performMaintenance(
+        serverUrl: String,
+        apiKey: String,
+        itemId: Int,
+        notes: String? = null,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasMaintenancePerformEndpoint) {
+            return@withContext Result.failure(
+                UnsupportedOperationException("Maintenance perform endpoint not found"),
+            )
+        }
+        val body = JSONObject().apply {
+            if (!notes.isNullOrBlank()) put("notes", notes)
+        }
+        if (DEBUG_LOG_DETAIL_RAW) {
+            Log.d(TAG_DETAIL, "POST ${BambuddyApi.maintenancePerformPath(itemId)} body=$body")
+        }
+        runApiCall(
+            serverUrl = serverUrl,
+            apiKey = apiKey,
+            path = BambuddyApi.maintenancePerformPath(itemId),
+            method = "POST",
+            postBody = body.toString(),
+        ) { Unit }
+    }
 
     suspend fun fetchMaintenance(
         serverUrl: String,
@@ -483,11 +513,29 @@ class BambuddyApiClient {
         val itemsArray = json.optJSONArray("maintenance_items") ?: JSONArray()
         val items = List(itemsArray.length()) { index ->
             val item = itemsArray.getJSONObject(index)
+            val isDue = item.optBoolean("is_due", false)
+            val isWarning = item.optBoolean("is_warning", false)
+            val hoursUntilDue = item.optDouble("hours_until_due").takeIf {
+                item.has("hours_until_due") && !item.isNull("hours_until_due")
+            }
+            val daysUntilDue = item.optDouble("days_until_due").takeIf {
+                item.has("days_until_due") && !item.isNull("days_until_due")
+            }
+            if (DEBUG_LOG_DETAIL_RAW) {
+                Log.d(
+                    TAG_DETAIL,
+                    "maintenance raw id=${item.optInt("id")} name=${item.optString("maintenance_type_name")} " +
+                        "is_due=$isDue is_warning=$isWarning hours_until_due=$hoursUntilDue days_until_due=$daysUntilDue",
+                )
+            }
             MaintenanceItem(
+                id = item.optInt("id", -1),
                 name = item.optString("maintenance_type_name", "Maintenance"),
-                isDue = item.optBoolean("is_due", false),
-                isWarning = item.optBoolean("is_warning", false),
+                isDue = isDue,
+                isWarning = isWarning,
                 enabled = item.optBoolean("enabled", true),
+                hoursUntilDue = hoursUntilDue,
+                daysUntilDue = daysUntilDue,
             )
         }
         val totalPrintHours = json.optDouble("total_print_hours")

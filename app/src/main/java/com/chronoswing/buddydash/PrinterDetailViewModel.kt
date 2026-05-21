@@ -35,6 +35,8 @@ data class PrinterDetailUiState(
     val isControlBusy: Boolean = false,
     val plateClearSnackbar: PlateClearSnackbar? = null,
     val controlSnackbar: ControlSnackbar? = null,
+    val isMaintenanceResetBusy: Boolean = false,
+    val maintenanceResetSnackbar: MaintenanceResetSnackbar? = null,
 )
 
 enum class PlateClearSnackbar {
@@ -47,6 +49,11 @@ enum class ControlSnackbar {
     Failed,
     StopSuccess,
     StopFailed,
+}
+
+enum class MaintenanceResetSnackbar {
+    Success,
+    Failed,
 }
 
 class PrinterDetailViewModel(
@@ -262,5 +269,38 @@ class PrinterDetailViewModel(
 
     fun onControlSnackbarShown() {
         _uiState.update { it.copy(controlSnackbar = null) }
+    }
+
+    fun performMaintenanceReset(itemId: Int) {
+        if (printerId < 0 || itemId <= 0) return
+        val state = _uiState.value
+        if (!state.hasCredentials || state.isMaintenanceResetBusy) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isMaintenanceResetBusy = true) }
+            apiClient.performMaintenance(state.serverUrl, state.apiKey, itemId).fold(
+                onSuccess = {
+                    _uiState.update {
+                        it.copy(
+                            isMaintenanceResetBusy = false,
+                            maintenanceResetSnackbar = MaintenanceResetSnackbar.Success,
+                        )
+                    }
+                    loadStatus(showLoading = false)
+                },
+                onFailure = {
+                    _uiState.update {
+                        it.copy(
+                            isMaintenanceResetBusy = false,
+                            maintenanceResetSnackbar = MaintenanceResetSnackbar.Failed,
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    fun onMaintenanceResetSnackbarShown() {
+        _uiState.update { it.copy(maintenanceResetSnackbar = null) }
     }
 }

@@ -103,6 +103,12 @@
     <string name="control_success">Command sent</string>
     <string name="control_failed">Command failed</string>
     <string name="maintenance_due_suffix">due</string>
+    <string name="maintenance_soon_suffix">soon</string>
+    <string name="maintenance_reset">Reset</string>
+    <string name="maintenance_reset_confirm_title">Reset maintenance reminder?</string>
+    <string name="maintenance_reset_confirm_message">Only reset this after completing the maintenance task.</string>
+    <string name="maintenance_reset_success">Maintenance reminder reset</string>
+    <string name="maintenance_reset_failed">Failed to reset maintenance reminder</string>
     <string name="firmware_compact">FW %1$s</string>
     <string name="fan_tag_part">P</string>
     <string name="fan_tag_aux">A</string>

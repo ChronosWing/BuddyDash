@@ -1,8 +1,10 @@
 package com.chronoswing.buddydash.util
 
+import android.util.Log
 import com.chronoswing.buddydash.data.model.AmsUnitInfo
 import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.network.BambuddyApi
 import kotlin.math.roundToInt
 
 enum class PrintSpeedMode(val apiValue: Int, val label: String) {
@@ -77,16 +79,34 @@ fun formatAmsUnitLabel(amsId: Int): String {
     return "AMS-$letter"
 }
 
+private const val DEBUG_LOG_MAINTENANCE = true
+private const val TAG_MAINTENANCE = "BuddyDash/Maintenance"
+
 enum class MaintenanceLineKind {
-    Healthy,
-    Warning,
+    Ok,
+    DueSoon,
     Due,
 }
 
 data class MaintenanceLine(
+    val itemId: Int,
     val name: String,
     val kind: MaintenanceLineKind,
+    val canReset: Boolean = false,
 )
+
+/** Reset only when Bambuddy marks the item due (`is_due`), not due-soon (`is_warning`). */
+fun canResetMaintenanceItem(item: MaintenanceItem): Boolean =
+    BambuddyApi.hasMaintenancePerformEndpoint &&
+        item.id > 0 &&
+        item.enabled &&
+        item.isDue
+
+fun resolveMaintenanceLineKind(item: MaintenanceItem): MaintenanceLineKind = when {
+    item.isDue -> MaintenanceLineKind.Due
+    item.isWarning -> MaintenanceLineKind.DueSoon
+    else -> MaintenanceLineKind.Ok
+}
 
 /** Short dashboard-style label from Bambuddy maintenance type names. */
 fun shortenMaintenanceName(raw: String): String {
@@ -116,13 +136,32 @@ fun maintenanceDisplayLines(items: List<MaintenanceItem>): List<MaintenanceLine>
     items
         .filter { it.enabled }
         .map { item ->
-            val kind = when {
-                item.isDue -> MaintenanceLineKind.Due
-                item.isWarning -> MaintenanceLineKind.Warning
-                else -> MaintenanceLineKind.Healthy
+            val kind = resolveMaintenanceLineKind(item)
+            val canReset = canResetMaintenanceItem(item)
+            val line = MaintenanceLine(
+                itemId = item.id,
+                name = shortenMaintenanceName(item.name),
+                kind = kind,
+                canReset = canReset,
+            )
+            if (DEBUG_LOG_MAINTENANCE) {
+                val displayLabel = maintenanceDisplayLabel(line)
+                Log.d(
+                    TAG_MAINTENANCE,
+                    "item name=${item.name} is_due=${item.isDue} is_warning=${item.isWarning} " +
+                        "hours_until_due=${item.hoursUntilDue} days_until_due=${item.daysUntilDue} " +
+                        "kind=$kind resettable=${canReset} label=\"$displayLabel\" showReset=$canReset",
+                )
             }
-            MaintenanceLine(name = shortenMaintenanceName(item.name), kind = kind)
+            line
         }
+
+/** Full label as shown in the maintenance row (for debug logging). */
+fun maintenanceDisplayLabel(line: MaintenanceLine): String = when (line.kind) {
+    MaintenanceLineKind.Ok -> line.name
+    MaintenanceLineKind.DueSoon -> "${line.name} soon"
+    MaintenanceLineKind.Due -> "${line.name} due"
+}
 
 fun PrinterStatus.hasConnectivitySection(totalPrintHours: Double? = null): Boolean =
     formatWifiCompact(wifiSignalDbm, wiredNetwork) != null ||
