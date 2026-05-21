@@ -18,15 +18,19 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chronoswing.buddydash.PlateClearSnackbar
 import com.chronoswing.buddydash.PrinterDetailViewModel
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.ui.components.ErrorContent
@@ -54,9 +58,11 @@ fun PrinterDetailScreen(
         error = uiState.error,
         labels = labels,
         isClearingPlate = uiState.isClearingPlate,
+        plateClearSnackbar = uiState.plateClearSnackbar,
         onBack = onBack,
         onRetry = viewModel::loadStatus,
         onMarkPlateClear = viewModel::markPlateClear,
+        onPlateClearSnackbarShown = viewModel::onPlateClearSnackbarShown,
     )
 }
 
@@ -68,11 +74,28 @@ private fun PrinterDetailScreenContent(
     error: String?,
     labels: PrinterDetailLabels?,
     isClearingPlate: Boolean,
+    plateClearSnackbar: PlateClearSnackbar?,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onMarkPlateClear: () -> Unit,
+    onPlateClearSnackbarShown: () -> Unit,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val plateClearSuccessMessage = stringResource(R.string.plate_clear_success)
+    val plateClearFailedMessage = stringResource(R.string.plate_clear_failed)
+
+    LaunchedEffect(plateClearSnackbar) {
+        val message = when (plateClearSnackbar) {
+            PlateClearSnackbar.Success -> plateClearSuccessMessage
+            PlateClearSnackbar.Failed -> plateClearFailedMessage
+            null -> return@LaunchedEffect
+        }
+        snackbarHostState.showSnackbar(message)
+        onPlateClearSnackbarShown()
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(title) },

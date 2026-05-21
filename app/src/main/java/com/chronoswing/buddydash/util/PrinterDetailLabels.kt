@@ -3,6 +3,9 @@ package com.chronoswing.buddydash.util
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.BambuddyApi
 
+// DEBUG: Set to false before release — keeps "Mark plate clear" visible for testing.
+private const val DEBUG_ALWAYS_SHOW_CLEAR_BUTTON = true
+
 data class PrinterDetailLabels(
     val connection: String,
     val currentActivity: String,
@@ -86,7 +89,7 @@ fun PrinterStatus.toDetailLabels(): PrinterDetailLabels {
         progressValue = progressValue,
         progressFraction = progressFraction,
         plateStatus = plateStatus,
-        showPlateClearAction = plateStatus == "Not clear",
+        showPlateClearAction = plateStatus == "Not clear" || DEBUG_ALWAYS_SHOW_CLEAR_BUTTON,
         plateClearEndpointAvailable = BambuddyApi.hasClearPlateEndpoint,
         showEta = isActivePrint && (remainingTimeSeconds ?: 0) > 0,
         eta = formatEta(remainingTimeSeconds),

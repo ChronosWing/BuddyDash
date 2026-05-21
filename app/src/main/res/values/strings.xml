@@ -24,6 +24,8 @@
     <string name="mark_plate_clear">Mark plate clear</string>
     <string name="plate_clear_endpoint_not_found">Plate clear endpoint not found</string>
     <string name="marking_plate_clear">Marking plate clear…</string>
+    <string name="plate_clear_success">Plate marked clear ✓</string>
+    <string name="plate_clear_failed">Failed to mark plate clear</string>
     <string name="eta">ETA</string>
     <string name="nozzle_temp">Nozzle temp</string>
     <string name="bed_temp">Bed temp</string>

@@ -21,7 +21,13 @@ data class PrinterDetailUiState(
     val apiKey: String = "",
     val hasCredentials: Boolean = false,
     val isClearingPlate: Boolean = false,
+    val plateClearSnackbar: PlateClearSnackbar? = null,
 )
+
+enum class PlateClearSnackbar {
+    Success,
+    Failed,
+}
 
 class PrinterDetailViewModel(
     private val settingsRepository: SettingsRepository,
@@ -110,18 +116,27 @@ class PrinterDetailViewModel(
             _uiState.update { it.copy(isClearingPlate = true, error = null) }
             apiClient.clearPlate(state.serverUrl, state.apiKey, printerId).fold(
                 onSuccess = {
-                    _uiState.update { it.copy(isClearingPlate = false) }
-                    loadStatus(showLoading = false)
-                },
-                onFailure = { error ->
                     _uiState.update {
                         it.copy(
                             isClearingPlate = false,
-                            error = error.message ?: "Failed to mark plate clear",
+                            plateClearSnackbar = PlateClearSnackbar.Success,
+                        )
+                    }
+                    loadStatus(showLoading = false)
+                },
+                onFailure = {
+                    _uiState.update {
+                        it.copy(
+                            isClearingPlate = false,
+                            plateClearSnackbar = PlateClearSnackbar.Failed,
                         )
                     }
                 },
             )
         }
+    }
+
+    fun onPlateClearSnackbarShown() {
+        _uiState.update { it.copy(plateClearSnackbar = null) }
     }
 }
