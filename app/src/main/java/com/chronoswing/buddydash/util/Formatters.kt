@@ -1,5 +1,7 @@
 package com.chronoswing.buddydash.util
 
+import kotlin.math.roundToInt
+
 /** Returns null when ETA should be hidden (unavailable or unreliable). */
 fun formatEta(seconds: Int?): String? {
     if (seconds == null || seconds <= 0) return null
@@ -12,18 +14,16 @@ fun formatEta(seconds: Int?): String? {
     }
 }
 
+/** UI display only — rounds to whole degrees. */
 fun formatTemp(value: Double?): String {
     if (value == null) return "—"
-    return if (value % 1.0 == 0.0) {
-        "${value.toInt()}°C"
-    } else {
-        String.format("%.1f°C", value)
-    }
+    return "${value.roundToInt()}°C"
 }
 
+/** UI display only — rounds to whole degrees. */
 fun formatTempShort(value: Double?): String {
     if (value == null) return "—"
-    return "${value.toInt()}°"
+    return "${value.roundToInt()}°"
 }
 
 fun buildPrintHeadline(activity: String, progressText: String?): String {
