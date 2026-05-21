@@ -31,6 +31,14 @@ class BambuddyOpenApiTest {
     }
 
     @Test
+    fun queueAddEndpoint_matchesOpenApiSpec() {
+        val spec = findOpenApiSpec().readText()
+        assertTrue(spec.contains("\"${BambuddyApi.QUEUE_ADD_PATH}\""))
+        assertTrue(spec.contains("add_to_queue_api_v1_queue__post"))
+        assertTrue(spec.contains("PrintQueueItemCreate"))
+    }
+
+    @Test
     fun spoolInventoryEndpoints_matchOpenApiSpec() {
         val spec = findOpenApiSpec().readText()
         assertTrue(spec.contains("\"${BambuddyApi.INVENTORY_SPOOLS_PATH}\""))

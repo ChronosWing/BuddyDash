@@ -191,6 +191,11 @@ fun BuddyDashNav(
                     archiveId = archiveId,
                     viewModel = viewModel,
                     onBack = { navController.popBackStack() },
+                    onViewQueue = { printerId, printerName, printerModel ->
+                        navController.navigate(
+                            Routes.printerDetail(printerId, printerName, printerModel),
+                        )
+                    },
                 )
             }
 

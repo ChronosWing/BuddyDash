@@ -74,6 +74,16 @@
     <string name="archive_label_project">Project</string>
     <string name="archive_label_model">Sliced for</string>
     <string name="archive_label_notes">Notes</string>
+    <string name="archive_reprint_queue_again">Queue Again</string>
+    <string name="archive_reprint_queue_print">Queue Print</string>
+    <string name="archive_reprint_quantity">Quantity</string>
+    <string name="archive_reprint_decrease_quantity">Decrease quantity</string>
+    <string name="archive_reprint_increase_quantity">Increase quantity</string>
+    <string name="archive_reprint_incompatible_hidden">%1$d incompatible printer hidden</string>
+    <string name="archive_reprint_no_printers">No compatible printers available</string>
+    <string name="archive_reprint_success">Added to queue</string>
+    <string name="archive_reprint_failed">Could not queue print</string>
+    <string name="archive_reprint_view_queue">View Queue</string>
     <string name="spools_title">Spools</string>
     <string name="spools_count">%1$d spools</string>
     <string name="spools_search_hint">Search material, color, brand…</string>

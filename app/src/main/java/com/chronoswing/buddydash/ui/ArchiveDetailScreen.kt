@@ -9,22 +9,29 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chronoswing.buddydash.ArchiveDetailViewModel
+import com.chronoswing.buddydash.ArchiveReprintSheetState
+import com.chronoswing.buddydash.ArchiveReprintSnackbar
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.ui.components.ArchiveThumbnail
@@ -49,6 +56,7 @@ fun ArchiveDetailScreen(
     archiveId: Int,
     viewModel: ArchiveDetailViewModel,
     onBack: () -> Unit,
+    onViewQueue: (printerId: Int, printerName: String, printerModel: String?) -> Unit,
 ) {
     LaunchedEffect(archiveId) {
         viewModel.init(archiveId)
@@ -62,8 +70,22 @@ fun ArchiveDetailScreen(
         error = uiState.error,
         serverUrl = uiState.serverUrl,
         cameraToken = uiState.cameraToken,
+        hasCredentials = uiState.hasCredentials,
+        reprintSheet = uiState.reprintSheet,
+        reprintSnackbar = uiState.reprintSnackbar,
         onBack = onBack,
         onRetry = viewModel::loadArchive,
+        onQueueAgain = viewModel::onQueueAgainClick,
+        onDismissReprintSheet = viewModel::onDismissReprintSheet,
+        onReprintPrinterSelected = viewModel::onReprintPrinterSelected,
+        onReprintQuantityChange = viewModel::onReprintQuantityChange,
+        onConfirmQueuePrint = viewModel::onConfirmQueuePrint,
+        onReprintSnackbarShown = viewModel::onReprintSnackbarShown,
+        onViewQueue = {
+            val id = uiState.queuedPrinterId ?: return@ArchiveDetailScreenContent
+            val name = uiState.queuedPrinterName ?: return@ArchiveDetailScreenContent
+            onViewQueue(id, name, uiState.queuedPrinterModel)
+        },
     )
 }
 
@@ -75,10 +97,47 @@ private fun ArchiveDetailScreenContent(
     error: String?,
     serverUrl: String,
     cameraToken: String,
+    hasCredentials: Boolean,
+    reprintSheet: ArchiveReprintSheetState,
+    reprintSnackbar: ArchiveReprintSnackbar?,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onQueueAgain: () -> Unit,
+    onDismissReprintSheet: () -> Unit,
+    onReprintPrinterSelected: (Int) -> Unit,
+    onReprintQuantityChange: (Int) -> Unit,
+    onConfirmQueuePrint: () -> Unit,
+    onReprintSnackbarShown: () -> Unit,
+    onViewQueue: () -> Unit,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val successMessage = stringResource(R.string.archive_reprint_success)
+    val failedMessage = stringResource(R.string.archive_reprint_failed)
+    val viewQueueAction = stringResource(R.string.archive_reprint_view_queue)
+
+    LaunchedEffect(reprintSnackbar) {
+        when (reprintSnackbar) {
+            ArchiveReprintSnackbar.Success -> {
+                val result = snackbarHostState.showSnackbar(
+                    message = successMessage,
+                    actionLabel = viewQueueAction,
+                    withDismissAction = true,
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    onViewQueue()
+                }
+                onReprintSnackbarShown()
+            }
+            ArchiveReprintSnackbar.Failed -> {
+                snackbarHostState.showSnackbar(failedMessage)
+                onReprintSnackbarShown()
+            }
+            null -> Unit
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.archive_detail_title)) },
@@ -91,6 +150,19 @@ private fun ArchiveDetailScreenContent(
                     }
                 },
             )
+        },
+        bottomBar = {
+            if (archive != null && hasCredentials) {
+                Button(
+                    onClick = onQueueAgain,
+                    enabled = !isLoading && !reprintSheet.isSubmitting,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                ) {
+                    Text(stringResource(R.string.archive_reprint_queue_again))
+                }
+            }
         },
     ) { innerPadding ->
         when {
@@ -119,6 +191,16 @@ private fun ArchiveDetailScreenContent(
                         cameraToken = cameraToken,
                     )
                 }
+                ArchiveReprintSheet(
+                    archive = archive,
+                    serverUrl = serverUrl,
+                    cameraToken = cameraToken,
+                    sheetState = reprintSheet,
+                    onDismiss = onDismissReprintSheet,
+                    onPrinterSelected = onReprintPrinterSelected,
+                    onQuantityChange = onReprintQuantityChange,
+                    onConfirm = onConfirmQueuePrint,
+                )
             }
         }
     }
