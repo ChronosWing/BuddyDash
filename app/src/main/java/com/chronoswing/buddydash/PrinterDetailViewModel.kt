@@ -19,6 +19,7 @@ data class PrinterDetailUiState(
     val error: String? = null,
     val serverUrl: String = "",
     val apiKey: String = "",
+    val hasCredentials: Boolean = false,
 )
 
 class PrinterDetailViewModel(
@@ -38,22 +39,42 @@ class PrinterDetailViewModel(
                 settingsRepository.apiKey,
             ) { url, key -> url to key }
                 .collect { (url, key) ->
-                    _uiState.update { it.copy(serverUrl = url, apiKey = key) }
+                    _uiState.update {
+                        it.copy(
+                            serverUrl = url,
+                            apiKey = key,
+                            hasCredentials = url.isNotBlank() && key.isNotBlank(),
+                        )
+                    }
+                    maybeLoadStatus()
                 }
         }
     }
 
     fun init(printerId: Int, printerName: String) {
         this.printerId = printerId
-        _uiState.update { it.copy(printerName = printerName) }
+        _uiState.update {
+            it.copy(printerName = printerName, error = null, isLoading = true)
+        }
+        maybeLoadStatus()
+    }
+
+    private fun maybeLoadStatus() {
+        val state = _uiState.value
+        if (printerId < 0 || !state.hasCredentials) return
         loadStatus()
     }
 
     fun loadStatus() {
         if (printerId < 0) return
         val state = _uiState.value
-        if (state.serverUrl.isBlank() || state.apiKey.isBlank()) {
-            _uiState.update { it.copy(error = "Configure server URL and API key in Settings") }
+        if (!state.hasCredentials) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    error = "Configure server URL and API key in Settings",
+                )
+            }
             return
         }
 
