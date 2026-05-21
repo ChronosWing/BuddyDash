@@ -23,6 +23,10 @@ class SettingsRepository(private val context: Context) {
         preferences[API_KEY_KEY].orEmpty()
     }
 
+    val cameraToken: Flow<String> = context.settingsDataStore.data.map { preferences ->
+        preferences[CAMERA_TOKEN_KEY].orEmpty()
+    }
+
     suspend fun saveServerUrl(url: String) {
         context.settingsDataStore.edit { preferences ->
             preferences[SERVER_URL_KEY] = url
@@ -35,8 +39,15 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
+    suspend fun saveCameraToken(token: String) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[CAMERA_TOKEN_KEY] = token
+        }
+    }
+
     companion object {
         private val SERVER_URL_KEY = stringPreferencesKey("server_url")
         private val API_KEY_KEY = stringPreferencesKey("api_key")
+        private val CAMERA_TOKEN_KEY = stringPreferencesKey("camera_token")
     }
 }

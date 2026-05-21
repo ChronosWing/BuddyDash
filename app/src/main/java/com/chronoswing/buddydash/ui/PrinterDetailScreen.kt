@@ -89,7 +89,7 @@ fun PrinterDetailScreen(
         title = uiState.printerName.ifBlank { printerName },
         printerId = printerId,
         serverUrl = uiState.serverUrl,
-        apiKey = uiState.apiKey,
+        cameraToken = uiState.cameraToken,
         isLoading = uiState.isLoading,
         isRefreshing = uiState.isRefreshing,
         error = uiState.error,
@@ -111,7 +111,7 @@ private fun PrinterDetailScreenContent(
     title: String,
     printerId: Int,
     serverUrl: String,
-    apiKey: String,
+    cameraToken: String,
     isLoading: Boolean,
     isRefreshing: Boolean,
     error: String?,
@@ -196,7 +196,7 @@ private fun PrinterDetailScreenContent(
                                     labels = labels,
                                     printerId = printerId,
                                     serverUrl = serverUrl,
-                                    apiKey = apiKey,
+                                    cameraToken = cameraToken,
                                     isClearingPlate = isClearingPlate,
                                     onMarkPlateClear = onMarkPlateClear,
                                 )
@@ -221,7 +221,7 @@ private fun StatusTab(
     labels: PrinterDetailLabels,
     printerId: Int,
     serverUrl: String,
-    apiKey: String,
+    cameraToken: String,
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
 ) {
@@ -230,7 +230,7 @@ private fun StatusTab(
             labels = labels,
             printerId = printerId,
             serverUrl = serverUrl,
-            apiKey = apiKey,
+            cameraToken = cameraToken,
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
         )
@@ -239,7 +239,7 @@ private fun StatusTab(
             labels = labels,
             printerId = printerId,
             serverUrl = serverUrl,
-            apiKey = apiKey,
+            cameraToken = cameraToken,
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
         )
@@ -251,13 +251,13 @@ private fun ActivePrintStatusTab(
     labels: PrinterDetailLabels,
     printerId: Int,
     serverUrl: String,
-    apiKey: String,
+    cameraToken: String,
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
 ) {
     PrinterCoverImage(
         serverUrl = serverUrl,
-        apiKey = apiKey,
+        cameraToken = cameraToken,
         printerId = printerId,
         height = 160.dp,
     )
@@ -340,13 +340,13 @@ private fun IdleStatusTab(
     labels: PrinterDetailLabels,
     printerId: Int,
     serverUrl: String,
-    apiKey: String,
+    cameraToken: String,
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
 ) {
     PrinterCoverImage(
         serverUrl = serverUrl,
-        apiKey = apiKey,
+        cameraToken = cameraToken,
         printerId = printerId,
         height = 160.dp,
     )

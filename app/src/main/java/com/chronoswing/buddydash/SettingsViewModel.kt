@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 data class SettingsUiState(
     val serverUrl: String = "",
     val apiKey: String = "",
+    val cameraToken: String = "",
     val statusMessage: String? = null,
     val isSuccess: Boolean? = null,
     val isLoading: Boolean = false,
@@ -38,6 +39,11 @@ class SettingsViewModel(
                 _uiState.update { it.copy(apiKey = key) }
             }
         }
+        viewModelScope.launch {
+            settingsRepository.cameraToken.collect { token ->
+                _uiState.update { it.copy(cameraToken = token) }
+            }
+        }
     }
 
     fun onServerUrlChange(url: String) {
@@ -48,11 +54,16 @@ class SettingsViewModel(
         _uiState.update { it.copy(apiKey = key, saved = false) }
     }
 
+    fun onCameraTokenChange(token: String) {
+        _uiState.update { it.copy(cameraToken = token, saved = false) }
+    }
+
     fun saveSettings() {
         val state = _uiState.value
         viewModelScope.launch {
             settingsRepository.saveServerUrl(state.serverUrl)
             settingsRepository.saveApiKey(state.apiKey)
+            settingsRepository.saveCameraToken(state.cameraToken)
             _uiState.update {
                 it.copy(saved = true, statusMessage = null, isSuccess = null)
             }

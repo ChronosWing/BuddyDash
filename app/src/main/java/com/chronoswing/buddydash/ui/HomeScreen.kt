@@ -71,7 +71,7 @@ fun HomeScreen(
         error = uiState.error,
         hasCredentials = uiState.hasCredentials,
         serverUrl = uiState.serverUrl,
-        apiKey = uiState.apiKey,
+        cameraToken = uiState.cameraToken,
         onRefresh = {
             viewModel.loadPrinters(showLoading = uiState.printers.isEmpty())
         },
@@ -92,7 +92,7 @@ private fun HomeScreenContent(
     error: String?,
     hasCredentials: Boolean,
     serverUrl: String,
-    apiKey: String,
+    cameraToken: String,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
     onPrinterClick: (Printer) -> Unit,
@@ -170,7 +170,7 @@ private fun HomeScreenContent(
                                 labels = printer.toCardLabels(),
                                 printerId = printer.id,
                                 serverUrl = serverUrl,
-                                apiKey = apiKey,
+                                cameraToken = cameraToken,
                                 onClick = { onPrinterClick(printer) },
                             )
                         }
@@ -186,7 +186,7 @@ private fun GlancePrinterCard(
     labels: PrinterCardLabels,
     printerId: Int,
     serverUrl: String,
-    apiKey: String,
+    cameraToken: String,
     onClick: () -> Unit,
 ) {
     Card(
@@ -262,7 +262,7 @@ private fun GlancePrinterCard(
                     }
                     PrinterCoverImage(
                         serverUrl = serverUrl,
-                        apiKey = apiKey,
+                        cameraToken = cameraToken,
                         printerId = printerId,
                         size = 56.dp,
                     )

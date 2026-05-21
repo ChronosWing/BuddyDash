@@ -14,6 +14,8 @@ import com.chronoswing.buddydash.util.isTrayLoaded
 import com.chronoswing.buddydash.util.normalizeFilamentType
 import com.chronoswing.buddydash.util.normalizeTrayColor
 import com.chronoswing.buddydash.util.parseInventoryByPrinter
+import com.chronoswing.buddydash.util.etaDebugLogLine
+import com.chronoswing.buddydash.util.parseRemainingTimeSeconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -34,6 +36,9 @@ class BambuddyApiClient {
         /** Temporary: log raw AMS / vt_tray JSON from status responses. Set false before release. */
         private const val DEBUG_LOG_FILAMENT_RAW = true
         private const val TAG_FILAMENT = "BuddyDash/Filament"
+        /** Temporary: log ETA-related raw fields during active prints. Set false before release. */
+        private const val DEBUG_LOG_ETA_RAW = true
+        private const val TAG_ETA = "BuddyDash/Eta"
     }
 
     private val client = OkHttpClient.Builder()
@@ -213,8 +218,16 @@ class BambuddyApiClient {
                 .takeIf { json.has("progress") && !json.isNull("progress") }
                 ?.toFloat(),
             fileName = resolveFileName(json),
-            remainingTimeSeconds = json.optInt("remaining_time")
-                .takeIf { json.has("remaining_time") && !json.isNull("remaining_time") },
+            remainingTimeSeconds = run {
+                val rawState = json.optString("state").takeIf { it.isNotBlank() }
+                val seconds = parseRemainingTimeSeconds(json)
+                if (DEBUG_LOG_ETA_RAW) {
+                    etaDebugLogLine(json, rawState, seconds)?.let { line ->
+                        Log.d(TAG_ETA, line)
+                    }
+                }
+                seconds
+            },
             nozzleTemp = temperatures?.optDouble("nozzle"),
             bedTemp = temperatures?.optDouble("bed"),
             hmsErrorCount = hmsErrors?.length() ?: 0,

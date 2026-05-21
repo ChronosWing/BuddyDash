@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,10 +20,14 @@ import coil.request.ImageRequest
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.network.printerCoverUrl
 
+/** Temporary: log cover URL and load failures. Set false before release. */
+private const val DEBUG_LOG_COVER = true
+private const val TAG_COVER = "BuddyDash/Cover"
+
 @Composable
 fun PrinterCoverImage(
     serverUrl: String,
-    apiKey: String,
+    cameraToken: String,
     printerId: Int,
     modifier: Modifier = Modifier,
     size: Dp? = null,
@@ -30,16 +35,37 @@ fun PrinterCoverImage(
     cornerRadius: Dp = 10.dp,
 ) {
     if (size == null && height == null) return
-    val imageUrl = remember(serverUrl, printerId) { printerCoverUrl(serverUrl, printerId) }
-    val trimmedKey = apiKey.trim()
-    if (imageUrl == null || trimmedKey.isEmpty() || printerId < 0) return
+    val imageUrl = remember(serverUrl, printerId, cameraToken) {
+        printerCoverUrl(serverUrl, printerId, cameraToken)
+    }
+    if (imageUrl == null || printerId < 0) return
 
     val context = LocalContext.current
-    val request = remember(imageUrl, trimmedKey) {
+    val request = remember(imageUrl) {
         ImageRequest.Builder(context)
             .data(imageUrl)
-            .addHeader("X-API-Key", trimmedKey)
             .crossfade(false)
+            .listener(
+                onStart = {
+                    if (DEBUG_LOG_COVER) {
+                        Log.d(TAG_COVER, "Cover load start printerId=$printerId")
+                    }
+                },
+                onSuccess = { _, _ ->
+                    if (DEBUG_LOG_COVER) {
+                        Log.d(TAG_COVER, "Cover load ok printerId=$printerId")
+                    }
+                },
+                onError = { _, result ->
+                    if (DEBUG_LOG_COVER) {
+                        Log.d(
+                            TAG_COVER,
+                            "Cover load failed printerId=$printerId url=${redactCoverToken(imageUrl)} " +
+                                "error=${result.throwable.message}",
+                        )
+                    }
+                },
+            )
             .build()
     }
     val shape = RoundedCornerShape(cornerRadius)
@@ -66,3 +92,6 @@ fun PrinterCoverImage(
         },
     )
 }
+
+private fun redactCoverToken(url: String): String =
+    url.replace(Regex("token=[^&]+"), "token=***")

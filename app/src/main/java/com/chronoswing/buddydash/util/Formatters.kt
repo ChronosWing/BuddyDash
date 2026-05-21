@@ -1,14 +1,14 @@
 package com.chronoswing.buddydash.util
 
-fun formatEta(seconds: Int?): String {
-    if (seconds == null || seconds <= 0) return "—"
+/** Returns null when ETA should be hidden (unavailable or unreliable). */
+fun formatEta(seconds: Int?): String? {
+    if (seconds == null || seconds <= 0) return null
     val hours = seconds / 3600
     val minutes = (seconds % 3600) / 60
-    val secs = seconds % 60
     return when {
-        hours > 0 -> "${hours}h ${minutes}m"
+        hours > 0 -> "${hours}h ${minutes.toString().padStart(2, '0')}m"
         minutes > 0 -> "${minutes}m"
-        else -> "${secs}s"
+        else -> "<1m"
     }
 }
 

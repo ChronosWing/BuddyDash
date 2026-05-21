@@ -75,7 +75,7 @@ fun Printer.toCardLabels(): PrinterCardLabels {
     val progressCompact = activityKind.progressSuffix(status.progress)
     val plateKind = status.resolvePlateKind()
     val etaFormatted = formatEta(status.remainingTimeSeconds)
-    val showEta = isActivePrint && etaFormatted != "—"
+    val showEta = isActivePrint && etaFormatted != null
 
     return PrinterCardLabels(
         title = title,
