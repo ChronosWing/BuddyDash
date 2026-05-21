@@ -42,9 +42,13 @@
     <string name="filament_type">Filament type</string>
     <string name="filament_remaining">Remaining</string>
     <string name="filament_metadata">Spool</string>
-    <string name="refresh_status">Refresh printer status</string>
-    <string name="pause_print_placeholder">Pause print (coming soon)</string>
-    <string name="cancel_print_placeholder">Cancel print (coming soon)</string>
+    <string name="refresh_status">Refresh status</string>
+    <string name="controls_section_status">Status actions</string>
+    <string name="controls_section_quick_actions">Quick actions</string>
+    <string name="coming_soon">Coming soon</string>
+    <string name="toggle_light">Toggle light</string>
+    <string name="camera_view">Camera view</string>
+    <string name="printer_files">Files</string>
     <string name="section_overview">Overview</string>
     <string name="section_print">Print</string>
     <string name="section_environment">Temperatures &amp; health</string>
