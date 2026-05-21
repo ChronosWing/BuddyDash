@@ -11,11 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
@@ -57,7 +53,6 @@ import com.chronoswing.buddydash.ui.components.DetailFansCard
 import com.chronoswing.buddydash.ui.components.DetailMaintenanceCard
 import com.chronoswing.buddydash.ui.components.DetailPrintSpeedCard
 import com.chronoswing.buddydash.ui.components.FilamentAmsEnvironmentSection
-import com.chronoswing.buddydash.ui.components.ChamberLightControlChip
 import com.chronoswing.buddydash.ui.components.MotionControlsSection
 import com.chronoswing.buddydash.ui.components.PrintSpeedControlChips
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
@@ -67,7 +62,8 @@ import com.chronoswing.buddydash.ui.components.FilamentDetailGroups
 import com.chronoswing.buddydash.ui.components.FilamentUsageText
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
 import com.chronoswing.buddydash.ui.components.DetailPrintQueueSection
-import com.chronoswing.buddydash.ui.components.StartNextPrintAction
+import com.chronoswing.buddydash.ui.components.PrinterStatusQuickActions
+import com.chronoswing.buddydash.ui.components.SectionHeaderRow
 import com.chronoswing.buddydash.ui.components.DetailStatusHeroImage
 import com.chronoswing.buddydash.ui.components.HighlightValue
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
@@ -343,11 +339,16 @@ private fun PrinterDetailScreenContent(
                                     startNextQueuedPrintReadiness = startNextQueuedPrintReadiness,
                                     isStartingQueuedPrint = isStartingQueuedPrint,
                                     isClearingPlate = isClearingPlate,
+                                    isControlBusy = isControlBusy,
                                     isMaintenanceResetBusy = isMaintenanceResetBusy,
                                     onMarkPlateClear = onMarkPlateClear,
                                     onPerformMaintenanceReset = onPerformMaintenanceReset,
                                     onViewFullQueue = onViewFullQueue,
                                     onStartNextQueuedPrint = onStartNextQueuedPrint,
+                                    onToggleLight = onToggleLight,
+                                    onPausePrint = onPausePrint,
+                                    onResumePrint = onResumePrint,
+                                    onStopPrint = onStopPrint,
                                 )
                                 1 -> FilamentTab(labels = labels)
                                 2 -> ControlsTab(
@@ -355,10 +356,6 @@ private fun PrinterDetailScreenContent(
                                     isClearingPlate = isClearingPlate,
                                     isControlBusy = isControlBusy,
                                     onSetPrintSpeed = onSetPrintSpeed,
-                                    onPausePrint = onPausePrint,
-                                    onResumePrint = onResumePrint,
-                                    onStopPrint = onStopPrint,
-                                    onToggleLight = onToggleLight,
                                     onJogBedUp = onJogBedUp,
                                     onJogBedDown = onJogBedDown,
                                 )
@@ -388,7 +385,28 @@ private fun StatusTab(
     onPerformMaintenanceReset: (Int) -> Unit,
     onViewFullQueue: () -> Unit,
     onStartNextQueuedPrint: () -> Unit,
+    onToggleLight: () -> Unit,
+    onPausePrint: () -> Unit,
+    onResumePrint: () -> Unit,
+    onStopPrint: () -> Unit,
+    isControlBusy: Boolean,
 ) {
+    val quickActions: @Composable () -> Unit = {
+        PrinterStatusQuickActions(
+            labels = labels,
+            printerName = printerName,
+            showStartNextPrint = showStartNextPrint,
+            startReadiness = startNextQueuedPrintReadiness,
+            isStartingQueuedPrint = isStartingQueuedPrint,
+            isControlBusy = isControlBusy,
+            isClearingPlate = isClearingPlate,
+            onToggleLight = onToggleLight,
+            onPausePrint = onPausePrint,
+            onResumePrint = onResumePrint,
+            onStopPrint = onStopPrint,
+            onStartNextQueuedPrint = onStartNextQueuedPrint,
+        )
+    }
     if (labels.isActivePrint) {
         ActivePrintStatusTab(
             labels = labels,
@@ -397,6 +415,7 @@ private fun StatusTab(
             cameraToken = cameraToken,
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
+            headerTrailing = quickActions,
         )
     } else {
         IdleStatusTab(
@@ -406,14 +425,7 @@ private fun StatusTab(
             cameraToken = cameraToken,
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
-        )
-    }
-    if (showStartNextPrint) {
-        StartNextPrintAction(
-            printerName = printerName,
-            readiness = startNextQueuedPrintReadiness,
-            isSubmitting = isStartingQueuedPrint,
-            onConfirmStart = onStartNextQueuedPrint,
+            headerTrailing = quickActions,
         )
     }
     if (queueUpcoming.isNotEmpty()) {
@@ -455,6 +467,7 @@ private fun ActivePrintStatusTab(
     cameraToken: String,
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
+    headerTrailing: @Composable () -> Unit,
 ) {
     var cameraHeroActive by remember { mutableStateOf(false) }
     DetailStatusHeroImage(
@@ -465,7 +478,10 @@ private fun ActivePrintStatusTab(
         onCameraHeroActive = { cameraHeroActive = it },
     )
     DetailInfoCard {
-        SectionHeader(stringResource(R.string.section_print))
+        SectionHeaderRow(
+            title = stringResource(R.string.section_print),
+            trailing = headerTrailing,
+        )
         PrinterQuickStatusRow(
             activityKind = labels.activityKind,
             progressCompact = labels.progressCompact,
@@ -535,6 +551,7 @@ private fun IdleStatusTab(
     cameraToken: String,
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
+    headerTrailing: @Composable () -> Unit,
 ) {
     var cameraHeroActive by remember { mutableStateOf(false) }
     DetailStatusHeroImage(
@@ -544,7 +561,10 @@ private fun IdleStatusTab(
         onCameraHeroActive = { cameraHeroActive = it },
     )
     DetailInfoCard {
-        SectionHeader(stringResource(R.string.section_overview))
+        SectionHeaderRow(
+            title = stringResource(R.string.section_overview),
+            trailing = headerTrailing,
+        )
         PrinterQuickStatusRow(
             activityKind = labels.activityKind,
             progressCompact = labels.progressCompact,
@@ -655,42 +675,11 @@ private fun ControlsTab(
     isClearingPlate: Boolean,
     isControlBusy: Boolean,
     onSetPrintSpeed: (Int) -> Unit,
-    onPausePrint: () -> Unit,
-    onResumePrint: () -> Unit,
-    onStopPrint: () -> Unit,
-    onToggleLight: () -> Unit,
     onJogBedUp: () -> Unit,
     onJogBedDown: () -> Unit,
 ) {
     val comingSoon = stringResource(R.string.coming_soon)
-    var showStopConfirm by remember { mutableStateOf(false) }
     val actionsEnabled = !isClearingPlate && !isControlBusy
-
-    if (showStopConfirm) {
-        AlertDialog(
-            onDismissRequest = { showStopConfirm = false },
-            title = { Text(stringResource(R.string.stop_print_confirm_title)) },
-            text = { Text(stringResource(R.string.stop_print_confirm_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showStopConfirm = false
-                        onStopPrint()
-                    },
-                ) {
-                    Text(
-                        text = stringResource(R.string.stop_print_confirm),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showStopConfirm = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
-    }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (labels.canControlPrint) {
@@ -701,51 +690,6 @@ private fun ControlsTab(
                     enabled = actionsEnabled,
                     onSelect = onSetPrintSpeed,
                 )
-            }
-        }
-
-        val hasQuickActions = labels.canPause || labels.canResume || labels.canStop ||
-            labels.canToggleLight
-        if (hasQuickActions) {
-            SectionHeader(stringResource(R.string.controls_section_quick_actions))
-            DetailInfoCard {
-                if (labels.canResume) {
-                    Button(
-                        onClick = onResumePrint,
-                        enabled = actionsEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.resume_print))
-                    }
-                } else if (labels.canPause) {
-                    Button(
-                        onClick = onPausePrint,
-                        enabled = actionsEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.pause_print))
-                    }
-                }
-                if (labels.canStop) {
-                    Button(
-                        onClick = { showStopConfirm = true },
-                        enabled = actionsEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError,
-                        ),
-                    ) {
-                        Text(stringResource(R.string.stop_print))
-                    }
-                }
-                if (labels.canToggleLight) {
-                    ChamberLightControlChip(
-                        isOn = labels.chamberLightOn == true,
-                        enabled = actionsEnabled,
-                        onToggle = onToggleLight,
-                    )
-                }
             }
         }
 

@@ -94,6 +94,7 @@
     <string name="archive_reprint_failed">Could not queue print</string>
     <string name="archive_reprint_view_queue">View Queue</string>
     <string name="start_next_print_action">Start next print</string>
+    <string name="start_next_queue_chip">Queue</string>
     <string name="start_next_print_confirm_title">Start next print?</string>
     <string name="start_next_print_confirm_message">This will start the next queued print on %1$s.</string>
     <string name="start_next_print_confirm_button">Start print</string>

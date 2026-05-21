@@ -166,6 +166,30 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier) {
     )
 }
 
+@Composable
+fun SectionHeaderRow(
+    title: String,
+    modifier: Modifier = Modifier,
+    trailing: @Composable () -> Unit = {},
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        trailing()
+    }
+}
+
 /** Passive last-updated label with optional subtle manual refresh tap. */
 @Composable
 fun StatusLastUpdatedIndicator(
