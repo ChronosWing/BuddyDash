@@ -49,6 +49,9 @@ import com.chronoswing.buddydash.ui.components.FilamentChipRow
 import com.chronoswing.buddydash.ui.components.FilamentSlotDetailHeader
 import com.chronoswing.buddydash.ui.components.HighlightValue
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
+import com.chronoswing.buddydash.ui.components.PrintFileHighlight
+import com.chronoswing.buddydash.ui.components.PrintFileNameText
+import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterCoverImage
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.ui.components.LoadingContent
@@ -281,9 +284,9 @@ private fun ActivePrintStatusTab(
             )
         }
         if (labels.showFile) {
-            HighlightValue(
+            PrintFileHighlight(
                 label = labels.fileLabel,
-                value = labels.fileName.ifBlank { "—" },
+                fileName = labels.fileName,
             )
         }
         if (labels.showEta) {
@@ -294,11 +297,11 @@ private fun ActivePrintStatusTab(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            labels.tempsLine?.let { temps ->
-                Text(
-                    text = temps,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
+            if (labels.tempsLine != null) {
+                PrintTempsRow(
+                    nozzleTemp = labels.nozzleTemp,
+                    bedTemp = labels.bedTemp,
+                    valueStyle = MaterialTheme.typography.titleMedium,
                 )
             }
             Text(
@@ -393,10 +396,18 @@ private fun IdleStatusTab(
                 )
             }
             if (labels.showFile) {
-                CompactLabelValue(
-                    label = labels.fileLabel,
-                    value = labels.fileName.ifBlank { "—" },
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = labels.fileLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    PrintFileNameText(
+                        fileName = labels.fileName.ifBlank { "—" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
             }
         }
     }
