@@ -26,6 +26,50 @@ fun formatTempShort(value: Double?): String {
     return "${value.roundToInt()}°"
 }
 
+/** Seconds since last successful status refresh; null if never updated. */
+fun statusRefreshAgeSeconds(
+    updatedAtMillis: Long?,
+    nowMillis: Long = System.currentTimeMillis(),
+): Long? {
+    if (updatedAtMillis == null) return null
+    return ((nowMillis - updatedAtMillis) / 1000L).coerceAtLeast(0L)
+}
+
+enum class StatusRefreshFreshness {
+    /** 0–10s — live telemetry. */
+    Live,
+    /** 10–30s — slightly stale. */
+    Aging,
+    /** 30–60s — stale connection. */
+    Stale,
+    /** 60s+ — strongly stale. */
+    ConnectionStale,
+}
+
+fun resolveStatusRefreshFreshness(
+    updatedAtMillis: Long?,
+    nowMillis: Long = System.currentTimeMillis(),
+): StatusRefreshFreshness? {
+    val seconds = statusRefreshAgeSeconds(updatedAtMillis, nowMillis) ?: return null
+    return when {
+        seconds < 10L -> StatusRefreshFreshness.Live
+        seconds < 30L -> StatusRefreshFreshness.Aging
+        seconds < 60L -> StatusRefreshFreshness.Stale
+        else -> StatusRefreshFreshness.ConnectionStale
+    }
+}
+
+/** Relative time since last successful status refresh, e.g. "Just now", "4s ago", "1m ago". */
+fun formatStatusUpdatedAgo(updatedAtMillis: Long?, nowMillis: Long = System.currentTimeMillis()): String? {
+    val seconds = statusRefreshAgeSeconds(updatedAtMillis, nowMillis) ?: return null
+    return when {
+        seconds < 3L -> "Just now"
+        seconds < 60L -> "${seconds}s ago"
+        seconds < 3_600L -> "${seconds / 60L}m ago"
+        else -> "${seconds / 3_600L}h ago"
+    }
+}
+
 fun buildPrintHeadline(activity: String, progressText: String?): String {
     if (progressText != null && progressText != "—") {
         return "$activity • $progressText"

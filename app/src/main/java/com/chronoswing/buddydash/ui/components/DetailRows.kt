@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -9,6 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -16,9 +19,20 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.chronoswing.buddydash.R
+import com.chronoswing.buddydash.util.StatusRefreshFreshness
+import com.chronoswing.buddydash.util.formatStatusUpdatedAgo
+import com.chronoswing.buddydash.util.resolveStatusRefreshFreshness
 import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.delay
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -150,6 +164,73 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.SemiBold,
     )
+}
+
+/** Passive last-updated label with optional subtle manual refresh tap. */
+@Composable
+fun StatusLastUpdatedIndicator(
+    lastUpdatedAtMillis: Long?,
+    isRefreshing: Boolean,
+    enabled: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var tick by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(lastUpdatedAtMillis) {
+        while (true) {
+            delay(1_000L)
+            tick = System.currentTimeMillis()
+        }
+    }
+    val now = if (tick == 0L) System.currentTimeMillis() else tick
+    val freshness = resolveStatusRefreshFreshness(lastUpdatedAtMillis, now) ?: return
+    val ago = formatStatusUpdatedAgo(lastUpdatedAtMillis, now)
+    val label = when {
+        isRefreshing -> stringResource(R.string.status_updating)
+        freshness == StatusRefreshFreshness.ConnectionStale ->
+            stringResource(R.string.status_connection_stale)
+        ago != null -> stringResource(R.string.status_updated_ago, ago)
+        else -> return
+    }
+
+    val dueSoonTint = Color(0xFFFBBF24)
+    val (textColor, iconTint) = when {
+        isRefreshing -> {
+            val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+            muted to muted
+        }
+        freshness == StatusRefreshFreshness.Live ->
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f) to
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+        freshness == StatusRefreshFreshness.Aging ->
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f) to
+                dueSoonTint.copy(alpha = 0.7f)
+        freshness == StatusRefreshFreshness.Stale ->
+            dueSoonTint to dueSoonTint.copy(alpha = 0.9f)
+        else ->
+            MaterialTheme.colorScheme.error.copy(alpha = 0.88f) to
+                MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
+    }
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = textColor,
+        )
+        Icon(
+            imageVector = Icons.Default.Refresh,
+            contentDescription = stringResource(R.string.cd_refresh_status),
+            modifier = Modifier
+                .size(14.dp)
+                .clickable(enabled = enabled && !isRefreshing) { onRefresh() },
+            tint = iconTint,
+        )
+    }
 }
 
 @Composable

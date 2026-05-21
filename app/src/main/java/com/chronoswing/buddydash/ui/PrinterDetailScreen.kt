@@ -72,6 +72,7 @@ import com.chronoswing.buddydash.network.printerCoverUrl
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
+import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildPrintHeadline
 import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
@@ -123,6 +124,7 @@ fun PrinterDetailScreen(
         controlSnackbar = uiState.controlSnackbar,
         isMaintenanceResetBusy = uiState.isMaintenanceResetBusy,
         maintenanceResetSnackbar = uiState.maintenanceResetSnackbar,
+        lastStatusUpdatedAtMillis = uiState.lastStatusUpdatedAtMillis,
         onBack = onBack,
         onRetry = viewModel::loadStatus,
         onRefresh = { viewModel.loadStatus(showLoading = false) },
@@ -159,6 +161,7 @@ private fun PrinterDetailScreenContent(
     controlSnackbar: ControlSnackbar?,
     isMaintenanceResetBusy: Boolean,
     maintenanceResetSnackbar: MaintenanceResetSnackbar?,
+    lastStatusUpdatedAtMillis: Long?,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
@@ -286,6 +289,8 @@ private fun PrinterDetailScreenContent(
                                     labels = labels,
                                     isClearingPlate = isClearingPlate,
                                     isControlBusy = isControlBusy,
+                                    isRefreshing = isRefreshing,
+                                    lastStatusUpdatedAtMillis = lastStatusUpdatedAtMillis,
                                     onRefresh = onRefresh,
                                     onMarkPlateClear = onMarkPlateClear,
                                     onSetPrintSpeed = onSetPrintSpeed,
@@ -559,6 +564,8 @@ private fun ControlsTab(
     labels: PrinterDetailLabels,
     isClearingPlate: Boolean,
     isControlBusy: Boolean,
+    isRefreshing: Boolean,
+    lastStatusUpdatedAtMillis: Long?,
     onRefresh: () -> Unit,
     onMarkPlateClear: () -> Unit,
     onSetPrintSpeed: (Int) -> Unit,
@@ -600,15 +607,23 @@ private fun ControlsTab(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(stringResource(R.string.controls_section_status))
-        DetailInfoCard {
-            Button(
-                onClick = onRefresh,
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SectionHeader(
+                title = stringResource(R.string.controls_section_status),
+                modifier = Modifier.padding(top = 0.dp),
+            )
+            StatusLastUpdatedIndicator(
+                lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
+                isRefreshing = isRefreshing,
                 enabled = actionsEnabled,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.refresh_status))
-            }
+                onRefresh = onRefresh,
+            )
+        }
+        DetailInfoCard {
             if (labels.showPlateClearAction) {
                 PlateClearButton(
                     labels = labels,

@@ -57,6 +57,10 @@
     <string name="filament_remaining">Remaining</string>
     <string name="filament_metadata">Spool</string>
     <string name="refresh_status">Refresh status</string>
+    <string name="status_updated_ago">Updated %1$s</string>
+    <string name="status_updating">Updating…</string>
+    <string name="status_connection_stale">Connection stale</string>
+    <string name="cd_refresh_status">Refresh printer status</string>
     <string name="controls_section_status">Status actions</string>
     <string name="controls_section_quick_actions">Quick actions</string>
     <string name="controls_section_more">More</string>
