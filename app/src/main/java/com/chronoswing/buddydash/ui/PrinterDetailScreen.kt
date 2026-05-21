@@ -40,6 +40,7 @@ import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentChipRow
+import com.chronoswing.buddydash.ui.components.FilamentSlotDetailHeader
 import com.chronoswing.buddydash.ui.components.HighlightValue
 import com.chronoswing.buddydash.ui.components.InlineProgress
 import com.chronoswing.buddydash.ui.components.LoadingContent
@@ -271,14 +272,15 @@ private fun FilamentTab(slots: List<FilamentSlot>) {
     }
     FilamentChipRow(slots = slots, compact = false, modifier = Modifier.fillMaxWidth())
     slots.forEach { slot ->
+        val typeLabel = if (slot.isLoaded) {
+            normalizeFilamentType(slot.filamentType)?.uppercase()
+                ?: stringResource(R.string.filament_unknown)
+        } else {
+            stringResource(R.string.filament_empty)
+        }
         DetailInfoCard {
-            CompactLabelValue(label = stringResource(R.string.slot_label), value = slot.label)
+            FilamentSlotDetailHeader(slot = slot, typeLabel = typeLabel)
             if (slot.isLoaded) {
-                CompactLabelValue(
-                    label = stringResource(R.string.filament_type),
-                    value = normalizeFilamentType(slot.filamentType)?.uppercase()
-                        ?: stringResource(R.string.filament_unknown),
-                )
                 slot.remainPercent?.let { remain ->
                     CompactLabelValue(
                         label = stringResource(R.string.filament_remaining),
@@ -288,11 +290,6 @@ private fun FilamentTab(slots: List<FilamentSlot>) {
                 slot.metadata?.let { meta ->
                     CompactLabelValue(label = stringResource(R.string.filament_metadata), value = meta)
                 }
-            } else {
-                CompactLabelValue(
-                    label = stringResource(R.string.filament_type),
-                    value = stringResource(R.string.filament_empty),
-                )
             }
         }
     }

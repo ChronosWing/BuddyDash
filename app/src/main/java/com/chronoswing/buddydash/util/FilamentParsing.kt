@@ -1,12 +1,21 @@
 package com.chronoswing.buddydash.util
 
+/** Bambu / Bambuddy colors are RRGGBB or RRGGBBAA; use the first six hex digits as RGB. */
 fun normalizeTrayColor(raw: String?): String? {
     val trimmed = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     if (trimmed.equals("null", ignoreCase = true)) return null
     val hex = trimmed.removePrefix("#")
-    if (hex.all { it == '0' }) return null
-    return trimmed
+    val rgb = when {
+        hex.length >= 8 -> hex.substring(0, 6)
+        hex.length >= 6 -> hex.substring(0, 6)
+        else -> return null
+    }
+    if (rgb.all { it == '0' }) return null
+    return "#$rgb"
 }
+
+/** Spool inventory [rgba] field (same RRGGBBAA layout as Bambuddy catalog). */
+fun normalizeInventoryColor(rgba: String?): String? = normalizeTrayColor(rgba)
 
 fun isTrayLoaded(
     filamentType: String?,

@@ -23,22 +23,61 @@ class InventoryFillTest {
     }
 
     @Test
-    fun applyInventoryFill_mergesBySlotKey() {
+    fun applyInventory_usesInventoryColorOverTray() {
         val slots = listOf(
             FilamentSlot(
                 label = "A1",
                 filamentType = "PLA",
-                colorHex = "#FF0000",
+                colorHex = "#0000FF",
                 amsId = 0,
                 trayId = 0,
                 isLoaded = true,
             ),
         )
-        val merged = applyInventoryFill(
-            slots,
-            mapOf(SlotInventoryKey(0, 0) to 42),
+        val merged = applyInventoryToSlots(
+            slots = slots,
+            inventoryBySlot = mapOf(
+                SlotInventoryKey(0, 0) to SlotInventoryInfo(
+                    remainPercent = 42,
+                    colorHex = "#FF0000",
+                    spoolId = 7,
+                    spoolName = "Bambu PLA Red",
+                ),
+            ),
+            printerName = "Test",
+            logColors = false,
         )
         assertEquals(42, merged.first().remainPercent)
+        assertEquals("#FF0000", merged.first().colorHex)
+    }
+
+    @Test
+    fun applyInventory_colorWithoutFill() {
+        val slots = listOf(
+            FilamentSlot(
+                label = "B2",
+                filamentType = "PETG",
+                colorHex = "#0000FF",
+                amsId = 0,
+                trayId = 1,
+                isLoaded = true,
+            ),
+        )
+        val merged = applyInventoryToSlots(
+            slots = slots,
+            inventoryBySlot = mapOf(
+                SlotInventoryKey(0, 1) to SlotInventoryInfo(
+                    remainPercent = null,
+                    colorHex = "#00FF00",
+                    spoolId = 3,
+                    spoolName = "Green PETG",
+                ),
+            ),
+            printerName = "Test",
+            logColors = false,
+        )
+        assertNull(merged.first().remainPercent)
+        assertEquals("#00FF00", merged.first().colorHex)
     }
 
     @Test
