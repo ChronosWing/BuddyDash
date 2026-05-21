@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +39,9 @@ import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentHomeGroupsRow
+import com.chronoswing.buddydash.ui.components.HomeCardMicroMotionFrame
+import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
+import com.chronoswing.buddydash.ui.components.MicroMotionThumbnailFrame
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterCoverImage
@@ -191,18 +193,22 @@ private fun GlancePrinterCard(
     cameraToken: String,
     onClick: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
+    HomeCardMicroMotionFrame(
+        motion = labels.cardMicroMotion,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            ),
         ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = labels.title,
@@ -226,6 +232,7 @@ private fun GlancePrinterCard(
                 activityKind = labels.activityKind,
                 progressCompact = labels.progressCompact,
                 plateKind = labels.plateKind,
+                cardMicroMotion = labels.cardMicroMotion,
             )
 
             if (labels.isActivePrint) {
@@ -241,11 +248,10 @@ private fun GlancePrinterCard(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         labels.progressFraction?.let { fraction ->
-                            LinearProgressIndicator(
+                            MicroMotionProgressBar(
                                 progress = { fraction.coerceIn(0f, 1f) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(3.dp),
+                                motion = labels.cardMicroMotion,
+                                modifier = Modifier.height(3.dp),
                             )
                         }
                         labels.fileLine?.let { file ->
@@ -262,13 +268,17 @@ private fun GlancePrinterCard(
                             )
                         }
                     }
-                    PrinterCoverImage(
-                        serverUrl = serverUrl,
-                        cameraToken = cameraToken,
-                        printerId = printerId,
+                    MicroMotionThumbnailFrame(
+                        motion = labels.cardMicroMotion,
                         modifier = Modifier.padding(start = 4.dp, end = 2.dp),
-                        size = 64.dp,
-                    )
+                    ) {
+                        PrinterCoverImage(
+                            serverUrl = serverUrl,
+                            cameraToken = cameraToken,
+                            printerId = printerId,
+                            size = 64.dp,
+                        )
+                    }
                 }
             } else {
                 if (labels.showLastPrint && labels.lastPrintResult != null) {
@@ -305,6 +315,7 @@ private fun GlancePrinterCard(
                 printerRawState = labels.printerRawState,
                 modifier = Modifier.padding(top = 2.dp),
             )
+            }
         }
     }
 }
