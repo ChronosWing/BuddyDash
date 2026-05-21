@@ -7,6 +7,7 @@ import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
+import com.chronoswing.buddydash.util.motionDebugLog
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -19,6 +20,7 @@ import kotlinx.coroutines.launch
 
 data class PrinterDetailUiState(
     val printerName: String = "",
+    val printerModel: String? = null,
     val status: PrinterStatus? = null,
     val maintenanceItems: List<MaintenanceItem> = emptyList(),
     val isLoading: Boolean = false,
@@ -79,10 +81,10 @@ class PrinterDetailViewModel(
         }
     }
 
-    fun init(printerId: Int, printerName: String) {
+    fun init(printerId: Int, printerName: String, printerModel: String? = null) {
         this.printerId = printerId
         _uiState.update {
-            it.copy(printerName = printerName, error = null)
+            it.copy(printerName = printerName, printerModel = printerModel, error = null)
         }
     }
 
@@ -211,12 +213,13 @@ class PrinterDetailViewModel(
     }
 
     /** Bed up (toward nozzle) — negative Z per Bambuddy API. */
-    fun jogBedUp() = jogBed(-BED_JOG_STEP_MM)
+    fun jogBedUp() = jogBed(-BED_JOG_STEP_MM, action = "up")
 
     /** Bed down (away from nozzle) — positive Z per Bambuddy API. */
-    fun jogBedDown() = jogBed(BED_JOG_STEP_MM)
+    fun jogBedDown() = jogBed(BED_JOG_STEP_MM, action = "down")
 
-    private fun jogBed(distanceMm: Float) = runControl {
+    private fun jogBed(distanceMm: Float, action: String) = runControl {
+        motionDebugLog(action, printerId, distanceMm)
         apiClient.bedJog(it.serverUrl, it.apiKey, printerId, distanceMm)
     }
 

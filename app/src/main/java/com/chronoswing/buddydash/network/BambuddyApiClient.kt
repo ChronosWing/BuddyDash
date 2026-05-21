@@ -46,6 +46,7 @@ class BambuddyApiClient {
         /** Temporary: log newly parsed detail/status fields. Set false before release. */
         private const val DEBUG_LOG_DETAIL_RAW = true
         private const val TAG_DETAIL = "BuddyDash/Detail"
+        private const val TAG_MOTION = "BuddyDash/Motion"
     }
 
     private val client = OkHttpClient.Builder()
@@ -255,7 +256,11 @@ class BambuddyApiClient {
                 UnsupportedOperationException("Bed jog endpoint not found"),
             )
         }
-        postPrinterAction(serverUrl, apiKey, BambuddyApi.bedJogPath(printerId, distanceMm))
+        val path = BambuddyApi.bedJogPath(printerId, distanceMm)
+        if (DEBUG_LOG_DETAIL_RAW) {
+            Log.d(TAG_MOTION, "POST $path")
+        }
+        postPrinterAction(serverUrl, apiKey, path)
     }
 
     private suspend fun postPrinterAction(
