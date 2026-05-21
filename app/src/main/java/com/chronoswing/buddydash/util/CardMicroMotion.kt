@@ -37,3 +37,11 @@ fun resolveCardMicroMotion(
         PrinterActivityKind.Error, PrinterActivityKind.Offline -> CardMicroMotion.None
     }
 }
+
+/** Maps home/detail card motion to filament-slot glow motion (same state rules). */
+fun CardMicroMotion.toFilamentGlowMotion(): FilamentGlowMotion = when (this) {
+    CardMicroMotion.Printing -> FilamentGlowMotion.Breathing
+    CardMicroMotion.Frozen -> FilamentGlowMotion.Frozen
+    CardMicroMotion.IdleAmbient -> FilamentGlowMotion.SoftIdle
+    CardMicroMotion.None, CardMicroMotion.CompletedFlash -> FilamentGlowMotion.None
+}

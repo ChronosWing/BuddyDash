@@ -43,14 +43,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.data.model.FilamentSlot
+import com.chronoswing.buddydash.util.CardMicroMotion
 import com.chronoswing.buddydash.util.FilamentGlowMotion
 import com.chronoswing.buddydash.util.FilamentSourceGroup
-import com.chronoswing.buddydash.util.PrinterActivityKind
 import com.chronoswing.buddydash.util.SlotInventoryKey
 import com.chronoswing.buddydash.util.groupByFilamentSource
 import com.chronoswing.buddydash.util.isActiveSlot
 import com.chronoswing.buddydash.util.normalizeFilamentType
-import com.chronoswing.buddydash.util.resolveFilamentGlowMotion
+import com.chronoswing.buddydash.util.toFilamentGlowMotion
 
 /** Set true locally to verify breathing; keep false for production subtlety. */
 private const val DEBUG_FILAMENT_GLOW_EXAGGERATED = false
@@ -80,15 +80,12 @@ private data class FilamentGlowConfig(
 fun FilamentHomeGroupsRow(
     slots: List<FilamentSlot>,
     activeKey: SlotInventoryKey?,
-    activityKind: PrinterActivityKind,
+    cardMicroMotion: CardMicroMotion,
     modifier: Modifier = Modifier,
-    printerRawState: String? = null,
 ) {
     if (slots.isEmpty()) return
     val groups = slots.groupByFilamentSource()
-    val glowMotion = remember(activityKind, printerRawState) {
-        resolveFilamentGlowMotion(activityKind, printerRawState)
-    }
+    val glowMotion = remember(cardMicroMotion) { cardMicroMotion.toFilamentGlowMotion() }
 
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
@@ -143,15 +140,12 @@ private fun FilamentHomeSourceSection(
 fun FilamentDetailGroups(
     slots: List<FilamentSlot>,
     activeKey: SlotInventoryKey?,
-    activityKind: PrinterActivityKind,
+    cardMicroMotion: CardMicroMotion,
     modifier: Modifier = Modifier,
-    printerRawState: String? = null,
 ) {
     if (slots.isEmpty()) return
     val groups = slots.groupByFilamentSource()
-    val glowMotion = remember(activityKind, printerRawState) {
-        resolveFilamentGlowMotion(activityKind, printerRawState)
-    }
+    val glowMotion = remember(cardMicroMotion) { cardMicroMotion.toFilamentGlowMotion() }
 
     Column(
         modifier = modifier.fillMaxWidth(),

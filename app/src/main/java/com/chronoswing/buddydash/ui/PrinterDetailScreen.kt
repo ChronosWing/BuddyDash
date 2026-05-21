@@ -14,7 +14,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -60,6 +59,8 @@ import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentDetailGroups
+import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
+import com.chronoswing.buddydash.ui.components.MicroMotionThumbnailFrame
 import com.chronoswing.buddydash.ui.components.HighlightValue
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.PrintFileHighlight
@@ -328,29 +329,34 @@ private fun ActivePrintStatusTab(
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
 ) {
-    PrinterCoverImage(
-        serverUrl = serverUrl,
-        cameraToken = cameraToken,
-        printerId = printerId,
-        height = 160.dp,
-    )
+    MicroMotionThumbnailFrame(
+        motion = labels.cardMicroMotion,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        PrinterCoverImage(
+            serverUrl = serverUrl,
+            cameraToken = cameraToken,
+            printerId = printerId,
+            height = 160.dp,
+        )
+    }
     DetailInfoCard {
         SectionHeader(stringResource(R.string.section_print))
         PrinterQuickStatusRow(
             activityKind = labels.activityKind,
             progressCompact = labels.progressCompact,
             plateKind = labels.plateKind,
+            cardMicroMotion = labels.cardMicroMotion,
         )
         HighlightValue(
             label = labels.progressTitle,
             value = buildPrintHeadline(labels.currentActivity, labels.progressValue),
         )
         labels.progressFraction?.let { fraction ->
-            LinearProgressIndicator(
+            MicroMotionProgressBar(
                 progress = { fraction.coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp),
+                motion = labels.cardMicroMotion,
+                modifier = Modifier.height(3.dp),
             )
         }
         if (labels.showFile) {
@@ -492,8 +498,7 @@ private fun FilamentTab(labels: PrinterDetailLabels) {
     FilamentDetailGroups(
         slots = slots,
         activeKey = labels.activeFilamentSlot,
-        activityKind = labels.activityKind,
-        printerRawState = labels.printerRawState,
+        cardMicroMotion = labels.cardMicroMotion,
         modifier = Modifier.fillMaxWidth(),
     )
 }
