@@ -35,7 +35,7 @@ import com.chronoswing.buddydash.SettingsViewModel
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     SettingsScreenContent(
@@ -58,18 +58,20 @@ private fun SettingsScreenContent(
     onCameraTokenChange: (String) -> Unit,
     onSave: () -> Unit,
     onTestConnection: () -> Unit,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
+                            )
+                        }
                     }
                 },
             )

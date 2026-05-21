@@ -5,6 +5,7 @@ import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.PrintQueueJob
+import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.data.model.PrinterMaintenanceOverview
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.util.FilamentSwatchColors
@@ -25,7 +26,11 @@ import com.chronoswing.buddydash.util.resolveActiveFilamentSlot
 import com.chronoswing.buddydash.util.isTrayLoaded
 import com.chronoswing.buddydash.util.normalizeFilamentType
 import com.chronoswing.buddydash.util.normalizeTrayColor
+import com.chronoswing.buddydash.util.mergeSpoolsWithAssignments
 import com.chronoswing.buddydash.util.parseInventoryByPrinter
+import com.chronoswing.buddydash.util.parseLowStockThreshold
+import com.chronoswing.buddydash.util.parseSpoolAssignments
+import com.chronoswing.buddydash.util.parseSpoolInventoryList
 import com.chronoswing.buddydash.util.etaDebugLogLine
 import com.chronoswing.buddydash.util.parseRemainingTimeSeconds
 import com.chronoswing.buddydash.util.queueDurationFieldCandidates
@@ -307,6 +312,48 @@ class BambuddyApiClient {
             }
             runApiCall(serverUrl, apiKey, BambuddyApi.queuePath(printerId)) { body ->
                 parsePrintQueueResponse(body)
+            }
+        }
+
+    /**
+     * Spool inventory for the Spools tab: list spools, slot assignments, and low-stock threshold.
+     */
+    suspend fun fetchSpoolInventory(
+        serverUrl: String,
+        apiKey: String,
+    ): Result<List<SpoolInventoryItem>> =
+        withContext(Dispatchers.IO) {
+            if (!BambuddyApi.hasSpoolInventoryEndpoint) {
+                return@withContext Result.failure(
+                    UnsupportedOperationException("Spool inventory endpoint not found"),
+                )
+            }
+            runCatching {
+                coroutineScope {
+                    val settingsDeferred = async {
+                        runApiCall(serverUrl, apiKey, BambuddyApi.SETTINGS_PATH) { body ->
+                            JSONObject(body)
+                        }.getOrNull()
+                    }
+                    val spoolsDeferred = async {
+                        runApiCall(serverUrl, apiKey, BambuddyApi.inventorySpoolsPath()) { body ->
+                            body
+                        }.getOrThrow()
+                    }
+                    val assignmentsDeferred = async {
+                        runApiCall(serverUrl, apiKey, BambuddyApi.inventoryAssignmentsPath()) { body ->
+                            body
+                        }.getOrThrow()
+                    }
+                    val globalThreshold = parseLowStockThreshold(settingsDeferred.await())
+                    val spools = parseSpoolInventoryList(spoolsDeferred.await(), globalThreshold)
+                    val assignments = parseSpoolAssignments(assignmentsDeferred.await())
+                    mergeSpoolsWithAssignments(spools, assignments)
+                        .sortedWith(
+                            compareBy<SpoolInventoryItem> { it.assignment == null }
+                                .thenBy { it.displayName.lowercase() },
+                        )
+                }
             }
         }
 

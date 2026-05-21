@@ -22,6 +22,14 @@ class BambuddyOpenApiTest {
     }
 
     @Test
+    fun spoolInventoryEndpoints_matchOpenApiSpec() {
+        val spec = findOpenApiSpec().readText()
+        assertTrue(spec.contains("\"${BambuddyApi.INVENTORY_SPOOLS_PATH}\""))
+        assertTrue(spec.contains("\"${BambuddyApi.SETTINGS_PATH}\""))
+        assertTrue(spec.contains("list_spools_api_v1_inventory_spools_get"))
+    }
+
+    @Test
     fun clearPlateEndpoint_matchesOpenApiSpec() {
         val spec = findOpenApiSpec().readText()
 

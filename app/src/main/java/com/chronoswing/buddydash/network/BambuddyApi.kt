@@ -17,6 +17,12 @@ object BambuddyApi {
 
     const val INVENTORY_ASSIGNMENTS_PATH = "/api/v1/inventory/assignments"
 
+    /** GET — list spools (operationId: list_spools_api_v1_inventory_spools_get). */
+    const val INVENTORY_SPOOLS_PATH = "/api/v1/inventory/spools"
+
+    /** GET — application settings including low_stock_threshold (AppSettings). */
+    const val SETTINGS_PATH = "/api/v1/settings"
+
     const val CHAMBER_LIGHT_PATH = "/api/v1/printers/{printer_id}/chamber-light"
     const val CAMERA_SNAPSHOT_PATH = "/api/v1/printers/{printer_id}/camera/snapshot"
     const val PRINTER_FILES_PATH = "/api/v1/printers/{printer_id}/files"
@@ -49,6 +55,7 @@ object BambuddyApi {
     val hasBedJogEndpoint: Boolean = true
     val hasCameraEndpoint: Boolean = true
     val hasFilesEndpoint: Boolean = true
+    val hasSpoolInventoryEndpoint: Boolean = true
 
     fun inventoryAssignmentsPath(printerId: Int? = null): String =
         if (printerId != null) {
@@ -98,6 +105,13 @@ object BambuddyApi {
     }
 
     fun queuePath(printerId: Int): String = "$QUEUE_PATH?printer_id=$printerId"
+
+    fun inventorySpoolsPath(includeArchived: Boolean = false): String =
+        if (includeArchived) {
+            "$INVENTORY_SPOOLS_PATH?include_archived=true"
+        } else {
+            INVENTORY_SPOOLS_PATH
+        }
 
     fun archiveThumbnailPath(archiveId: Int): String =
         ARCHIVE_THUMBNAIL_PATH.replace("{archive_id}", archiveId.toString())
