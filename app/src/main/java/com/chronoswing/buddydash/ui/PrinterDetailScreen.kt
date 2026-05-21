@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
@@ -52,6 +53,9 @@ import com.chronoswing.buddydash.ui.components.DetailFansCard
 import com.chronoswing.buddydash.ui.components.DetailMaintenanceCard
 import com.chronoswing.buddydash.ui.components.DetailPrintSpeedCard
 import com.chronoswing.buddydash.ui.components.FilamentAmsEnvironmentSection
+import com.chronoswing.buddydash.ui.components.BedAdjustControl
+import com.chronoswing.buddydash.ui.components.BedAdjustOptionsDialog
+import com.chronoswing.buddydash.ui.components.ChamberLightControlChip
 import com.chronoswing.buddydash.ui.components.PrintSpeedControlChips
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
@@ -71,6 +75,7 @@ import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildPrintHeadline
 import com.chronoswing.buddydash.util.normalizeFilamentType
+import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
 import com.chronoswing.buddydash.util.toDetailLabels
 
 private val detailTabs = listOf("Status", "Filament", "Controls")
@@ -124,6 +129,8 @@ fun PrinterDetailScreen(
         onResumePrint = viewModel::resumePrint,
         onStopPrint = viewModel::stopPrint,
         onToggleLight = viewModel::toggleChamberLight,
+        onJogBedUp = viewModel::jogBedUp,
+        onJogBedDown = viewModel::jogBedDown,
     )
 }
 
@@ -154,12 +161,16 @@ private fun PrinterDetailScreenContent(
     onResumePrint: () -> Unit,
     onStopPrint: () -> Unit,
     onToggleLight: () -> Unit,
+    onJogBedUp: () -> Unit,
+    onJogBedDown: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val plateClearSuccessMessage = stringResource(R.string.plate_clear_success)
     val plateClearFailedMessage = stringResource(R.string.plate_clear_failed)
     val controlSuccessMessage = stringResource(R.string.control_success)
     val controlFailedMessage = stringResource(R.string.control_failed)
+    val printStoppedSuccessMessage = stringResource(R.string.print_stopped_success)
+    val printStoppedFailedMessage = stringResource(R.string.print_stopped_failed)
     var selectedTab by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(plateClearSnackbar) {
@@ -176,6 +187,8 @@ private fun PrinterDetailScreenContent(
         val message = when (controlSnackbar) {
             ControlSnackbar.Success -> controlSuccessMessage
             ControlSnackbar.Failed -> controlFailedMessage
+            ControlSnackbar.StopSuccess -> printStoppedSuccessMessage
+            ControlSnackbar.StopFailed -> printStoppedFailedMessage
             null -> return@LaunchedEffect
         }
         snackbarHostState.showSnackbar(message)
@@ -254,6 +267,8 @@ private fun PrinterDetailScreenContent(
                                     onResumePrint = onResumePrint,
                                     onStopPrint = onStopPrint,
                                     onToggleLight = onToggleLight,
+                                    onJogBedUp = onJogBedUp,
+                                    onJogBedDown = onJogBedDown,
                                 )
                             }
                         }
@@ -516,10 +531,21 @@ private fun ControlsTab(
     onResumePrint: () -> Unit,
     onStopPrint: () -> Unit,
     onToggleLight: () -> Unit,
+    onJogBedUp: () -> Unit,
+    onJogBedDown: () -> Unit,
 ) {
     val comingSoon = stringResource(R.string.coming_soon)
     var showStopConfirm by remember { mutableStateOf(false) }
+    var showBedAdjustDialog by remember { mutableStateOf(false) }
     val actionsEnabled = !isClearingPlate && !isControlBusy
+
+    BedAdjustOptionsDialog(
+        visible = showBedAdjustDialog,
+        stepMm = BED_JOG_STEP_MM,
+        onDismiss = { showBedAdjustDialog = false },
+        onRaiseBed = onJogBedUp,
+        onLowerBed = onJogBedDown,
+    )
 
     if (showStopConfirm) {
         AlertDialog(
@@ -533,7 +559,10 @@ private fun ControlsTab(
                         onStopPrint()
                     },
                 ) {
-                    Text(stringResource(R.string.stop_print_confirm))
+                    Text(
+                        text = stringResource(R.string.stop_print_confirm),
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             },
             dismissButton = {
@@ -574,19 +603,11 @@ private fun ControlsTab(
             }
         }
 
-        val hasQuickActions = labels.canPause || labels.canResume || labels.canStop || labels.canToggleLight
+        val hasQuickActions = labels.canPause || labels.canResume || labels.canStop ||
+            labels.showBedAdjust || labels.canToggleLight
         if (hasQuickActions) {
             SectionHeader(stringResource(R.string.controls_section_quick_actions))
             DetailInfoCard {
-                if (labels.canPause) {
-                    Button(
-                        onClick = onPausePrint,
-                        enabled = actionsEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.pause_print))
-                    }
-                }
                 if (labels.canResume) {
                     Button(
                         onClick = onResumePrint,
@@ -595,29 +616,41 @@ private fun ControlsTab(
                     ) {
                         Text(stringResource(R.string.resume_print))
                     }
+                } else if (labels.canPause) {
+                    Button(
+                        onClick = onPausePrint,
+                        enabled = actionsEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.pause_print))
+                    }
                 }
                 if (labels.canStop) {
-                    OutlinedButton(
+                    Button(
                         onClick = { showStopConfirm = true },
                         enabled = actionsEnabled,
                         modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError,
+                        ),
                     ) {
                         Text(stringResource(R.string.stop_print))
                     }
                 }
+                if (labels.showBedAdjust) {
+                    BedAdjustControl(
+                        enabled = labels.canAdjustBed,
+                        actionsEnabled = actionsEnabled,
+                        onOpenOptions = { showBedAdjustDialog = true },
+                    )
+                }
                 if (labels.canToggleLight) {
-                    val lightOn = labels.chamberLightOn == true
-                    OutlinedButton(
-                        onClick = onToggleLight,
+                    ChamberLightControlChip(
+                        isOn = labels.chamberLightOn == true,
                         enabled = actionsEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            stringResource(
-                                if (lightOn) R.string.light_off else R.string.light_on,
-                            ),
-                        )
-                    }
+                        onToggle = onToggleLight,
+                    )
                 }
             }
         }

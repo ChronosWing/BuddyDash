@@ -56,6 +56,8 @@ data class PrinterDetailLabels(
     val canResume: Boolean,
     val canStop: Boolean,
     val canToggleLight: Boolean,
+    val showBedAdjust: Boolean,
+    val canAdjustBed: Boolean,
     val maintenanceItems: List<MaintenanceItem>,
 )
 
@@ -141,6 +143,8 @@ fun PrinterStatus.toDetailLabels(
         canResume = connected && isPaused,
         canStop = canControlPrint,
         canToggleLight = connected && chamberLightOn != null,
+        showBedAdjust = BambuddyApi.hasBedJogEndpoint && connected,
+        canAdjustBed = BambuddyApi.hasBedJogEndpoint && canAdjustBedWhenIdle(),
         maintenanceItems = maintenanceItems,
     )
 }

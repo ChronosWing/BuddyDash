@@ -106,3 +106,9 @@ fun PrinterStatus.hasFansSection(): Boolean =
 
 fun PrinterStatus.hasPrintSpeedSection(): Boolean =
     formatPrintSpeedLevel(speedLevel) != null
+
+/** Bambuddy bed-jog step size (mm). API: negative = bed up, positive = bed down. */
+const val BED_JOG_STEP_MM = 10f
+
+fun PrinterStatus.canAdjustBedWhenIdle(): Boolean =
+    connected && resolveActivityKind() == PrinterActivityKind.Idle
