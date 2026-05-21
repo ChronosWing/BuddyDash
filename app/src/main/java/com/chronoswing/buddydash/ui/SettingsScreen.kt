@@ -42,6 +42,7 @@ fun SettingsScreen(
         uiState = uiState,
         onServerUrlChange = viewModel::onServerUrlChange,
         onApiKeyChange = viewModel::onApiKeyChange,
+        onCameraTokenChange = viewModel::onCameraTokenChange,
         onSave = viewModel::saveSettings,
         onTestConnection = viewModel::testConnection,
         onBack = onBack,
@@ -54,6 +55,7 @@ private fun SettingsScreenContent(
     uiState: SettingsUiState,
     onServerUrlChange: (String) -> Unit,
     onApiKeyChange: (String) -> Unit,
+    onCameraTokenChange: (String) -> Unit,
     onSave: () -> Unit,
     onTestConnection: () -> Unit,
     onBack: () -> Unit,
@@ -96,6 +98,15 @@ private fun SettingsScreenContent(
                 onValueChange = onApiKeyChange,
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(stringResource(R.string.api_key_label)) },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+            )
+
+            OutlinedTextField(
+                value = uiState.cameraToken,
+                onValueChange = onCameraTokenChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.camera_cover_token_label)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
             )

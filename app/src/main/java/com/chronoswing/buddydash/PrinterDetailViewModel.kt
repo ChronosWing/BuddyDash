@@ -21,6 +21,7 @@ data class PrinterDetailUiState(
     val error: String? = null,
     val serverUrl: String = "",
     val apiKey: String = "",
+    val cameraToken: String = "",
     val hasCredentials: Boolean = false,
     val isClearingPlate: Boolean = false,
     val plateClearSnackbar: PlateClearSnackbar? = null,
@@ -48,12 +49,14 @@ class PrinterDetailViewModel(
             combine(
                 settingsRepository.serverUrl,
                 settingsRepository.apiKey,
-            ) { url, key -> url to key }
-                .collect { (url, key) ->
+                settingsRepository.cameraToken,
+            ) { url, key, cameraToken -> Triple(url, key, cameraToken) }
+                .collect { (url, key, cameraToken) ->
                     _uiState.update {
                         it.copy(
                             serverUrl = url,
                             apiKey = key,
+                            cameraToken = cameraToken,
                             hasCredentials = url.isNotBlank() && key.isNotBlank(),
                         )
                     }

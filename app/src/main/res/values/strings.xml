@@ -4,6 +4,7 @@
     <string name="server_url_label">Bambuddy server URL</string>
     <string name="server_url_placeholder">http://192.168.1.50:8080</string>
     <string name="api_key_label">API key</string>
+    <string name="camera_cover_token_label">Camera / cover token</string>
     <string name="save_settings">Save</string>
     <string name="settings_saved">Settings saved</string>
     <string name="test_connection">Test connection</string>
