@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.MaintenanceItem
+import com.chronoswing.buddydash.data.model.PrintQueueJob
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
@@ -39,6 +40,7 @@ data class PrinterDetailUiState(
     val maintenanceResetSnackbar: MaintenanceResetSnackbar? = null,
     /** Epoch millis of last successful status fetch (for passive refresh indicator). */
     val lastStatusUpdatedAtMillis: Long? = null,
+    val queueUpcoming: List<PrintQueueJob> = emptyList(),
 )
 
 enum class PlateClearSnackbar {
@@ -133,7 +135,11 @@ class PrinterDetailViewModel(
                 val maintenanceDeferred = async {
                     apiClient.fetchMaintenance(state.serverUrl, state.apiKey, printerId).getOrNull()
                 }
-                statusDeferred.await() to maintenanceDeferred.await()
+                val queueDeferred = async {
+                    apiClient.fetchPrintQueue(state.serverUrl, state.apiKey, printerId).getOrNull()
+                        .orEmpty()
+                }
+                Triple(statusDeferred.await(), maintenanceDeferred.await(), queueDeferred.await())
             }
 
             statusResult.first.fold(
@@ -145,6 +151,7 @@ class PrinterDetailViewModel(
                             status = status,
                             maintenanceItems = statusResult.second?.items.orEmpty(),
                             totalPrintHours = statusResult.second?.totalPrintHours,
+                            queueUpcoming = statusResult.third,
                             error = null,
                             lastStatusUpdatedAtMillis = System.currentTimeMillis(),
                         )
@@ -158,6 +165,7 @@ class PrinterDetailViewModel(
                             status = null,
                             maintenanceItems = emptyList(),
                             totalPrintHours = null,
+                            queueUpcoming = emptyList(),
                             error = error.message ?: "Failed to load printer status",
                         )
                     }

@@ -46,6 +46,7 @@ fun PrinterQuickStatusRow(
     modifier: Modifier = Modifier,
     cardMicroMotion: CardMicroMotion = CardMicroMotion.None,
     maintenanceIndicator: MaintenanceHomeIndicator = MaintenanceHomeIndicator.None,
+    pendingQueueCount: Int = 0,
 ) {
     val chipBreath = rememberPrintingChipBreath(cardMicroMotion == CardMicroMotion.Printing)
     Row(
@@ -60,6 +61,31 @@ fun PrinterQuickStatusRow(
         )
         plateKind?.let { PlateStatusChip(kind = it) }
         MaintenanceHomeIndicatorIcon(indicator = maintenanceIndicator)
+        QueueCountChip(count = pendingQueueCount)
+    }
+}
+
+@Composable
+fun QueueCountChip(
+    count: Int,
+    modifier: Modifier = Modifier,
+) {
+    if (count <= 0) return
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.32f),
+        border = BorderStroke(
+            width = 0.5.dp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f),
+        ),
+    ) {
+        Text(
+            text = stringResource(R.string.queue_count_chip, count),
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+        )
     }
 }
 

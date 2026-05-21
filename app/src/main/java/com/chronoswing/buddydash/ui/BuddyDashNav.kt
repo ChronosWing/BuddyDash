@@ -1,8 +1,10 @@
 package com.chronoswing.buddydash.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -21,6 +23,7 @@ object Routes {
     const val HOME = "home"
     const val SETTINGS = "settings"
     const val PRINTER_DETAIL = "printer/{printerId}/{printerName}/{printerModel}"
+    const val PRINTER_QUEUE = "printer_queue"
 
     fun printerDetail(printerId: Int, printerName: String, printerModel: String? = null): String {
         val encodedName = java.net.URLEncoder.encode(printerName, StandardCharsets.UTF_8.toString())
@@ -94,6 +97,29 @@ fun BuddyDashNav(
                 printerName = printerName,
                 printerModel = printerModel,
                 viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onViewFullQueue = { navController.navigate(Routes.PRINTER_QUEUE) },
+            )
+        }
+
+        composable(Routes.PRINTER_QUEUE) {
+            val parentEntry = navController.previousBackStackEntry
+            if (parentEntry == null) {
+                navController.popBackStack()
+                return@composable
+            }
+            val viewModel: PrinterDetailViewModel = viewModel(
+                viewModelStoreOwner = parentEntry,
+                factory = viewModelFactory {
+                    PrinterDetailViewModel(settingsRepository, apiClient)
+                },
+            )
+            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            PrinterQueueScreen(
+                printerName = uiState.printerName,
+                jobs = uiState.queueUpcoming,
+                serverUrl = uiState.serverUrl,
+                cameraToken = uiState.cameraToken,
                 onBack = { navController.popBackStack() },
             )
         }

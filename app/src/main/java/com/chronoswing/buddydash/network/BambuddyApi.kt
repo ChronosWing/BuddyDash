@@ -29,7 +29,18 @@ object BambuddyApi {
     const val MAINTENANCE_PERFORM_PATH = "/api/v1/maintenance/items/{item_id}/perform"
     const val BED_JOG_PATH = "/api/v1/printers/{printer_id}/bed-jog"
 
+    /** GET — list print queue (OpenAPI: list_queue_api_v1_queue__get). */
+    const val QUEUE_PATH = "/api/v1/queue/"
+
+    const val ARCHIVE_THUMBNAIL_PATH = "/api/v1/archives/{archive_id}/thumbnail"
+    const val ARCHIVE_PLATE_THUMBNAIL_PATH =
+        "/api/v1/archives/{archive_id}/plate-thumbnail/{plate_index}"
+    const val LIBRARY_FILE_THUMBNAIL_PATH = "/api/v1/library/files/{file_id}/thumbnail"
+    const val LIBRARY_FILE_PLATE_THUMBNAIL_PATH =
+        "/api/v1/library/files/{file_id}/plate-thumbnail/{plate_index}"
+
     val hasClearPlateEndpoint: Boolean = true
+    val hasQueueEndpoint: Boolean = true
     val hasChamberLightEndpoint: Boolean = true
     val hasPrintControlEndpoints: Boolean = true
     val hasPrintSpeedEndpoint: Boolean = true
@@ -85,4 +96,22 @@ object BambuddyApi {
         val forceQuery = if (force) "&force=true" else ""
         return "$base?distance=$distanceMm$forceQuery"
     }
+
+    fun queuePath(printerId: Int): String = "$QUEUE_PATH?printer_id=$printerId"
+
+    fun archiveThumbnailPath(archiveId: Int): String =
+        ARCHIVE_THUMBNAIL_PATH.replace("{archive_id}", archiveId.toString())
+
+    fun archivePlateThumbnailPath(archiveId: Int, plateIndex: Int): String =
+        ARCHIVE_PLATE_THUMBNAIL_PATH
+            .replace("{archive_id}", archiveId.toString())
+            .replace("{plate_index}", plateIndex.toString())
+
+    fun libraryFileThumbnailPath(fileId: Int): String =
+        LIBRARY_FILE_THUMBNAIL_PATH.replace("{file_id}", fileId.toString())
+
+    fun libraryFilePlateThumbnailPath(fileId: Int, plateIndex: Int): String =
+        LIBRARY_FILE_PLATE_THUMBNAIL_PATH
+            .replace("{file_id}", fileId.toString())
+            .replace("{plate_index}", plateIndex.toString())
 }
