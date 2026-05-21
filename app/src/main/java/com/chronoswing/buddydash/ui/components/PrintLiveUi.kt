@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
+import com.chronoswing.buddydash.util.formatFilenameForDisplay
 
 @Composable
 fun PrintFileNameText(
@@ -32,8 +33,9 @@ fun PrintFileNameText(
     color: Color = Color.Unspecified,
     fontWeight: FontWeight? = null,
 ) {
+    val displayName = formatFilenameForDisplay(fileName)
     Text(
-        text = fileName,
+        text = displayName,
         modifier = modifier.semantics {
             contentDescription = fileName
         },
