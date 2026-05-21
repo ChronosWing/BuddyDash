@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Pause
@@ -80,6 +81,13 @@ fun PlateStatusChip(
     modifier: Modifier = Modifier,
 ) {
     val style = when (kind) {
+        PlateIndicatorKind.InUse -> PlateChipStyle(
+            label = stringResource(R.string.plate_in_use_chip),
+            icon = Icons.Filled.Layers,
+            accent = CyanAccent,
+            container = CyanAccent.copy(alpha = 0.14f),
+            content = CyanAccent,
+        )
         PlateIndicatorKind.Clear -> PlateChipStyle(
             label = stringResource(R.string.plate_clear_chip),
             icon = Icons.Filled.CheckCircle,
