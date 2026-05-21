@@ -8,6 +8,7 @@ import com.chronoswing.buddydash.network.BambuddyApi
 private const val DEBUG_ALWAYS_SHOW_CLEAR_BUTTON = false
 
 data class PrinterDetailLabels(
+    val isActivePrint: Boolean,
     val connection: String,
     val currentActivity: String,
     val lastPrintResult: String?,
@@ -24,6 +25,8 @@ data class PrinterDetailLabels(
     val plateClearEndpointAvailable: Boolean,
     val showEta: Boolean,
     val eta: String,
+    val tempsLine: String?,
+    val hmsSummary: String,
     val nozzleTemp: String,
     val bedTemp: String,
     val hmsHealth: String,
@@ -57,10 +60,11 @@ fun PrinterStatus.toDetailLabels(): PrinterDetailLabels {
     }
 
     return PrinterDetailLabels(
+        isActivePrint = isActivePrint,
         connection = formatConnection(connected),
         currentActivity = state.currentActivity,
         lastPrintResult = state.lastPrintResult,
-        showLastPrintOnCard = state.showLastPrintOnCard,
+        showLastPrintOnCard = !isActivePrint && state.showLastPrintOnCard,
         showFile = showFile,
         fileLabel = fileLabel,
         fileName = fileName.orEmpty(),
@@ -73,6 +77,8 @@ fun PrinterStatus.toDetailLabels(): PrinterDetailLabels {
         plateClearEndpointAvailable = BambuddyApi.hasClearPlateEndpoint,
         showEta = isActivePrint && (remainingTimeSeconds ?: 0) > 0,
         eta = formatEta(remainingTimeSeconds),
+        tempsLine = if (isActivePrint) formatPrintTempsLine(nozzleTemp, bedTemp) else null,
+        hmsSummary = formatHmsSummary(hmsErrorCount),
         nozzleTemp = formatTemp(nozzleTemp),
         bedTemp = formatTemp(bedTemp),
         hmsHealth = formatHmsHealth(hmsErrorCount),

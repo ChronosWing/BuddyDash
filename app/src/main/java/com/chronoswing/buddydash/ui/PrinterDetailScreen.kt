@@ -2,14 +2,17 @@ package com.chronoswing.buddydash.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,8 +30,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chronoswing.buddydash.PlateClearSnackbar
@@ -42,12 +47,12 @@ import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentChipRow
 import com.chronoswing.buddydash.ui.components.FilamentSlotDetailHeader
 import com.chronoswing.buddydash.ui.components.HighlightValue
-import com.chronoswing.buddydash.ui.components.InlineProgress
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.util.PrinterDetailLabels
+import com.chronoswing.buddydash.util.buildPrintHeadline
 import com.chronoswing.buddydash.util.normalizeFilamentType
 import com.chronoswing.buddydash.util.toDetailLabels
 
@@ -195,6 +200,102 @@ private fun StatusTab(
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
 ) {
+    if (labels.isActivePrint) {
+        ActivePrintStatusTab(
+            labels = labels,
+            isClearingPlate = isClearingPlate,
+            onMarkPlateClear = onMarkPlateClear,
+        )
+    } else {
+        IdleStatusTab(
+            labels = labels,
+            isClearingPlate = isClearingPlate,
+            onMarkPlateClear = onMarkPlateClear,
+        )
+    }
+}
+
+@Composable
+private fun ActivePrintStatusTab(
+    labels: PrinterDetailLabels,
+    isClearingPlate: Boolean,
+    onMarkPlateClear: () -> Unit,
+) {
+    DetailInfoCard {
+        SectionHeader(stringResource(R.string.section_print))
+        HighlightValue(
+            label = labels.progressTitle,
+            value = buildPrintHeadline(labels.currentActivity, labels.progressValue),
+        )
+        labels.progressFraction?.let { fraction ->
+            LinearProgressIndicator(
+                progress = { fraction.coerceIn(0f, 1f) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp),
+            )
+        }
+        if (labels.showFile) {
+            HighlightValue(
+                label = labels.fileLabel,
+                value = labels.fileName.ifBlank { "—" },
+            )
+        }
+        if (labels.showEta) {
+            CompactLabelValue(label = stringResource(R.string.eta), value = labels.eta)
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            labels.tempsLine?.let { temps ->
+                Text(
+                    text = temps,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            Text(
+                text = labels.hmsSummary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (labels.hmsHasErrors) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+        }
+        CompactLabelValue(
+            label = stringResource(R.string.current_activity),
+            value = labels.currentActivity,
+        )
+        CompactLabelValue(
+            label = stringResource(R.string.connection),
+            value = labels.connection,
+        )
+        labels.plateStatus?.let { plate ->
+            SecondaryNote(
+                label = stringResource(R.string.plate_status),
+                value = plate,
+            )
+        }
+        if (labels.showPlateClearAction) {
+            PlateClearButton(
+                labels = labels,
+                isClearingPlate = isClearingPlate,
+                onClick = onMarkPlateClear,
+            )
+        }
+    }
+}
+
+@Composable
+private fun IdleStatusTab(
+    labels: PrinterDetailLabels,
+    isClearingPlate: Boolean,
+    onMarkPlateClear: () -> Unit,
+) {
     DetailInfoCard {
         SectionHeader(stringResource(R.string.section_overview))
         HighlightValue(
@@ -220,9 +321,7 @@ private fun StatusTab(
         }
     }
 
-    val hasPrintSection = labels.showProgress ||
-        labels.showFile ||
-        labels.showEta ||
+    val hasPrintSection = labels.showFile ||
         labels.lastPrintResult != null
 
     if (hasPrintSection) {
@@ -234,23 +333,11 @@ private fun StatusTab(
                     value = result,
                 )
             }
-            if (labels.showProgress) {
-                labels.progressFraction?.let { fraction ->
-                    InlineProgress(
-                        label = labels.progressTitle,
-                        value = labels.progressValue,
-                        fraction = fraction,
-                    )
-                }
-            }
             if (labels.showFile) {
                 CompactLabelValue(
                     label = labels.fileLabel,
                     value = labels.fileName.ifBlank { "—" },
                 )
-            }
-            if (labels.showEta) {
-                CompactLabelValue(label = stringResource(R.string.eta), value = labels.eta)
             }
         }
     }
