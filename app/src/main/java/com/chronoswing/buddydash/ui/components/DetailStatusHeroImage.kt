@@ -1,6 +1,8 @@
 package com.chronoswing.buddydash.ui.components
 
 import android.util.Log
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -16,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -43,6 +46,8 @@ private const val TAG_CAMERA = "BuddyDash/Camera"
 
 /** Refresh interval while detail Status tab is visible (RESUMED). */
 private const val SNAPSHOT_REFRESH_MS = 7_000L
+
+private const val SNAPSHOT_CROSSFADE_MS = 200
 
 private val HeroScrimGradient = Brush.verticalGradient(
     0f to Color.Transparent,
@@ -156,6 +161,7 @@ private fun PrinterCameraSnapshotImage(
         }
     }
 
+    var lastPainter by remember(printerId) { mutableStateOf<Painter?>(null) }
     val context = LocalContext.current
     val request = remember(imageUrl) {
         ImageRequest.Builder(context)
@@ -175,40 +181,64 @@ private fun PrinterCameraSnapshotImage(
                                 "error=${result.throwable.message}",
                         )
                     }
-                    onLoadFailed()
                 },
             )
             .build()
     }
     val shape = RoundedCornerShape(10.dp)
+    val frameModifier = Modifier
+        .fillMaxWidth()
+        .height(height)
+        .clip(shape)
 
-    SubcomposeAsyncImage(
-        model = request,
-        contentDescription = null,
-        modifier = Modifier.fillMaxWidth(),
-        loading = { },
-        error = { },
-        success = { state ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(height)
-                    .clip(shape),
-            ) {
-                Image(
-                    painter = state.painter,
-                    contentDescription = stringResource(R.string.camera_snapshot),
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(HeroScrimGradient),
-                )
-            }
-        },
-    )
+    Box(modifier = frameModifier) {
+        SubcomposeAsyncImage(
+            model = request,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            loading = {
+                lastPainter?.let { painter ->
+                    CameraSnapshotFrame(painter = painter)
+                }
+            },
+            error = {
+                if (lastPainter == null) {
+                    LaunchedEffect(imageUrl) { onLoadFailed() }
+                } else {
+                    lastPainter?.let { painter ->
+                        CameraSnapshotFrame(painter = painter)
+                    }
+                }
+            },
+            success = { state ->
+                Crossfade(
+                    targetState = state.painter,
+                    animationSpec = tween(SNAPSHOT_CROSSFADE_MS),
+                    label = "cameraSnapshot",
+                ) { painter ->
+                    lastPainter = painter
+                    CameraSnapshotFrame(painter = painter)
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun CameraSnapshotFrame(painter: Painter) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painter,
+            contentDescription = stringResource(R.string.camera_snapshot),
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(HeroScrimGradient),
+        )
+    }
 }
 
 private fun redactImageToken(url: String): String =
