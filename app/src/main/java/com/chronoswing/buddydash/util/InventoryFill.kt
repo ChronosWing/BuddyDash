@@ -1,13 +1,24 @@
 package com.chronoswing.buddydash.util
 
+import android.util.Log
+import com.chronoswing.buddydash.data.model.FilamentSlot
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
-/** Maps Bambuddy inventory assignment to an AMS / external slot. */
+private const val TAG_FILAMENT_COLOR = "BuddyDash/FilamentColor"
+
+/** Maps Bambuddy inventory assignment to an AMS / external slot (printer_id + ams_id + tray_id). */
 data class SlotInventoryKey(
     val amsId: Int,
     val trayId: Int,
+)
+
+data class SlotInventoryInfo(
+    val remainPercent: Int?,
+    val colorHex: String?,
+    val spoolId: Int,
+    val spoolName: String,
 )
 
 fun formatAmsSlotLabel(
@@ -29,10 +40,6 @@ fun externalInventoryTrayId(vtTrayGlobalId: Int, fallbackIndex: Int): Int =
 
 const val EXTERNAL_AMS_ID = 255
 
-/**
- * Remaining % from Bambuddy spool inventory (label_weight − weight_used).
- * Matches PrintersPage inventory fill when weight_used is tracked.
- */
 fun inventoryFillPercent(labelWeight: Int, weightUsed: Double?): Int? {
     if (labelWeight <= 0) return null
     if (weightUsed == null) return null
@@ -48,8 +55,26 @@ fun inventoryFillPercentFromSpool(spool: JSONObject): Int? {
     return inventoryFillPercent(labelWeight, spool.optDouble("weight_used"))
 }
 
-fun parseInventoryFillByPrinter(assignments: JSONArray): Map<Int, Map<SlotInventoryKey, Int>> {
-    val byPrinter = mutableMapOf<Int, MutableMap<SlotInventoryKey, Int>>()
+fun spoolDisplayName(spool: JSONObject): String {
+    val id = spool.optInt("id", -1)
+    val label = listOfNotNull(
+        spool.optString("brand").takeIf { it.isNotBlank() },
+        spool.optString("material").takeIf { it.isNotBlank() },
+        spool.optString("color_name").takeIf { it.isNotBlank() },
+    ).joinToString(" ")
+    return label.ifBlank { if (id >= 0) "spool#$id" else "spool" }
+}
+
+fun parseSlotInventoryInfo(spool: JSONObject): SlotInventoryInfo =
+    SlotInventoryInfo(
+        remainPercent = inventoryFillPercentFromSpool(spool),
+        colorHex = normalizeInventoryColor(spool.optString("rgba")),
+        spoolId = spool.optInt("id", -1),
+        spoolName = spoolDisplayName(spool),
+    )
+
+fun parseInventoryByPrinter(assignments: JSONArray): Map<Int, Map<SlotInventoryKey, SlotInventoryInfo>> {
+    val byPrinter = mutableMapOf<Int, MutableMap<SlotInventoryKey, SlotInventoryInfo>>()
     for (i in 0 until assignments.length()) {
         val row = assignments.optJSONObject(i) ?: continue
         val printerId = row.optInt("printer_id", -1)
@@ -57,18 +82,35 @@ fun parseInventoryFillByPrinter(assignments: JSONArray): Map<Int, Map<SlotInvent
         val amsId = row.optInt("ams_id")
         val trayId = row.optInt("tray_id")
         val spool = row.optJSONObject("spool") ?: continue
-        val fill = inventoryFillPercentFromSpool(spool) ?: continue
-        byPrinter.getOrPut(printerId) { mutableMapOf() }[SlotInventoryKey(amsId, trayId)] = fill
+        byPrinter.getOrPut(printerId) { mutableMapOf() }[SlotInventoryKey(amsId, trayId)] =
+            parseSlotInventoryInfo(spool)
     }
     return byPrinter
 }
 
-fun applyInventoryFill(
-    slots: List<com.chronoswing.buddydash.data.model.FilamentSlot>,
-    fillBySlot: Map<SlotInventoryKey, Int>,
-): List<com.chronoswing.buddydash.data.model.FilamentSlot> =
+fun applyInventoryToSlots(
+    slots: List<FilamentSlot>,
+    inventoryBySlot: Map<SlotInventoryKey, SlotInventoryInfo>,
+    printerName: String,
+    logColors: Boolean = true,
+): List<FilamentSlot> =
     slots.map { slot ->
-        val key = slot.inventoryKey ?: return@map slot
-        val fill = fillBySlot[key] ?: return@map slot
-        slot.copy(remainPercent = fill)
+        val trayColor = slot.colorHex
+        val key = slot.inventoryKey
+        val inventory = key?.let { inventoryBySlot[it] }
+        val displayColor = inventory?.colorHex ?: trayColor
+        if (logColors) {
+            Log.d(
+                TAG_FILAMENT_COLOR,
+                "printer=$printerName slot=${slot.label} " +
+                    "trayType=${slot.filamentType} trayColor=$trayColor " +
+                    "inventorySpool=${inventory?.spoolName ?: "none"} " +
+                    "inventorySpoolId=${inventory?.spoolId?.takeIf { it >= 0 } ?: "n/a"} " +
+                    "inventoryColor=${inventory?.colorHex} displayedColor=$displayColor",
+            )
+        }
+        slot.copy(
+            colorHex = displayColor,
+            remainPercent = inventory?.remainPercent ?: slot.remainPercent,
+        )
     }

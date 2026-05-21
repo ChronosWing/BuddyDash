@@ -3,15 +3,16 @@ package com.chronoswing.buddydash.network
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.util.SlotInventoryInfo
 import com.chronoswing.buddydash.util.SlotInventoryKey
-import com.chronoswing.buddydash.util.applyInventoryFill
+import com.chronoswing.buddydash.util.applyInventoryToSlots
 import com.chronoswing.buddydash.util.EXTERNAL_AMS_ID
 import com.chronoswing.buddydash.util.externalInventoryTrayId
 import com.chronoswing.buddydash.util.formatAmsSlotLabel
 import com.chronoswing.buddydash.util.isTrayLoaded
 import com.chronoswing.buddydash.util.normalizeFilamentType
 import com.chronoswing.buddydash.util.normalizeTrayColor
-import com.chronoswing.buddydash.util.parseInventoryFillByPrinter
+import com.chronoswing.buddydash.util.parseInventoryByPrinter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -86,7 +87,7 @@ class BambuddyApiClient {
     suspend fun fetchPrintersWithStatus(serverUrl: String, apiKey: String): Result<List<Printer>> =
         withContext(Dispatchers.IO) {
             fetchPrinters(serverUrl, apiKey).mapCatching { printers ->
-                val inventoryByPrinter = fetchInventoryFillByPrinter(serverUrl, apiKey, printerId = null)
+                val inventoryByPrinter = fetchInventoryByPrinter(serverUrl, apiKey, printerId = null)
                     .getOrElse { emptyMap() }
                 coroutineScope {
                     printers.map { printer ->
@@ -95,7 +96,7 @@ class BambuddyApiClient {
                                 serverUrl = serverUrl,
                                 apiKey = apiKey,
                                 printerId = printer.id,
-                                inventoryFill = inventoryByPrinter[printer.id],
+                                inventoryBySlot = inventoryByPrinter[printer.id],
                             )
                             mergePrinterWithStatus(printer, statusResult.getOrNull())
                         }
@@ -108,24 +109,24 @@ class BambuddyApiClient {
         serverUrl: String,
         apiKey: String,
         printerId: Int,
-        inventoryFill: Map<SlotInventoryKey, Int>? = null,
+        inventoryBySlot: Map<SlotInventoryKey, SlotInventoryInfo>? = null,
     ): Result<PrinterStatus> =
         withContext(Dispatchers.IO) {
-            val fill = inventoryFill ?: fetchInventoryFillByPrinter(serverUrl, apiKey, printerId)
+            val inventory = inventoryBySlot ?: fetchInventoryByPrinter(serverUrl, apiKey, printerId)
                 .getOrElse { emptyMap() }
                 .getOrElse(printerId) { emptyMap() }
             runApiCall(serverUrl, apiKey, BambuddyApi.printerStatusPath(printerId)) { body ->
-                parsePrinterStatus(JSONObject(body), fill)
+                parsePrinterStatus(JSONObject(body), inventory)
             }
         }
 
-    private fun fetchInventoryFillByPrinter(
+    private fun fetchInventoryByPrinter(
         serverUrl: String,
         apiKey: String,
         printerId: Int?,
-    ): Result<Map<Int, Map<SlotInventoryKey, Int>>> =
+    ): Result<Map<Int, Map<SlotInventoryKey, SlotInventoryInfo>>> =
         runApiCall(serverUrl, apiKey, BambuddyApi.inventoryAssignmentsPath(printerId)) { body ->
-            parseInventoryFillByPrinter(JSONArray(body))
+            parseInventoryByPrinter(JSONArray(body))
         }
 
     private inline fun <T> runApiCall(
@@ -201,7 +202,7 @@ class BambuddyApiClient {
 
     private fun parsePrinterStatus(
         json: JSONObject,
-        inventoryFill: Map<SlotInventoryKey, Int> = emptyMap(),
+        inventoryBySlot: Map<SlotInventoryKey, SlotInventoryInfo> = emptyMap(),
     ): PrinterStatus {
         val temperatures = json.optJSONObject("temperatures")
         val hmsErrors = json.optJSONArray("hms_errors")
@@ -225,17 +226,17 @@ class BambuddyApiClient {
             bedTemp = temperatures?.optDouble("bed"),
             hmsErrorCount = hmsErrors?.length() ?: 0,
             awaitingPlateClear = awaitingPlateClear,
-            filamentSlots = parseFilamentSlots(json, inventoryFill),
+            filamentSlots = parseFilamentSlots(json, inventoryBySlot),
         )
     }
 
     private fun parseFilamentSlots(
         json: JSONObject,
-        inventoryFill: Map<SlotInventoryKey, Int>,
+        inventoryBySlot: Map<SlotInventoryKey, SlotInventoryInfo>,
     ): List<FilamentSlot> {
+        val printerName = json.optString("name", "")
         if (DEBUG_LOG_FILAMENT_RAW) {
             val printerId = json.optInt("id", -1)
-            val printerName = json.optString("name", "")
             Log.d(
                 TAG_FILAMENT,
                 "status printer=$printerId ($printerName) ams=${json.optJSONArray("ams")}",
@@ -254,13 +255,13 @@ class BambuddyApiClient {
                 val isAmsHt = trays.length() == 1
                 for (trayIndex in 0 until trays.length()) {
                     val trayJson = trays.optJSONObject(trayIndex) ?: continue
-                    val trayId = trayJson.optInt("id", trayIndex)
+                    // Inventory assignments use 0-based slot index, not necessarily tray.id from MQTT.
                     slots.add(
                         parseTray(
                             tray = trayJson,
-                            label = formatAmsSlotLabel(amsId, trayId, isAmsHt, isExternal = false),
+                            label = formatAmsSlotLabel(amsId, trayIndex, isAmsHt, isExternal = false),
                             amsId = amsId,
-                            trayId = trayId,
+                            trayId = trayIndex,
                         ),
                     )
                 }
@@ -282,7 +283,12 @@ class BambuddyApiClient {
                 )
             }
         }
-        return applyInventoryFill(slots, inventoryFill)
+        return applyInventoryToSlots(
+            slots = slots,
+            inventoryBySlot = inventoryBySlot,
+            printerName = printerName.ifBlank { "printer ${json.optInt("id", -1)}" },
+            logColors = DEBUG_LOG_FILAMENT_RAW,
+        )
     }
 
     private fun parseTray(

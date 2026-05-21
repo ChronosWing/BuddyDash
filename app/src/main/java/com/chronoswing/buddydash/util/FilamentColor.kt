@@ -9,8 +9,8 @@ fun parseFilamentColor(hex: String?): Color? {
         when (cleaned.length) {
             6 -> Color(0xFF000000L or cleaned.toLong(16))
             8 -> {
-                // Bambu often sends AARRGGBB or RRGGBBAA; use last 6 as RGB for the dot
-                Color(0xFF000000L or cleaned.takeLast(6).toLong(16))
+                // Bambu / Bambuddy RRGGBBAA — RGB is the first six digits (see normalizeTrayColor)
+                Color(0xFF000000L or cleaned.substring(0, 6).toLong(16))
             }
             else -> null
         }
