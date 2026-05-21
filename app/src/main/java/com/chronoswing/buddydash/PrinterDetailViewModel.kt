@@ -37,6 +37,8 @@ data class PrinterDetailUiState(
     val controlSnackbar: ControlSnackbar? = null,
     val isMaintenanceResetBusy: Boolean = false,
     val maintenanceResetSnackbar: MaintenanceResetSnackbar? = null,
+    /** Epoch millis of last successful status fetch (for passive refresh indicator). */
+    val lastStatusUpdatedAtMillis: Long? = null,
 )
 
 enum class PlateClearSnackbar {
@@ -144,6 +146,7 @@ class PrinterDetailViewModel(
                             maintenanceItems = statusResult.second?.items.orEmpty(),
                             totalPrintHours = statusResult.second?.totalPrintHours,
                             error = null,
+                            lastStatusUpdatedAtMillis = System.currentTimeMillis(),
                         )
                     }
                 },
