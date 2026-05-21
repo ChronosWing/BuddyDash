@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,7 +44,6 @@ import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentChipRow
-import com.chronoswing.buddydash.ui.components.InlineProgress
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.theme.OnlineGreen
@@ -217,75 +218,128 @@ private fun GlancePrinterCard(
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = labels.currentActivity,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                labels.plateStatus?.let { plate ->
+            if (labels.isActivePrint) {
+                labels.printHeadline?.let { headline ->
                     Text(
-                        text = plate,
-                        style = MaterialTheme.typography.labelMedium,
+                        text = headline,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                labels.progressFraction?.let { fraction ->
+                    LinearProgressIndicator(
+                        progress = { fraction.coerceIn(0f, 1f) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp),
+                    )
+                }
+                labels.fileLine?.let { file ->
+                    Text(
+                        text = file,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                labels.etaLine?.let { eta ->
+                    Text(
+                        text = eta,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    labels.tempsLine?.let { temps ->
+                        Text(
+                            text = temps,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                    Text(
+                        text = labels.hmsSummary,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (labels.hmsHasErrors) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+                labels.plateStatus?.let { plate ->
+                    Text(
+                        text = plate,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = labels.currentActivity,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    labels.plateStatus?.let { plate ->
+                        Text(
+                            text = plate,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
 
-            if (labels.showLastPrint && labels.lastPrintResult != null) {
-                Text(
-                    text = stringResource(
-                        R.string.last_print_line,
-                        labels.lastPrintResult,
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+                if (labels.showLastPrint && labels.lastPrintResult != null) {
+                    Text(
+                        text = stringResource(
+                            R.string.last_print_line,
+                            labels.lastPrintResult,
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
-            if (labels.progressText != null && labels.progressFraction != null) {
-                InlineProgress(
-                    label = stringResource(R.string.printing),
-                    value = labels.progressText,
-                    fraction = labels.progressFraction,
-                )
-            }
+                labels.fileLine?.let { file ->
+                    Text(
+                        text = file,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
 
-            labels.fileLine?.let { file ->
-                Text(
-                    text = file,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = stringResource(R.string.nozzle_short, labels.nozzleTemp),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                Text(
-                    text = stringResource(R.string.bed_short, labels.bedTemp),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                Text(
-                    text = stringResource(R.string.hms_short, labels.hmsHealth),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (labels.hmsHasErrors) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = stringResource(R.string.nozzle_short, labels.nozzleTemp),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    Text(
+                        text = stringResource(R.string.bed_short, labels.bedTemp),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    Text(
+                        text = stringResource(R.string.hms_short, labels.hmsHealth),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (labels.hmsHasErrors) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
             }
 
             FilamentChipRow(slots = labels.filamentSlots, compact = true)

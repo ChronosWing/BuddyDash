@@ -21,6 +21,27 @@ fun formatTemp(value: Double?): String {
     }
 }
 
+fun formatTempShort(value: Double?): String {
+    if (value == null) return "—"
+    return "${value.toInt()}°"
+}
+
+fun buildPrintHeadline(activity: String, progressText: String?): String {
+    if (progressText != null && progressText != "—") {
+        return "$activity • $progressText"
+    }
+    return activity
+}
+
+fun formatPrintTempsLine(nozzle: Double?, bed: Double?): String {
+    val nozzleText = formatTempShort(nozzle)
+    val bedText = formatTempShort(bed)
+    return "$nozzleText / $bedText"
+}
+
+fun formatHmsSummary(errorCount: Int): String =
+    if (errorCount == 0) "HMS OK" else "HMS $errorCount"
+
 fun formatProgress(progress: Float?): String {
     if (progress == null) return "—"
     return if (progress % 1f == 0f) {
