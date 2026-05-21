@@ -38,6 +38,15 @@ object BambuddyApi {
     /** GET — list print queue (OpenAPI: list_queue_api_v1_queue__get). */
     const val QUEUE_PATH = "/api/v1/queue/"
 
+    /** POST — add archive to queue (OpenAPI: add_to_queue_api_v1_queue__post, PrintQueueItemCreate). */
+    const val QUEUE_ADD_PATH = "/api/v1/queue/"
+
+    /**
+     * POST — reprint archive directly (OpenAPI: reprint_archive_…). BuddyDash v1 uses [QUEUE_ADD_PATH]
+     * with manual_start instead to avoid bypassing the queue.
+     */
+    const val ARCHIVE_REPRINT_PATH = "/api/v1/archives/{archive_id}/reprint"
+
     /** GET — list archives (operationId: list_archives_api_v1_archives__get). */
     const val ARCHIVES_PATH = "/api/v1/archives/"
 
@@ -63,6 +72,7 @@ object BambuddyApi {
     val hasFilesEndpoint: Boolean = true
     val hasSpoolInventoryEndpoint: Boolean = true
     val hasArchivesEndpoint: Boolean = true
+    val hasQueueAddEndpoint: Boolean = true
 
     fun inventoryAssignmentsPath(printerId: Int? = null): String =
         if (printerId != null) {
@@ -124,6 +134,9 @@ object BambuddyApi {
 
     fun archiveDetailPath(archiveId: Int): String =
         ARCHIVE_DETAIL_PATH.replace("{archive_id}", archiveId.toString())
+
+    fun archiveReprintPath(archiveId: Int, printerId: Int): String =
+        "${ARCHIVE_REPRINT_PATH.replace("{archive_id}", archiveId.toString())}?printer_id=$printerId"
 
     fun inventorySpoolsPath(includeArchived: Boolean = false): String =
         if (includeArchived) {

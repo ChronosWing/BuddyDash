@@ -43,7 +43,9 @@ import com.chronoswing.buddydash.util.queueDurationFieldCandidates
 import com.chronoswing.buddydash.util.queueFilamentUsageFieldCandidates
 import com.chronoswing.buddydash.util.resolveFilamentUsageFromJson
 import com.chronoswing.buddydash.util.ARCHIVES_LIST_DEFAULT_LIMIT
+import com.chronoswing.buddydash.util.DEBUG_LOG_ARCHIVE_REPRINT
 import com.chronoswing.buddydash.util.DEBUG_LOG_ARCHIVES
+import com.chronoswing.buddydash.util.TAG_ARCHIVE_REPRINT
 import com.chronoswing.buddydash.util.TAG_ARCHIVES
 import com.chronoswing.buddydash.util.archiveDisplayFieldsSample
 import com.chronoswing.buddydash.util.logArchiveStatsDateItemDebug
@@ -443,6 +445,46 @@ class BambuddyApiClient {
                 }.getOrThrow()
             }
         }
+
+    /**
+     * Queue an archive for printing via POST /api/v1/queue/ (PrintQueueItemCreate).
+     * Uses manual_start so the job stays queued until started from the printer UI.
+     */
+    suspend fun addArchiveToQueue(
+        serverUrl: String,
+        apiKey: String,
+        archiveId: Int,
+        printerId: Int,
+        quantity: Int = 1,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasQueueAddEndpoint) {
+            return@withContext Result.failure(
+                UnsupportedOperationException("Queue add endpoint not found"),
+            )
+        }
+        val path = BambuddyApi.QUEUE_ADD_PATH
+        val payload = JSONObject().apply {
+            put("archive_id", archiveId)
+            put("printer_id", printerId)
+            put("quantity", quantity.coerceIn(1, 99))
+            put("manual_start", true)
+        }
+        if (DEBUG_LOG_ARCHIVE_REPRINT) {
+            Log.d(
+                TAG_ARCHIVE_REPRINT,
+                "endpoint=POST $path (not ${BambuddyApi.ARCHIVE_REPRINT_PATH}) payload=$payload",
+            )
+        }
+        runApiCall(serverUrl, apiKey, path, method = "POST", postBody = payload.toString()) { body ->
+            if (DEBUG_LOG_ARCHIVE_REPRINT) {
+                Log.d(TAG_ARCHIVE_REPRINT, "response=$body")
+            }
+        }
+    }.onFailure { error ->
+        if (DEBUG_LOG_ARCHIVE_REPRINT) {
+            Log.e(TAG_ARCHIVE_REPRINT, "queueArchive failed", error)
+        }
+    }
 
     private fun parseArchivesList(
         body: String,
