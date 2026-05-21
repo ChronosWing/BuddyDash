@@ -47,6 +47,7 @@ import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentHomeGroupsRow
 import com.chronoswing.buddydash.ui.components.HomePrinterSearchField
+import com.chronoswing.buddydash.ui.components.HomePrinterSearchFilterChips
 import com.chronoswing.buddydash.ui.components.HomeCardMicroMotionFrame
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
 import com.chronoswing.buddydash.ui.components.MicroMotionThumbnailFrame
@@ -58,7 +59,9 @@ import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.util.HOME_PRINTER_SEARCH_MIN_COUNT
 import com.chronoswing.buddydash.util.PrinterCardLabels
-import com.chronoswing.buddydash.util.filterPrintersForSearch
+import com.chronoswing.buddydash.util.HomePrinterSearchFilter
+import com.chronoswing.buddydash.util.applyHomePrinterSearch
+import com.chronoswing.buddydash.util.homeSearchEmptyMessageRes
 import com.chronoswing.buddydash.util.toCardLabels
 
 @Composable
@@ -115,12 +118,14 @@ private fun HomeScreenContent(
     val showPrinterSearch = printers.size >= HOME_PRINTER_SEARCH_MIN_COUNT
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
+    var searchFilter by rememberSaveable { mutableStateOf(HomePrinterSearchFilter.All) }
     val listState = rememberLazyListState()
 
     if (searchExpanded) {
         BackHandler {
             searchExpanded = false
             searchQuery = ""
+            searchFilter = HomePrinterSearchFilter.All
         }
     }
 
@@ -128,6 +133,7 @@ private fun HomeScreenContent(
         if (!showPrinterSearch) {
             searchExpanded = false
             searchQuery = ""
+            searchFilter = HomePrinterSearchFilter.All
         }
     }
 
@@ -140,7 +146,10 @@ private fun HomeScreenContent(
                         IconButton(
                             onClick = {
                                 searchExpanded = !searchExpanded
-                                if (!searchExpanded) searchQuery = ""
+                                if (!searchExpanded) {
+                                    searchQuery = ""
+                                    searchFilter = HomePrinterSearchFilter.All
+                                }
                             },
                         ) {
                             Icon(
@@ -193,7 +202,11 @@ private fun HomeScreenContent(
                 )
             }
             else -> {
-                val filteredPrinters = filterPrintersForSearch(printers, searchQuery)
+                val filteredPrinters = if (searchExpanded) {
+                    applyHomePrinterSearch(printers, searchQuery, searchFilter)
+                } else {
+                    printers
+                }
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -203,6 +216,11 @@ private fun HomeScreenContent(
                         expanded = searchExpanded,
                         query = searchQuery,
                         onQueryChange = { searchQuery = it },
+                    )
+                    HomePrinterSearchFilterChips(
+                        expanded = searchExpanded,
+                        selectedFilter = searchFilter,
+                        onFilterSelected = { searchFilter = it },
                     )
                     PullToRefreshBox(
                         isRefreshing = isRefreshing,
@@ -224,10 +242,12 @@ private fun HomeScreenContent(
                                     )
                                 }
                             }
-                            if (searchExpanded && searchQuery.isNotBlank() && filteredPrinters.isEmpty()) {
+                            if (searchExpanded && filteredPrinters.isEmpty()) {
                                 item(key = "search_empty") {
                                     Text(
-                                        text = stringResource(R.string.no_printers_match_search),
+                                        text = stringResource(
+                                            homeSearchEmptyMessageRes(searchQuery, searchFilter),
+                                        ),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(vertical = 12.dp),
