@@ -1,7 +1,10 @@
 package com.chronoswing.buddydash.network
 
+import com.chronoswing.buddydash.data.model.AmsUnitInfo
 import com.chronoswing.buddydash.data.model.FilamentSlot
+import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.Printer
+import com.chronoswing.buddydash.data.model.PrinterMaintenanceOverview
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.util.FilamentSwatchColors
 import com.chronoswing.buddydash.util.SlotInventoryInfo
@@ -10,6 +13,7 @@ import com.chronoswing.buddydash.util.applyInventoryToSlots
 import com.chronoswing.buddydash.util.EXTERNAL_AMS_ID
 import com.chronoswing.buddydash.util.externalInventoryTrayId
 import com.chronoswing.buddydash.util.formatAmsSlotLabel
+import com.chronoswing.buddydash.util.formatAmsUnitLabel
 import com.chronoswing.buddydash.util.isTrayLoaded
 import com.chronoswing.buddydash.util.normalizeFilamentType
 import com.chronoswing.buddydash.util.normalizeTrayColor
@@ -39,6 +43,9 @@ class BambuddyApiClient {
         /** Temporary: log ETA-related raw fields during active prints. Set false before release. */
         private const val DEBUG_LOG_ETA_RAW = true
         private const val TAG_ETA = "BuddyDash/Eta"
+        /** Temporary: log newly parsed detail/status fields. Set false before release. */
+        private const val DEBUG_LOG_DETAIL_RAW = true
+        private const val TAG_DETAIL = "BuddyDash/Detail"
     }
 
     private val client = OkHttpClient.Builder()
@@ -198,6 +205,53 @@ class BambuddyApiClient {
             }
         }
 
+    suspend fun fetchMaintenance(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+    ): Result<PrinterMaintenanceOverview> =
+        withContext(Dispatchers.IO) {
+            if (!BambuddyApi.hasMaintenanceEndpoint) {
+                return@withContext Result.failure(
+                    UnsupportedOperationException("Maintenance endpoint not found"),
+                )
+            }
+            runApiCall(serverUrl, apiKey, BambuddyApi.maintenancePrinterPath(printerId)) { body ->
+                parseMaintenanceOverview(JSONObject(body))
+            }
+        }
+
+    suspend fun setPrintSpeed(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+        mode: Int,
+    ): Result<Unit> = postPrinterAction(serverUrl, apiKey, BambuddyApi.printSpeedPath(printerId, mode))
+
+    suspend fun pausePrint(serverUrl: String, apiKey: String, printerId: Int): Result<Unit> =
+        postPrinterAction(serverUrl, apiKey, BambuddyApi.printPausePath(printerId))
+
+    suspend fun resumePrint(serverUrl: String, apiKey: String, printerId: Int): Result<Unit> =
+        postPrinterAction(serverUrl, apiKey, BambuddyApi.printResumePath(printerId))
+
+    suspend fun stopPrint(serverUrl: String, apiKey: String, printerId: Int): Result<Unit> =
+        postPrinterAction(serverUrl, apiKey, BambuddyApi.printStopPath(printerId))
+
+    suspend fun setChamberLight(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+        on: Boolean,
+    ): Result<Unit> = postPrinterAction(serverUrl, apiKey, BambuddyApi.chamberLightPath(printerId, on))
+
+    private suspend fun postPrinterAction(
+        serverUrl: String,
+        apiKey: String,
+        path: String,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runApiCall(serverUrl, apiKey, path, method = "POST") { Unit }
+    }
+
     private fun parsePrinterStatus(
         json: JSONObject,
         inventoryBySlot: Map<SlotInventoryKey, SlotInventoryInfo> = emptyMap(),
@@ -210,6 +264,9 @@ class BambuddyApiClient {
         } else {
             null
         }
+
+        val amsUnits = parseAmsUnits(json)
+        val operational = parseOperationalFields(json, temperatures)
 
         return PrinterStatus(
             connected = json.optBoolean("connected", false),
@@ -230,10 +287,146 @@ class BambuddyApiClient {
             },
             nozzleTemp = temperatures?.optDouble("nozzle"),
             bedTemp = temperatures?.optDouble("bed"),
+            chamberTemp = operational.chamberTemp,
             hmsErrorCount = hmsErrors?.length() ?: 0,
             awaitingPlateClear = awaitingPlateClear,
             filamentSlots = parseFilamentSlots(json, inventoryBySlot),
+            amsUnits = amsUnits,
+            wifiSignalDbm = operational.wifiSignalDbm,
+            wiredNetwork = operational.wiredNetwork,
+            doorOpen = operational.doorOpen,
+            firmwareVersion = operational.firmwareVersion,
+            partFanPercent = operational.partFanPercent,
+            auxFanPercent = operational.auxFanPercent,
+            chamberFanPercent = operational.chamberFanPercent,
+            speedLevel = operational.speedLevel,
+            chamberLightOn = operational.chamberLightOn,
         )
+    }
+
+    private data class OperationalFields(
+        val chamberTemp: Double?,
+        val wifiSignalDbm: Int?,
+        val wiredNetwork: Boolean?,
+        val doorOpen: Boolean?,
+        val firmwareVersion: String?,
+        val partFanPercent: Int?,
+        val auxFanPercent: Int?,
+        val chamberFanPercent: Int?,
+        val speedLevel: Int?,
+        val chamberLightOn: Boolean?,
+    )
+
+    private fun parseOperationalFields(
+        json: JSONObject,
+        temperatures: JSONObject?,
+    ): OperationalFields {
+        val chamberTemp = parseChamberTemp(temperatures)
+        val wifiSignalDbm = json.optInt("wifi_signal").takeIf { json.has("wifi_signal") && !json.isNull("wifi_signal") }
+        val wiredNetwork = if (json.has("wired_network") && !json.isNull("wired_network")) {
+            json.getBoolean("wired_network")
+        } else {
+            null
+        }
+        val doorOpen = if (json.has("door_open") && !json.isNull("door_open")) {
+            json.getBoolean("door_open")
+        } else {
+            null
+        }
+        val firmwareVersion = json.optString("firmware_version").takeIf { it.isNotBlank() }
+        val partFanPercent = json.optInt("cooling_fan_speed").takeIf {
+            json.has("cooling_fan_speed") && !json.isNull("cooling_fan_speed")
+        }
+        val auxFanPercent = json.optInt("big_fan1_speed").takeIf {
+            json.has("big_fan1_speed") && !json.isNull("big_fan1_speed")
+        }
+        val chamberFanPercent = json.optInt("big_fan2_speed").takeIf {
+            json.has("big_fan2_speed") && !json.isNull("big_fan2_speed")
+        }
+        val speedLevel = json.optInt("speed_level").takeIf {
+            json.has("speed_level") && !json.isNull("speed_level")
+        }
+        val chamberLightOn = if (json.has("chamber_light") && !json.isNull("chamber_light")) {
+            json.getBoolean("chamber_light")
+        } else {
+            null
+        }
+
+        if (DEBUG_LOG_DETAIL_RAW) {
+            Log.d(
+                TAG_DETAIL,
+                "operational wifi=$wifiSignalDbm wired=$wiredNetwork door=$doorOpen " +
+                    "firmware=$firmwareVersion chamber=$chamberTemp fans=($partFanPercent,$auxFanPercent,$chamberFanPercent) " +
+                    "speed=$speedLevel light=$chamberLightOn heatbreak=${json.opt("heatbreak_fan_speed")}",
+            )
+            temperatures?.keys()?.asSequence()?.toList()?.let { keys ->
+                if (keys.isNotEmpty()) Log.d(TAG_DETAIL, "temperature keys=$keys")
+            }
+        }
+
+        return OperationalFields(
+            chamberTemp = chamberTemp,
+            wifiSignalDbm = wifiSignalDbm,
+            wiredNetwork = wiredNetwork,
+            doorOpen = doorOpen,
+            firmwareVersion = firmwareVersion,
+            partFanPercent = partFanPercent,
+            auxFanPercent = auxFanPercent,
+            chamberFanPercent = chamberFanPercent,
+            speedLevel = speedLevel,
+            chamberLightOn = chamberLightOn,
+        )
+    }
+
+    private fun parseChamberTemp(temperatures: JSONObject?): Double? {
+        if (temperatures == null) return null
+        for (key in listOf("chamber", "chamber_temp", "chamber_temperature")) {
+            if (temperatures.has(key) && !temperatures.isNull(key)) {
+                return temperatures.optDouble(key)
+            }
+        }
+        return null
+    }
+
+    private fun parseAmsUnits(json: JSONObject): List<AmsUnitInfo> {
+        val amsArray = json.optJSONArray("ams") ?: return emptyList()
+        val units = mutableListOf<AmsUnitInfo>()
+        for (unitIndex in 0 until amsArray.length()) {
+            val unit = amsArray.optJSONObject(unitIndex) ?: continue
+            val amsId = unit.optInt("id", unitIndex)
+            val temp = unit.optDouble("temp").takeIf { unit.has("temp") && !unit.isNull("temp") }
+            val humidity = unit.optInt("humidity").takeIf { unit.has("humidity") && !unit.isNull("humidity") }
+            if (temp == null && humidity == null) continue
+            units.add(
+                AmsUnitInfo(
+                    amsId = amsId,
+                    label = formatAmsUnitLabel(amsId),
+                    tempC = temp,
+                    humidityPercent = humidity,
+                ),
+            )
+            if (DEBUG_LOG_DETAIL_RAW) {
+                Log.d(TAG_DETAIL, "ams unit $amsId temp=$temp humidity=$humidity")
+            }
+        }
+        return units
+    }
+
+    private fun parseMaintenanceOverview(json: JSONObject): PrinterMaintenanceOverview {
+        val itemsArray = json.optJSONArray("maintenance_items") ?: JSONArray()
+        val items = List(itemsArray.length()) { index ->
+            val item = itemsArray.getJSONObject(index)
+            MaintenanceItem(
+                name = item.optString("maintenance_type_name", "Maintenance"),
+                isDue = item.optBoolean("is_due", false),
+                isWarning = item.optBoolean("is_warning", false),
+                enabled = item.optBoolean("enabled", true),
+            )
+        }
+        if (DEBUG_LOG_DETAIL_RAW) {
+            Log.d(TAG_DETAIL, "maintenance items=${items.size} due=${json.optInt("due_count")} warn=${json.optInt("warning_count")}")
+        }
+        return PrinterMaintenanceOverview(items = items)
     }
 
     private fun parseFilamentSlots(
@@ -257,6 +450,12 @@ class BambuddyApiClient {
             for (unitIndex in 0 until amsArray.length()) {
                 val unit = amsArray.optJSONObject(unitIndex) ?: continue
                 val amsId = unit.optInt("id", unitIndex)
+                if (DEBUG_LOG_DETAIL_RAW) {
+                    Log.d(
+                        TAG_DETAIL,
+                        "ams[$amsId] temp=${unit.opt("temp")} humidity=${unit.opt("humidity")}",
+                    )
+                }
                 val trays = unit.optJSONArray("tray") ?: continue
                 val isAmsHt = trays.length() == 1
                 for (trayIndex in 0 until trays.length()) {

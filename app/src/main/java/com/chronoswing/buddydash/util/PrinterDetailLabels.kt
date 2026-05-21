@@ -1,6 +1,8 @@
 package com.chronoswing.buddydash.util
 
+import com.chronoswing.buddydash.data.model.AmsUnitInfo
 import com.chronoswing.buddydash.data.model.FilamentSlot
+import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.BambuddyApi
 
@@ -35,9 +37,31 @@ data class PrinterDetailLabels(
     val hmsHealth: String,
     val hmsHasErrors: Boolean,
     val filamentSlots: List<FilamentSlot>,
+    val amsUnits: List<AmsUnitInfo>,
+    val showConnectivitySection: Boolean,
+    val wifiCompact: String?,
+    val doorLine: String?,
+    val firmwareLine: String?,
+    val chamberTempCompact: String?,
+    val showFansSection: Boolean,
+    val partFanPercent: Int?,
+    val auxFanPercent: Int?,
+    val chamberFanPercent: Int?,
+    val showPrintSpeedSection: Boolean,
+    val printSpeedLabel: String?,
+    val speedLevel: Int?,
+    val chamberLightOn: Boolean?,
+    val canControlPrint: Boolean,
+    val canPause: Boolean,
+    val canResume: Boolean,
+    val canStop: Boolean,
+    val canToggleLight: Boolean,
+    val maintenanceItems: List<MaintenanceItem>,
 )
 
-fun PrinterStatus.toDetailLabels(): PrinterDetailLabels {
+fun PrinterStatus.toDetailLabels(
+    maintenanceItems: List<MaintenanceItem> = emptyList(),
+): PrinterDetailLabels {
     val raw = rawState?.uppercase()
     val isPrinting = raw == "RUNNING"
     val isPaused = raw == "PAUSE"
@@ -61,6 +85,13 @@ fun PrinterStatus.toDetailLabels(): PrinterDetailLabels {
     val plateStatus = awaitingPlateClear?.let { awaiting ->
         if (awaiting) "Not clear" else "Clear"
     }
+
+    val wifiCompact = formatWifiCompact(wifiSignalDbm, wiredNetwork)
+    val doorLine = formatDoorState(doorOpen)
+    val firmwareLine = firmwareVersion?.takeIf { it.isNotBlank() }
+    val chamberTempCompact = formatChamberTempCompact(chamberTemp)
+    val printSpeedLabel = formatPrintSpeedLevel(speedLevel)
+    val canControlPrint = connected && isActivePrint
 
     val activityKind = resolveActivityKind()
     return PrinterDetailLabels(
@@ -91,5 +122,25 @@ fun PrinterStatus.toDetailLabels(): PrinterDetailLabels {
         hmsHealth = formatHmsHealth(hmsErrorCount),
         hmsHasErrors = hmsErrorCount > 0,
         filamentSlots = filamentSlots,
+        amsUnits = amsUnits,
+        showConnectivitySection = hasConnectivitySection(),
+        wifiCompact = wifiCompact,
+        doorLine = doorLine,
+        firmwareLine = firmwareLine,
+        chamberTempCompact = chamberTempCompact,
+        showFansSection = hasFansSection(),
+        partFanPercent = partFanPercent,
+        auxFanPercent = auxFanPercent,
+        chamberFanPercent = chamberFanPercent,
+        showPrintSpeedSection = hasPrintSpeedSection(),
+        printSpeedLabel = printSpeedLabel,
+        speedLevel = speedLevel,
+        chamberLightOn = chamberLightOn,
+        canControlPrint = canControlPrint,
+        canPause = canControlPrint && isPrinting,
+        canResume = connected && isPaused,
+        canStop = canControlPrint,
+        canToggleLight = connected && chamberLightOn != null,
+        maintenanceItems = maintenanceItems,
     )
 }
