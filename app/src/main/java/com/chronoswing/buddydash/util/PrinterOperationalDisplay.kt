@@ -59,6 +59,30 @@ data class MaintenanceLine(
     val kind: MaintenanceLineKind,
 )
 
+/** Short dashboard-style label from Bambuddy maintenance type names. */
+fun shortenMaintenanceName(raw: String): String {
+    var name = raw.trim()
+    val isClean = name.startsWith("Clean ", ignoreCase = true)
+    val isCheck = name.startsWith("Check ", ignoreCase = true)
+    when {
+        isClean -> {
+            name = name.removePrefix("Clean ").trim()
+            if (name.contains("build plate", ignoreCase = true)) {
+                return "Build plate cleaning"
+            }
+        }
+        isCheck -> name = name.removePrefix("Check ").trim()
+    }
+    name = name.replace("/", " / ")
+    return name.split(Regex("\\s+")).joinToString(" ") { word ->
+        when {
+            word.equals("PTFE", ignoreCase = true) -> "PTFE"
+            word.length <= 2 -> word.uppercase()
+            else -> word.lowercase().replaceFirstChar { it.titlecase() }
+        }
+    }
+}
+
 fun maintenanceDisplayLines(items: List<MaintenanceItem>): List<MaintenanceLine> =
     items
         .filter { it.enabled }
@@ -68,7 +92,7 @@ fun maintenanceDisplayLines(items: List<MaintenanceItem>): List<MaintenanceLine>
                 item.isWarning -> MaintenanceLineKind.Warning
                 else -> MaintenanceLineKind.Healthy
             }
-            MaintenanceLine(name = item.name, kind = kind)
+            MaintenanceLine(name = shortenMaintenanceName(item.name), kind = kind)
         }
 
 fun PrinterStatus.hasConnectivitySection(): Boolean =

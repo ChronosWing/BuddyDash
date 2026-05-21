@@ -346,26 +346,11 @@ private fun ActivePrintStatusTab(
         if (labels.showEta) {
             CompactLabelValue(label = stringResource(R.string.eta), value = labels.eta)
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (labels.tempsLine != null) {
-                PrintTempsRow(
-                    nozzleTemp = labels.nozzleTemp,
-                    bedTemp = labels.bedTemp,
-                    valueStyle = MaterialTheme.typography.titleMedium,
-                )
-            }
-            Text(
-                text = labels.hmsSummary,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (labels.hmsHasErrors) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
+        if (labels.tempsLine != null) {
+            PrintTempsRow(
+                nozzleTemp = labels.nozzleTemp,
+                bedTemp = labels.bedTemp,
+                valueStyle = MaterialTheme.typography.titleMedium,
             )
         }
         CompactLabelValue(

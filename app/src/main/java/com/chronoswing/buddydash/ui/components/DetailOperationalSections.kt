@@ -1,6 +1,7 @@
 package com.chronoswing.buddydash.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -11,7 +12,6 @@ import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DoorFront
-import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Warning
@@ -42,33 +42,35 @@ fun DetailConnectivityCard(labels: PrinterDetailLabels) {
     if (!labels.showConnectivitySection) return
     DetailInfoCard {
         SectionHeader(stringResource(R.string.section_connectivity))
-        CompactIconStatsFlowRow {
-            labels.wifiCompact?.let { value ->
-                CompactIconStat(
-                    icon = Icons.Default.Wifi,
-                    value = value,
-                    contentDescription = stringResource(R.string.cd_wifi, value),
-                )
-            }
-            labels.doorLine?.let { value ->
-                CompactIconStat(
-                    icon = Icons.Default.DoorFront,
-                    value = value,
-                    contentDescription = stringResource(R.string.cd_door, value),
-                )
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            CompactIconStatsFlowRow {
+                labels.wifiCompact?.let { value ->
+                    CompactIconStat(
+                        icon = Icons.Default.Wifi,
+                        value = value,
+                        contentDescription = stringResource(R.string.cd_wifi, value),
+                    )
+                }
+                labels.doorLine?.let { value ->
+                    CompactIconStat(
+                        icon = Icons.Default.DoorFront,
+                        value = value,
+                        contentDescription = stringResource(R.string.cd_door, value),
+                    )
+                }
+                labels.chamberTempCompact?.let { value ->
+                    CompactIconStat(
+                        icon = Icons.Default.Thermostat,
+                        value = value,
+                        contentDescription = stringResource(R.string.cd_chamber_temp, value),
+                    )
+                }
             }
             labels.firmwareLine?.let { value ->
-                CompactIconStat(
-                    icon = Icons.Default.Memory,
-                    value = value,
-                    contentDescription = stringResource(R.string.cd_firmware, value),
-                )
-            }
-            labels.chamberTempCompact?.let { value ->
-                CompactIconStat(
-                    icon = Icons.Default.Thermostat,
-                    value = value,
-                    contentDescription = stringResource(R.string.cd_chamber_temp, value),
+                Text(
+                    text = stringResource(R.string.firmware_compact, value),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
                 )
             }
         }
@@ -83,8 +85,8 @@ fun DetailFansCard(labels: PrinterDetailLabels) {
         CompactIconStatsFlowRow {
             labels.partFanPercent?.let { percent ->
                 formatFanPercentCompact(percent)?.let { value ->
-                    CompactIconStat(
-                        icon = Icons.Default.Air,
+                    FanCompactStat(
+                        microLabel = stringResource(R.string.fan_tag_part),
                         value = value,
                         contentDescription = stringResource(R.string.cd_part_fan, value),
                     )
@@ -92,8 +94,8 @@ fun DetailFansCard(labels: PrinterDetailLabels) {
             }
             labels.auxFanPercent?.let { percent ->
                 formatFanPercentCompact(percent)?.let { value ->
-                    CompactIconStat(
-                        icon = Icons.Default.Air,
+                    FanCompactStat(
+                        microLabel = stringResource(R.string.fan_tag_aux),
                         value = value,
                         contentDescription = stringResource(R.string.cd_aux_fan, value),
                     )
@@ -101,8 +103,8 @@ fun DetailFansCard(labels: PrinterDetailLabels) {
             }
             labels.chamberFanPercent?.let { percent ->
                 formatFanPercentCompact(percent)?.let { value ->
-                    CompactIconStat(
-                        icon = Icons.Default.Air,
+                    FanCompactStat(
+                        microLabel = stringResource(R.string.fan_tag_chamber),
                         value = value,
                         contentDescription = stringResource(R.string.cd_chamber_fan, value),
                     )
@@ -126,39 +128,52 @@ fun DetailPrintSpeedCard(labels: PrinterDetailLabels) {
 }
 
 @Composable
+private fun FanCompactStat(
+    microLabel: String,
+    value: String,
+    contentDescription: String,
+) {
+    CompactIconStat(
+        icon = Icons.Default.Air,
+        microLabel = microLabel,
+        value = value,
+        contentDescription = contentDescription,
+    )
+}
+
+@Composable
 private fun MaintenanceStatusRow(line: MaintenanceLine) {
-    val (icon, tint, suffix) = when (line.kind) {
+    val (icon, tint, label) = when (line.kind) {
         MaintenanceLineKind.Healthy -> Triple(
             Icons.Default.CheckCircle,
             MaterialTheme.colorScheme.primary,
-            stringResource(R.string.maintenance_ok_suffix),
+            line.name,
         )
         MaintenanceLineKind.Warning -> Triple(
             Icons.Default.Warning,
             MaterialTheme.colorScheme.error,
-            stringResource(R.string.maintenance_soon_suffix),
+            line.name,
         )
         MaintenanceLineKind.Due -> Triple(
             Icons.Default.Build,
             MaterialTheme.colorScheme.error,
-            stringResource(R.string.maintenance_due_suffix),
+            "${line.name} ${stringResource(R.string.maintenance_due_suffix)}",
         )
     }
-    val label = "${line.name} $suffix".trim()
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = stringResource(R.string.cd_maintenance_item, label),
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(16.dp),
             tint = tint,
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = if (line.kind == MaintenanceLineKind.Healthy) {
                 MaterialTheme.colorScheme.onSurface
             } else {
@@ -174,8 +189,10 @@ fun DetailMaintenanceCard(labels: PrinterDetailLabels) {
     if (lines.isEmpty()) return
     DetailInfoCard {
         SectionHeader(stringResource(R.string.section_maintenance))
-        lines.forEach { line ->
-            MaintenanceStatusRow(line)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            lines.forEach { line ->
+                MaintenanceStatusRow(line)
+            }
         }
     }
 }

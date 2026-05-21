@@ -22,11 +22,8 @@ data class PrinterCardLabels(
     val fileLine: String?,
     val etaLine: String?,
     val tempsLine: String?,
-    val hmsSummary: String,
-    val hmsHasErrors: Boolean,
     val nozzleTemp: String,
     val bedTemp: String,
-    val hmsHealth: String,
     val filamentSlots: List<FilamentSlot>,
 )
 
@@ -52,11 +49,8 @@ fun Printer.toCardLabels(): PrinterCardLabels {
             fileLine = null,
             etaLine = null,
             tempsLine = null,
-            hmsSummary = "—",
-            hmsHasErrors = false,
             nozzleTemp = "—",
             bedTemp = "—",
-            hmsHealth = "—",
             filamentSlots = emptyList(),
         )
     }
@@ -113,11 +107,8 @@ fun Printer.toCardLabels(): PrinterCardLabels {
         } else {
             null
         },
-        hmsSummary = formatHmsSummary(status.hmsErrorCount),
-        hmsHasErrors = detail.hmsHasErrors,
         nozzleTemp = detail.nozzleTemp,
         bedTemp = detail.bedTemp,
-        hmsHealth = detail.hmsHealth,
         filamentSlots = status.filamentSlots,
     )
 }
