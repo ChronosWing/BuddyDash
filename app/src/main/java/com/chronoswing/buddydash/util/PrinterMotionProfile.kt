@@ -28,14 +28,6 @@ fun resolveMotionLayout(printerModel: String?): PrinterMotionLayout {
     return layout
 }
 
-private fun isBedSlingerModel(modelUpper: String): Boolean {
-    if (modelUpper.isEmpty()) return false
-    return modelUpper.contains("A1 MINI") ||
-        modelUpper.contains("A1MINI") ||
-        modelUpper == "A1" ||
-        modelUpper.startsWith("A1 ") ||
-        modelUpper.contains("A1 ")
-}
 
 fun motionDebugLog(action: String, printerId: Int, distanceMm: Float) {
     Log.d(TAG_MOTION, "bed-jog action=$action printer=$printerId distance=$distanceMm")

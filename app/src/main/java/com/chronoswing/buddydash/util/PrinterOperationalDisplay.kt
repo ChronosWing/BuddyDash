@@ -163,17 +163,6 @@ fun maintenanceDisplayLabel(line: MaintenanceLine): String = when (line.kind) {
     MaintenanceLineKind.Due -> "${line.name} due"
 }
 
-fun PrinterStatus.hasConnectivitySection(totalPrintHours: Double? = null): Boolean =
-    formatWifiCompact(wifiSignalDbm, wiredNetwork) != null ||
-        formatDoorState(doorOpen) != null ||
-        !firmwareVersion.isNullOrBlank() ||
-        chamberTemp != null ||
-        formatTotalPrintTimeCompact(totalPrintHours) != null ||
-        !nozzleDiameterDisplay.isNullOrBlank()
-
-fun PrinterStatus.hasFansSection(): Boolean =
-    partFanPercent != null || auxFanPercent != null || chamberFanPercent != null
-
 fun PrinterStatus.hasPrintSpeedSection(): Boolean =
     formatPrintSpeedLevel(speedLevel) != null
 

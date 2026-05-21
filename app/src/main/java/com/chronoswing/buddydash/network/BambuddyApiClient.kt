@@ -14,6 +14,9 @@ import com.chronoswing.buddydash.util.EXTERNAL_AMS_ID
 import com.chronoswing.buddydash.util.externalInventoryTrayId
 import com.chronoswing.buddydash.util.formatAmsSlotLabel
 import com.chronoswing.buddydash.util.formatAmsUnitLabel
+import com.chronoswing.buddydash.util.isAmsLiteModule
+import com.chronoswing.buddydash.util.isMeaningfulAmsHumidity
+import com.chronoswing.buddydash.util.isMeaningfulAmsTemp
 import com.chronoswing.buddydash.util.formatNozzleDiameterDisplay
 import com.chronoswing.buddydash.util.resolveActiveFilamentSlot
 import com.chronoswing.buddydash.util.isTrayLoaded
@@ -491,19 +494,28 @@ class BambuddyApiClient {
         for (unitIndex in 0 until amsArray.length()) {
             val unit = amsArray.optJSONObject(unitIndex) ?: continue
             val amsId = unit.optInt("id", unitIndex)
-            val temp = unit.optDouble("temp").takeIf { unit.has("temp") && !unit.isNull("temp") }
-            val humidity = unit.optInt("humidity").takeIf { unit.has("humidity") && !unit.isNull("humidity") }
+            val moduleType = unit.optString("module_type").takeIf { it.isNotBlank() }
+            val isLite = isAmsLiteModule(moduleType)
+            val tempRaw = unit.optDouble("temp").takeIf { unit.has("temp") && !unit.isNull("temp") }
+            val humidityRaw = unit.optInt("humidity").takeIf { unit.has("humidity") && !unit.isNull("humidity") }
+            val temp = tempRaw.takeIf { isMeaningfulAmsTemp(it, isLite) }
+            val humidity = humidityRaw.takeIf { isMeaningfulAmsHumidity(it, isLite) }
             if (temp == null && humidity == null) continue
             units.add(
                 AmsUnitInfo(
                     amsId = amsId,
                     label = formatAmsUnitLabel(amsId),
+                    moduleType = moduleType,
                     tempC = temp,
                     humidityPercent = humidity,
                 ),
             )
             if (DEBUG_LOG_DETAIL_RAW) {
-                Log.d(TAG_DETAIL, "ams unit $amsId temp=$temp humidity=$humidity")
+                Log.d(
+                    TAG_DETAIL,
+                    "ams unit $amsId module_type=$moduleType lite=$isLite temp=$temp humidity=$humidity " +
+                        "raw=($tempRaw,$humidityRaw)",
+                )
             }
         }
         return units
