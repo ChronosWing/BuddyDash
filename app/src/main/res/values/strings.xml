@@ -63,6 +63,7 @@
     <string name="archive_stats_recent_failures">Recent failures</string>
     <string name="archive_unnamed_print">Unnamed print</string>
     <string name="archive_detail_title">Print archive</string>
+    <string name="archive_thumbnail_placeholder">No preview</string>
     <string name="archive_label_result">Result</string>
     <string name="archive_label_printer">Printer</string>
     <string name="archive_label_started">Started</string>

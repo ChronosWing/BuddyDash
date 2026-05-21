@@ -2,6 +2,7 @@ package com.chronoswing.buddydash.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,12 +19,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -33,23 +36,27 @@ import com.chronoswing.buddydash.ArchiveDetailViewModel
 import com.chronoswing.buddydash.ArchiveReprintSheetState
 import com.chronoswing.buddydash.ArchiveReprintSnackbar
 import com.chronoswing.buddydash.R
+import com.chronoswing.buddydash.data.model.ArchiveResultKind
 import com.chronoswing.buddydash.data.model.PrintArchive
-import com.chronoswing.buddydash.ui.components.ArchiveThumbnail
+import com.chronoswing.buddydash.ui.components.ArchiveDetailHeroImage
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
+import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
+import com.chronoswing.buddydash.ui.components.FilamentColorSwatch
 import com.chronoswing.buddydash.ui.components.FilamentUsageText
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
-import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.util.ARCHIVE_DISPLAY_NAME_FALLBACK
-import com.chronoswing.buddydash.util.formatArchiveDate
+import com.chronoswing.buddydash.util.archiveFilamentColorHexes
+import com.chronoswing.buddydash.util.formatArchiveDetailMaterialType
 import com.chronoswing.buddydash.util.formatArchiveDuration
-import com.chronoswing.buddydash.util.formatArchiveMaterialLine
 import com.chronoswing.buddydash.util.formatArchivePlateLine
 import com.chronoswing.buddydash.util.formatArchivePrinterLine
 import com.chronoswing.buddydash.util.formatArchiveStatusLabel
 import com.chronoswing.buddydash.util.formatFilamentUsageCompact
+import com.chronoswing.buddydash.util.isMeaningfulArchiveField
+import com.chronoswing.buddydash.util.shouldShowArchiveFailureReason
 
 @Composable
 fun ArchiveDetailScreen(
@@ -67,6 +74,7 @@ fun ArchiveDetailScreen(
     ArchiveDetailScreenContent(
         archive = uiState.archive,
         isLoading = uiState.isLoading,
+        settingsReady = uiState.settingsReady,
         error = uiState.error,
         serverUrl = uiState.serverUrl,
         cameraToken = uiState.cameraToken,
@@ -94,6 +102,7 @@ fun ArchiveDetailScreen(
 private fun ArchiveDetailScreenContent(
     archive: PrintArchive?,
     isLoading: Boolean,
+    settingsReady: Boolean,
     error: String?,
     serverUrl: String,
     cameraToken: String,
@@ -166,8 +175,14 @@ private fun ArchiveDetailScreenContent(
         },
     ) { innerPadding ->
         when {
-            isLoading && archive == null -> {
+            !settingsReady || (isLoading && archive == null) -> {
                 LoadingContent(Modifier.padding(innerPadding))
+            }
+            settingsReady && !hasCredentials && archive == null -> {
+                EmptyContent(
+                    message = stringResource(R.string.configure_settings_hint),
+                    modifier = Modifier.padding(innerPadding),
+                )
             }
             error != null && archive == null -> {
                 ErrorContent(
@@ -217,44 +232,30 @@ private fun ArchiveDetailBody(
     } else {
         archive.displayName
     }
+    val statusLabel = formatArchiveStatusLabel(archive.resultKind, archive.statusRaw)
+    val materialType = formatArchiveDetailMaterialType(archive)
+    val colorHexes = archiveFilamentColorHexes(archive)
 
     DetailInfoCard {
-        ArchiveThumbnail(
+        ArchiveDetailHeroImage(
             archiveId = archive.id,
             serverUrl = serverUrl,
             cameraToken = cameraToken,
-            size = 200.dp,
         )
         PrintFileNameText(
             fileName = displayName,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        CompactLabelValue(
-            label = stringResource(R.string.archive_label_result),
-            value = formatArchiveStatusLabel(archive.resultKind, archive.statusRaw),
+        ArchiveResultBadge(
+            label = statusLabel,
+            resultKind = archive.resultKind,
         )
         formatArchivePrinterLine(archive)?.let { printer ->
             CompactLabelValue(
                 label = stringResource(R.string.archive_label_printer),
                 value = printer,
             )
-        }
-        archive.startedAtIso?.let { started ->
-            formatArchiveDate(started)?.let { formatted ->
-                CompactLabelValue(
-                    label = stringResource(R.string.archive_label_started),
-                    value = formatted,
-                )
-            }
-        }
-        archive.completedAtIso?.let { completed ->
-            formatArchiveDate(completed)?.let { formatted ->
-                CompactLabelValue(
-                    label = stringResource(R.string.archive_label_completed),
-                    value = formatted,
-                )
-            }
         }
         formatArchiveDuration(archive.durationSeconds)?.let { duration ->
             CompactLabelValue(
@@ -268,10 +269,10 @@ private fun ArchiveDetailBody(
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
-        formatArchiveMaterialLine(archive)?.let { material ->
-            CompactLabelValue(
-                label = stringResource(R.string.archive_label_material),
-                value = material,
+        if (materialType != null || colorHexes.isNotEmpty()) {
+            ArchiveDetailMaterialRow(
+                typeLabel = materialType,
+                colorHexes = colorHexes,
             )
         }
         formatArchivePlateLine(archive)?.let { plate ->
@@ -280,32 +281,93 @@ private fun ArchiveDetailBody(
                 value = plate,
             )
         }
-        archive.failureReason?.let { reason ->
-            SectionHeader(stringResource(R.string.archive_label_failure))
-            Text(
-                text = reason,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error.copy(alpha = 0.88f),
-                modifier = Modifier.fillMaxWidth(),
+        if (shouldShowArchiveFailureReason(archive)) {
+            CompactLabelValue(
+                label = stringResource(R.string.archive_label_failure),
+                value = archive.failureReason.orEmpty(),
             )
         }
-        archive.projectName?.let { project ->
+        archive.projectName?.takeIf { isMeaningfulArchiveField(it) }?.let { project ->
             CompactLabelValue(
                 label = stringResource(R.string.archive_label_project),
                 value = project,
             )
         }
-        archive.slicedForModel?.let { model ->
-            CompactLabelValue(
-                label = stringResource(R.string.archive_label_model),
-                value = model,
-            )
-        }
-        archive.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+        archive.notes?.takeIf { isMeaningfulArchiveField(it) }?.let { notes ->
             CompactLabelValue(
                 label = stringResource(R.string.archive_label_notes),
                 value = notes,
             )
+        }
+    }
+}
+
+@Composable
+private fun ArchiveResultBadge(
+    label: String,
+    resultKind: ArchiveResultKind,
+) {
+    val containerColor = when (resultKind) {
+        ArchiveResultKind.Success ->
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+        ArchiveResultKind.Failed ->
+            MaterialTheme.colorScheme.error.copy(alpha = 0.18f)
+        ArchiveResultKind.Cancelled ->
+            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f)
+        ArchiveResultKind.Other ->
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+    }
+    val contentColor = when (resultKind) {
+        ArchiveResultKind.Success -> MaterialTheme.colorScheme.primary
+        ArchiveResultKind.Failed -> MaterialTheme.colorScheme.error
+        ArchiveResultKind.Cancelled -> MaterialTheme.colorScheme.tertiary
+        ArchiveResultKind.Other -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = containerColor,
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = contentColor,
+        )
+    }
+}
+
+@Composable
+private fun ArchiveDetailMaterialRow(
+    typeLabel: String?,
+    colorHexes: List<String>,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.archive_label_material),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (colorHexes.isNotEmpty()) {
+                FilamentColorSwatch(
+                    colorHexes = colorHexes,
+                    size = 22.dp,
+                )
+            }
+            typeLabel?.let { type ->
+                Text(
+                    text = type,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
         }
     }
 }
