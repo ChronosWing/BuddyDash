@@ -41,4 +41,6 @@ data class PrinterStatus(
     val chamberLightOn: Boolean? = null,
     /** Formatted nozzle diameter for display, e.g. "0.4 mm"; from `nozzles` / `nozzle_rack`. */
     val nozzleDiameterDisplay: String? = null,
+    /** Filament usage when present on status JSON (OpenAPI has no field; may appear at runtime). */
+    val filamentUsage: FilamentUsage? = null,
 )

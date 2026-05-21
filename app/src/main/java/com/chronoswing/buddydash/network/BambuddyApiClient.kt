@@ -5,6 +5,7 @@ import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.PrintQueueJob
+import com.chronoswing.buddydash.data.model.PrinterQueueSnapshot
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.data.model.PrinterMaintenanceOverview
 import com.chronoswing.buddydash.data.model.PrinterStatus
@@ -33,7 +34,14 @@ import com.chronoswing.buddydash.util.parseSpoolAssignments
 import com.chronoswing.buddydash.util.parseSpoolInventoryList
 import com.chronoswing.buddydash.util.etaDebugLogLine
 import com.chronoswing.buddydash.util.parseRemainingTimeSeconds
+import com.chronoswing.buddydash.util.DEBUG_LOG_FILAMENT_USAGE
+import com.chronoswing.buddydash.util.TAG_FILAMENT_USAGE
+import com.chronoswing.buddydash.util.formatFilamentUsageCompact
+import com.chronoswing.buddydash.util.logFilamentUsageDiscovery
 import com.chronoswing.buddydash.util.queueDurationFieldCandidates
+import com.chronoswing.buddydash.util.queueFilamentUsageFieldCandidates
+import com.chronoswing.buddydash.util.resolveFilamentUsageFromJson
+import com.chronoswing.buddydash.util.resolveQueueFilamentUsage
 import com.chronoswing.buddydash.util.queueImageIdFieldCandidates
 import com.chronoswing.buddydash.util.queueJsonPositiveInt
 import com.chronoswing.buddydash.util.queueNameFieldCandidates
@@ -75,6 +83,7 @@ class BambuddyApiClient {
         private const val DEBUG_LOG_QUEUE = true
         private const val TAG_QUEUE = "BuddyDash/Queue"
         private const val QUEUE_STATUS_PENDING = "pending"
+        private const val QUEUE_STATUS_PRINTING = "printing"
     }
 
     private val client = OkHttpClient.Builder()
@@ -304,6 +313,14 @@ class BambuddyApiClient {
         apiKey: String,
         printerId: Int,
     ): Result<List<PrintQueueJob>> =
+        fetchPrinterQueueSnapshot(serverUrl, apiKey, printerId).map { it.upcoming }
+
+    /** Full queue snapshot: pending jobs plus optional in-progress printing job. */
+    suspend fun fetchPrinterQueueSnapshot(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+    ): Result<PrinterQueueSnapshot> =
         withContext(Dispatchers.IO) {
             if (!BambuddyApi.hasQueueEndpoint) {
                 return@withContext Result.failure(
@@ -423,6 +440,15 @@ class BambuddyApiClient {
         val operational = parseOperationalFields(json, temperatures)
         val filament = parseFilamentSlots(json, inventoryBySlot)
         val metadata = parsePrinterMetadata(json)
+        val filamentUsage = resolveFilamentUsageFromJson(json)
+        if (DEBUG_LOG_FILAMENT_USAGE) {
+            logFilamentUsageDiscovery(
+                tag = TAG_FILAMENT_USAGE,
+                context = "printerStatus printer=${json.optInt("id", -1)}",
+                json = json,
+                resolved = filamentUsage,
+            )
+        }
 
         return PrinterStatus(
             connected = json.optBoolean("connected", false),
@@ -459,6 +485,7 @@ class BambuddyApiClient {
             speedLevel = operational.speedLevel,
             chamberLightOn = operational.chamberLightOn,
             nozzleDiameterDisplay = metadata.nozzleDiameterDisplay,
+            filamentUsage = filamentUsage,
         )
     }
 
@@ -802,7 +829,7 @@ class BambuddyApiClient {
         return null
     }
 
-    private fun parsePrintQueueResponse(body: String): List<PrintQueueJob> {
+    private fun parsePrintQueueResponse(body: String): PrinterQueueSnapshot {
         val array = JSONArray(body)
         val parsed = mutableListOf<Triple<PrintQueueJob, String, JSONObject>>()
         for (index in 0 until array.length()) {
@@ -836,17 +863,38 @@ class BambuddyApiClient {
                     TAG_QUEUE,
                     "durationFields=${queueDurationFieldCandidates(json)} resolvedSeconds=${job.estimatedDurationSeconds}",
                 )
+                if (DEBUG_LOG_FILAMENT_USAGE) {
+                    Log.d(
+                        TAG_FILAMENT_USAGE,
+                        "queueItem id=${job.id} status=$status " +
+                            "filamentFields=${queueFilamentUsageFieldCandidates(json)} " +
+                            "display=${formatFilamentUsageCompact(job.filamentUsage)}",
+                    )
+                    logFilamentUsageDiscovery(
+                        tag = TAG_FILAMENT_USAGE,
+                        context = "queueItem id=${job.id} status=$status",
+                        json = json,
+                        resolved = job.filamentUsage,
+                    )
+                }
             }
         }
-        return parsed
+        val printing = parsed
+            .filter { (_, status, _) -> status.equals(QUEUE_STATUS_PRINTING, ignoreCase = true) }
+            .map { (job, _, _) -> job }
+            .minByOrNull { it.position }
+        val upcoming = parsed
             .filter { (_, status, _) -> status == QUEUE_STATUS_PENDING }
             .map { (job, _, _) -> job }
             .sortedBy { it.position }
-            .also { upcoming ->
-                if (DEBUG_LOG_QUEUE) {
-                    Log.d(TAG_QUEUE, "upcomingCount=${upcoming.size} (pending only, excludes printing)")
-                }
-            }
+        if (DEBUG_LOG_QUEUE) {
+            Log.d(
+                TAG_QUEUE,
+                "upcomingCount=${upcoming.size} printing=${printing?.id} " +
+                    "(pending + optional printing job for filament metadata)",
+            )
+        }
+        return PrinterQueueSnapshot(upcoming = upcoming, printing = printing)
     }
 
     private fun parsePrintQueueItem(json: JSONObject): PrintQueueJob = PrintQueueJob(
@@ -859,6 +907,7 @@ class BambuddyApiClient {
         archiveId = queueJsonPositiveInt(json, "archive_id"),
         plateId = queueJsonPlateId(json),
         estimatedDurationSeconds = resolveQueueDurationSeconds(json),
+        filamentUsage = resolveQueueFilamentUsage(json),
     )
 
 }
