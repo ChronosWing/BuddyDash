@@ -1,0 +1,70 @@
+package com.chronoswing.buddydash
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.chronoswing.buddydash.data.SettingsRepository
+import com.chronoswing.buddydash.data.model.Printer
+import com.chronoswing.buddydash.network.BambuddyApiClient
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+data class HomeUiState(
+    val printers: List<Printer> = emptyList(),
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val serverUrl: String = "",
+    val apiKey: String = "",
+    val hasCredentials: Boolean = false,
+)
+
+class HomeViewModel(
+    private val settingsRepository: SettingsRepository,
+    private val apiClient: BambuddyApiClient,
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(HomeUiState())
+    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            combine(
+                settingsRepository.serverUrl,
+                settingsRepository.apiKey,
+            ) { url, key ->
+                url to key
+            }.collect { (url, key) ->
+                _uiState.update {
+                    it.copy(
+                        serverUrl = url,
+                        apiKey = key,
+                        hasCredentials = url.isNotBlank() && key.isNotBlank(),
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadPrinters() {
+        val state = _uiState.value
+        if (!state.hasCredentials) {
+            _uiState.update { it.copy(error = "Configure server URL and API key in Settings") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            val result = apiClient.fetchPrintersWithStatus(state.serverUrl, state.apiKey)
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    printers = result.getOrElse { emptyList() },
+                    error = result.exceptionOrNull()?.message,
+                )
+            }
+        }
+    }
+}

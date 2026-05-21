@@ -1,0 +1,27 @@
+<resources>
+    <string name="app_name">BuddyDash</string>
+    <string name="settings_title">Settings</string>
+    <string name="server_url_label">Bambuddy server URL</string>
+    <string name="server_url_placeholder">http://192.168.1.50:8080</string>
+    <string name="api_key_label">API key</string>
+    <string name="save_settings">Save</string>
+    <string name="settings_saved">Settings saved</string>
+    <string name="test_connection">Test connection</string>
+    <string name="testing_connection">Testing…</string>
+    <string name="back">Back</string>
+    <string name="refresh">Refresh</string>
+    <string name="configure_settings_hint">Open Settings to enter your Bambuddy server URL and API key.</string>
+    <string name="no_printers">No printers found on this server.</string>
+    <string name="online">Online</string>
+    <string name="offline">Offline</string>
+    <string name="printer_status_label">Status: %1$s</string>
+    <string name="printer_model_label">Model: %1$s</string>
+    <string name="print_progress">Progress: %1$s</string>
+    <string name="print_state">Print state</string>
+    <string name="current_file">Current file</string>
+    <string name="eta">ETA</string>
+    <string name="nozzle_temp">Nozzle temp</string>
+    <string name="bed_temp">Bed temp</string>
+    <string name="connection">Connection</string>
+    <string name="hms_health">HMS health</string>
+</resources>
