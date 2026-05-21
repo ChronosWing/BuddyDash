@@ -3,6 +3,7 @@ package com.chronoswing.buddydash.util
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
 
 data class PrinterCardLabels(
     val title: String,
@@ -28,6 +29,7 @@ data class PrinterCardLabels(
     val activeFilamentSlot: SlotInventoryKey? = null,
     val printerRawState: String? = null,
     val cardMicroMotion: CardMicroMotion = CardMicroMotion.None,
+    val maintenanceIndicator: MaintenanceHomeIndicator = MaintenanceHomeIndicator.None,
 )
 
 fun Printer.toCardLabels(): PrinterCardLabels {
@@ -58,6 +60,7 @@ fun Printer.toCardLabels(): PrinterCardLabels {
             activeFilamentSlot = null,
             printerRawState = null,
             cardMicroMotion = CardMicroMotion.None,
+            maintenanceIndicator = MaintenanceHomeIndicator.None,
         )
     }
     val detail = status.toDetailLabels(printerModel = model)
@@ -119,5 +122,6 @@ fun Printer.toCardLabels(): PrinterCardLabels {
         activeFilamentSlot = status.activeFilamentSlot,
         printerRawState = status.rawState,
         cardMicroMotion = resolveCardMicroMotion(activityKind, status.rawState),
+        maintenanceIndicator = maintenanceIndicator,
     )
 }

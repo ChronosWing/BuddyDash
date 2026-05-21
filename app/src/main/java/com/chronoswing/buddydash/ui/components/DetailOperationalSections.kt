@@ -72,10 +72,15 @@ fun DetailConnectivityCard(labels: PrinterDetailLabels) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             CompactIconStatsFlowRow {
                 labels.wifiCompact?.let { value ->
+                    val wifiStyle = wifiSignalStyle(labels.wifiSignalLevel)
                     CompactIconStat(
                         icon = Icons.Default.Wifi,
                         value = value,
                         contentDescription = stringResource(R.string.cd_wifi, value),
+                        iconTint = wifiStyle?.iconTint
+                            ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                        valueColor = wifiStyle?.valueTint
+                            ?: MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 labels.doorLine?.let { value ->

@@ -233,6 +233,7 @@ private fun GlancePrinterCard(
                 progressCompact = labels.progressCompact,
                 plateKind = labels.plateKind,
                 cardMicroMotion = labels.cardMicroMotion,
+                maintenanceIndicator = labels.maintenanceIndicator,
             )
 
             if (labels.isActivePrint) {
