@@ -60,7 +60,7 @@ fun Printer.toCardLabels(): PrinterCardLabels {
             cardMicroMotion = CardMicroMotion.None,
         )
     }
-    val detail = status.toDetailLabels()
+    val detail = status.toDetailLabels(printerModel = model)
     val raw = status.rawState?.uppercase()
     val isActivePrint = raw == "RUNNING" || raw == "PAUSE"
 

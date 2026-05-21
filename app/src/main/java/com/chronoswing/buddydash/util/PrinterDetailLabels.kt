@@ -96,10 +96,9 @@ fun PrinterStatus.toDetailLabels(
         if (awaiting) "Not clear" else "Clear"
     }
 
+    val caps = applyDisplayCapabilities(this, printerModel, totalPrintHours)
     val wifiCompact = formatWifiCompact(wifiSignalDbm, wiredNetwork)
-    val doorLine = formatDoorState(doorOpen)
     val firmwareLine = firmwareVersion?.takeIf { it.isNotBlank() }
-    val chamberTempCompact = formatChamberTempCompact(chamberTemp)
     val printSpeedLabel = formatPrintSpeedLevel(speedLevel)
     val canControlPrint = connected && isActivePrint
     val motionLayout = if (connected) {
@@ -140,18 +139,18 @@ fun PrinterStatus.toDetailLabels(
         activeFilamentSlot = activeFilamentSlot,
         printerRawState = rawState,
         cardMicroMotion = resolveCardMicroMotion(activityKind, rawState),
-        amsUnits = amsUnits,
-        showConnectivitySection = hasConnectivitySection(totalPrintHours),
+        amsUnits = caps.amsUnits,
+        showConnectivitySection = caps.showConnectivitySection,
         wifiCompact = wifiCompact,
-        doorLine = doorLine,
+        doorLine = caps.doorLine,
         firmwareLine = firmwareLine,
         totalPrintTimeCompact = formatTotalPrintTimeCompact(totalPrintHours),
         nozzleDiameterCompact = nozzleDiameterDisplay,
-        chamberTempCompact = chamberTempCompact,
-        showFansSection = hasFansSection(),
-        partFanPercent = partFanPercent,
-        auxFanPercent = auxFanPercent,
-        chamberFanPercent = chamberFanPercent,
+        chamberTempCompact = caps.chamberTempCompact,
+        showFansSection = caps.showFansSection,
+        partFanPercent = caps.partFanPercent,
+        auxFanPercent = caps.auxFanPercent,
+        chamberFanPercent = caps.chamberFanPercent,
         showPrintSpeedSection = hasPrintSpeedSection(),
         printSpeedLabel = printSpeedLabel,
         speedLevel = speedLevel,
@@ -160,7 +159,7 @@ fun PrinterStatus.toDetailLabels(
         canPause = canControlPrint && isPrinting,
         canResume = connected && isPaused,
         canStop = canControlPrint,
-        canToggleLight = connected && chamberLightOn != null,
+        canToggleLight = caps.canToggleChamberLight,
         motionLayout = motionLayout,
         showMotionControls = motionLayout != PrinterMotionLayout.Hidden,
         canUseMotionControls = motionLayout != PrinterMotionLayout.Hidden && canAdjustBedWhenIdle(),
