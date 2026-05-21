@@ -22,6 +22,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +45,7 @@ import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentChipRow
+import com.chronoswing.buddydash.ui.components.PrinterCoverImage
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.theme.OnlineGreen
@@ -71,10 +73,16 @@ fun HomeScreen(
     HomeScreenContent(
         printers = uiState.printers,
         isLoading = uiState.isLoading,
+        isRefreshing = uiState.isRefreshing,
         error = uiState.error,
         hasCredentials = uiState.hasCredentials,
+        serverUrl = uiState.serverUrl,
+        apiKey = uiState.apiKey,
         onRefresh = {
             viewModel.loadPrinters(showLoading = uiState.printers.isEmpty())
+        },
+        onPullRefresh = {
+            viewModel.loadPrinters(showLoading = false, fromPull = true)
         },
         onPrinterClick = onPrinterClick,
         onSettingsClick = onSettingsClick,
@@ -86,9 +94,13 @@ fun HomeScreen(
 private fun HomeScreenContent(
     printers: List<Printer>,
     isLoading: Boolean,
+    isRefreshing: Boolean,
     error: String?,
     hasCredentials: Boolean,
+    serverUrl: String,
+    apiKey: String,
     onRefresh: () -> Unit,
+    onPullRefresh: () -> Unit,
     onPrinterClick: (Printer) -> Unit,
     onSettingsClick: () -> Unit,
 ) {
@@ -118,11 +130,18 @@ private fun HomeScreenContent(
                 LoadingContent(Modifier.padding(innerPadding))
             }
             error != null && printers.isEmpty() -> {
-                ErrorContent(
-                    message = error,
-                    onRetry = onRefresh,
-                    modifier = Modifier.padding(innerPadding),
-                )
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = onPullRefresh,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                ) {
+                    ErrorContent(
+                        message = error,
+                        onRetry = onRefresh,
+                    )
+                }
             }
             printers.isEmpty() -> {
                 EmptyContent(
@@ -131,27 +150,36 @@ private fun HomeScreenContent(
                 )
             }
             else -> {
-                LazyColumn(
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = onPullRefresh,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    if (error != null) {
-                        item {
-                            Text(
-                                text = error,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        if (error != null) {
+                            item {
+                                Text(
+                                    text = error,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                        items(printers, key = { it.id }) { printer ->
+                            GlancePrinterCard(
+                                labels = printer.toCardLabels(),
+                                printerId = printer.id,
+                                serverUrl = serverUrl,
+                                apiKey = apiKey,
+                                onClick = { onPrinterClick(printer) },
                             )
                         }
-                    }
-                    items(printers, key = { it.id }) { printer ->
-                        GlancePrinterCard(
-                            labels = printer.toCardLabels(),
-                            onClick = { onPrinterClick(printer) },
-                        )
                     }
                 }
             }
@@ -162,6 +190,9 @@ private fun HomeScreenContent(
 @Composable
 private fun GlancePrinterCard(
     labels: PrinterCardLabels,
+    printerId: Int,
+    serverUrl: String,
+    apiKey: String,
     onClick: () -> Unit,
 ) {
     Card(
@@ -219,55 +250,72 @@ private fun GlancePrinterCard(
             }
 
             if (labels.isActivePrint) {
-                labels.printHeadline?.let { headline ->
-                    Text(
-                        text = headline,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                labels.progressFraction?.let { fraction ->
-                    LinearProgressIndicator(
-                        progress = { fraction.coerceIn(0f, 1f) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(3.dp),
-                    )
-                }
-                labels.fileLine?.let { file ->
-                    Text(
-                        text = file,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                labels.etaLine?.let { eta ->
-                    Text(
-                        text = eta,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.Top,
                 ) {
-                    labels.tempsLine?.let { temps ->
-                        Text(
-                            text = temps,
-                            style = MaterialTheme.typography.labelMedium,
-                        )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        labels.printHeadline?.let { headline ->
+                            Text(
+                                text = headline,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                        labels.progressFraction?.let { fraction ->
+                            LinearProgressIndicator(
+                                progress = { fraction.coerceIn(0f, 1f) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(3.dp),
+                            )
+                        }
+                        labels.fileLine?.let { file ->
+                            Text(
+                                text = file,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        labels.etaLine?.let { eta ->
+                            Text(
+                                text = eta,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            labels.tempsLine?.let { temps ->
+                                Text(
+                                    text = temps,
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            }
+                            Text(
+                                text = labels.hmsSummary,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (labels.hmsHasErrors) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
                     }
-                    Text(
-                        text = labels.hmsSummary,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (labels.hmsHasErrors) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
+                    PrinterCoverImage(
+                        serverUrl = serverUrl,
+                        apiKey = apiKey,
+                        printerId = printerId,
+                        size = 56.dp,
                     )
                 }
                 labels.plateStatus?.let { plate ->

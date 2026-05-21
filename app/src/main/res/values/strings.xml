@@ -34,6 +34,7 @@
     <string name="last_print_result_short">Last print</string>
     <string name="last_print_line">Last print: %1$s</string>
     <string name="printing">Printing</string>
+    <string name="print_cover">Print cover image</string>
     <string name="nozzle_short">Nozzle %1$s</string>
     <string name="bed_short">Bed %1$s</string>
     <string name="hms_short">HMS %1$s</string>

@@ -44,7 +44,7 @@ class BambuddyApiClient {
     /** Server liveness — Bambuddy exposes GET /health at the app root (not /api/health). */
     suspend fun checkServerHealth(serverUrl: String): Result<String> =
         withContext(Dispatchers.IO) {
-            val baseUrl = normalizeBaseUrl(serverUrl) ?: return@withContext Result.failure(
+            val baseUrl = normalizeBambuddyBaseUrl(serverUrl) ?: return@withContext Result.failure(
                 IllegalArgumentException("Server URL is required"),
             )
             runCatching {
@@ -137,7 +137,7 @@ class BambuddyApiClient {
         method: String = "GET",
         parse: (String) -> T,
     ): Result<T> {
-        val baseUrl = normalizeBaseUrl(serverUrl)
+        val baseUrl = normalizeBambuddyBaseUrl(serverUrl)
         if (baseUrl == null) {
             return Result.failure(IllegalArgumentException("Server URL is required"))
         }
@@ -169,14 +169,6 @@ class BambuddyApiClient {
                 parse(body)
             }
         }
-    }
-
-    private fun normalizeBaseUrl(serverUrl: String): String? {
-        var trimmed = serverUrl.trim().trimEnd('/')
-        if (trimmed.endsWith("/api/v1")) {
-            trimmed = trimmed.removeSuffix("/api/v1")
-        }
-        return trimmed.takeIf { it.isNotEmpty() }
     }
 
     /** Config row from GET /api/v1/printers — no live connection/state fields. */

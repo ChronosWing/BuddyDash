@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 data class HomeUiState(
     val printers: List<Printer> = emptyList(),
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val serverUrl: String = "",
     val apiKey: String = "",
@@ -51,7 +52,7 @@ class HomeViewModel(
         }
     }
 
-    fun loadPrinters(showLoading: Boolean = false) {
+    fun loadPrinters(showLoading: Boolean = false, fromPull: Boolean = false) {
         val state = _uiState.value
         if (!state.hasCredentials) {
             _uiState.update { it.copy(error = "Configure server URL and API key in Settings") }
@@ -60,13 +61,16 @@ class HomeViewModel(
 
         fetchJob?.cancel()
         fetchJob = viewModelScope.launch {
-            if (showLoading) {
+            if (fromPull) {
+                _uiState.update { it.copy(isRefreshing = true, error = null) }
+            } else if (showLoading) {
                 _uiState.update { it.copy(isLoading = true, error = null) }
             }
             val result = apiClient.fetchPrintersWithStatus(state.serverUrl, state.apiKey)
             _uiState.update {
                 it.copy(
                     isLoading = false,
+                    isRefreshing = false,
                     printers = result.getOrElse { emptyList() },
                     error = result.exceptionOrNull()?.message,
                 )
