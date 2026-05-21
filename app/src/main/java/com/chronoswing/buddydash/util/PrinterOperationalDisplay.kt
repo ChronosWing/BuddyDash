@@ -92,6 +92,8 @@ data class MaintenanceLine(
     val itemId: Int,
     val name: String,
     val kind: MaintenanceLineKind,
+    val remainingText: String? = null,
+    val progressFraction: Float? = null,
     val canReset: Boolean = false,
 )
 
@@ -110,19 +112,22 @@ fun resolveMaintenanceLineKind(item: MaintenanceItem): MaintenanceLineKind = whe
 
 /** Short dashboard-style label from Bambuddy maintenance type names. */
 fun shortenMaintenanceName(raw: String): String {
-    var name = raw.trim()
-    val isClean = name.startsWith("Clean ", ignoreCase = true)
-    val isCheck = name.startsWith("Check ", ignoreCase = true)
+    val normalized = raw.trim().replace("/", " / ")
     when {
-        isClean -> {
-            name = name.removePrefix("Clean ").trim()
-            if (name.contains("build plate", ignoreCase = true)) {
-                return "Build plate cleaning"
-            }
-        }
-        isCheck -> name = name.removePrefix("Check ").trim()
+        normalized.contains("build plate", ignoreCase = true) -> return "Clean build plate"
+        normalized.contains("carbon rod", ignoreCase = true) -> return "Carbon rods"
+        normalized.contains("nozzle", ignoreCase = true) && normalized.contains("hotend", ignoreCase = true) ->
+            return "Nozzle / hotend"
+        normalized.contains("belt tension", ignoreCase = true) -> return "Belt tension"
+        normalized.contains("ptfe", ignoreCase = true) -> return "PTFE tube"
     }
-    name = name.replace("/", " / ")
+    var name = normalized
+    if (name.startsWith("Clean ", ignoreCase = true)) {
+        name = name.removePrefix("Clean ").trim()
+    }
+    if (name.startsWith("Check ", ignoreCase = true)) {
+        name = name.removePrefix("Check ").trim()
+    }
     return name.split(Regex("\\s+")).joinToString(" ") { word ->
         when {
             word.equals("PTFE", ignoreCase = true) -> "PTFE"
@@ -132,36 +137,88 @@ fun shortenMaintenanceName(raw: String): String {
     }
 }
 
+/** Compact remaining label from API `hours_until_due` / `days_until_due` only. */
+fun formatMaintenanceRemainingText(item: MaintenanceItem, kind: MaintenanceLineKind): String? {
+    if (kind == MaintenanceLineKind.Due) return "Due"
+    val hours = maintenanceHoursUntilDue(item) ?: return null
+    if (hours <= 0.0) return null
+    val duration = formatMaintenanceDuration(hours) ?: return null
+    return when (kind) {
+        MaintenanceLineKind.DueSoon -> "Due in $duration"
+        MaintenanceLineKind.Ok -> "$duration left"
+        MaintenanceLineKind.Due -> "Due"
+    }
+}
+
+private fun maintenanceHoursUntilDue(item: MaintenanceItem): Double? {
+    val hours = item.hoursUntilDue
+    if (hours != null && !hours.isNaN()) return hours
+    val days = item.daysUntilDue
+    if (days != null && !days.isNaN()) return days * 24.0
+    return null
+}
+
+/** e.g. 49m, 3d, 1.0w — from hours until due. */
+fun formatMaintenanceDuration(hours: Double): String? {
+    if (hours.isNaN() || hours <= 0.0) return null
+    return when {
+        hours >= 168.0 -> {
+            val weeks = hours / 168.0
+            val numeric = when {
+                weeks >= 10.0 -> weeks.roundToInt().toString()
+                weeks >= 2.0 && kotlin.math.abs(weeks - weeks.roundToInt()) < 0.15 ->
+                    weeks.roundToInt().toString()
+                else -> "%.1f".format(weeks)
+            }
+            "${numeric}w"
+        }
+        hours >= 24.0 -> "${(hours / 24.0).roundToInt()}d"
+        hours >= 1.0 -> "${hours.roundToInt()}h"
+        else -> "${(hours * 60.0).roundToInt().coerceAtLeast(1)}m"
+    }
+}
+
+/** Thin micro-bar progress from `hours_since_maintenance` / `interval_hours`. */
+fun maintenanceProgressFraction(item: MaintenanceItem, kind: MaintenanceLineKind): Float? {
+    val interval = item.intervalHours ?: return null
+    if (interval <= 0.0) return null
+    val since = item.hoursSinceMaintenance ?: return null
+    val fraction = (since / interval).toFloat().coerceIn(0f, 1f)
+    return when (kind) {
+        MaintenanceLineKind.Due,
+        MaintenanceLineKind.DueSoon,
+        -> fraction
+        MaintenanceLineKind.Ok -> fraction.takeIf { it >= 0.35f }
+    }
+}
+
 fun maintenanceDisplayLines(items: List<MaintenanceItem>): List<MaintenanceLine> =
     items
         .filter { it.enabled }
         .map { item ->
             val kind = resolveMaintenanceLineKind(item)
             val canReset = canResetMaintenanceItem(item)
+            val remainingText = formatMaintenanceRemainingText(item, kind)
+            val progressFraction = maintenanceProgressFraction(item, kind)
             val line = MaintenanceLine(
                 itemId = item.id,
                 name = shortenMaintenanceName(item.name),
                 kind = kind,
+                remainingText = remainingText,
+                progressFraction = progressFraction,
                 canReset = canReset,
             )
             if (DEBUG_LOG_MAINTENANCE) {
-                val displayLabel = maintenanceDisplayLabel(line)
                 Log.d(
                     TAG_MAINTENANCE,
                     "item name=${item.name} is_due=${item.isDue} is_warning=${item.isWarning} " +
                         "hours_until_due=${item.hoursUntilDue} days_until_due=${item.daysUntilDue} " +
-                        "kind=$kind resettable=${canReset} label=\"$displayLabel\" showReset=$canReset",
+                        "interval_hours=${item.intervalHours} hours_since=${item.hoursSinceMaintenance} " +
+                        "kind=$kind resettable=$canReset remaining=\"$remainingText\" progress=$progressFraction",
                 )
             }
             line
         }
-
-/** Full label as shown in the maintenance row (for debug logging). */
-fun maintenanceDisplayLabel(line: MaintenanceLine): String = when (line.kind) {
-    MaintenanceLineKind.Ok -> line.name
-    MaintenanceLineKind.DueSoon -> "${line.name} soon"
-    MaintenanceLineKind.Due -> "${line.name} due"
-}
 
 fun PrinterStatus.hasPrintSpeedSection(): Boolean =
     formatPrintSpeedLevel(speedLevel) != null

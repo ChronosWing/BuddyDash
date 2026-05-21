@@ -11,6 +11,9 @@ data class MaintenanceItem(
     val enabled: Boolean,
     val hoursUntilDue: Double? = null,
     val daysUntilDue: Double? = null,
+    val intervalHours: Double? = null,
+    val hoursSinceMaintenance: Double? = null,
+    val intervalType: String? = null,
 )
 
 data class PrinterMaintenanceOverview(
