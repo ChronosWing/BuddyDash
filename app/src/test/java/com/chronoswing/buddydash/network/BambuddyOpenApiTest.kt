@@ -15,6 +15,13 @@ class BambuddyOpenApiTest {
     }
 
     @Test
+    fun cameraSnapshotEndpoint_matchesOpenApiSpec() {
+        val spec = findOpenApiSpec().readText()
+        assertTrue(spec.contains("\"${BambuddyApi.CAMERA_SNAPSHOT_PATH}\""))
+        assertTrue(spec.contains("camera_snapshot_api_v1_printers__printer_id__camera_snapshot_get"))
+    }
+
+    @Test
     fun clearPlateEndpoint_matchesOpenApiSpec() {
         val spec = findOpenApiSpec().readText()
 

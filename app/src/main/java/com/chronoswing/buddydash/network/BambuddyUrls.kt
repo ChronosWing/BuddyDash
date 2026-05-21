@@ -12,11 +12,36 @@ fun normalizeBambuddyBaseUrl(serverUrl: String): String? {
     return trimmed.takeIf { it.isNotEmpty() }
 }
 
-/** Cover image requires `?token=` query param; API key / Bearer auth are not accepted. */
-fun printerCoverUrl(serverUrl: String, printerId: Int, cameraToken: String): String? {
+private fun tokenImageUrl(
+    serverUrl: String,
+    printerId: Int,
+    cameraToken: String,
+    path: String,
+    cacheBust: Long? = null,
+): String? {
     val base = normalizeBambuddyBaseUrl(serverUrl) ?: return null
     val token = cameraToken.trim()
     if (token.isEmpty() || printerId < 0) return null
     val encoded = URLEncoder.encode(token, StandardCharsets.UTF_8.toString())
-    return "$base${BambuddyApi.printerCoverPath(printerId)}?token=$encoded"
+    val bust = cacheBust?.let { "&t=$it" }.orEmpty()
+    return "$base$path?token=$encoded$bust"
 }
+
+/** Cover image requires `?token=` query param; API key / Bearer auth are not accepted. */
+fun printerCoverUrl(serverUrl: String, printerId: Int, cameraToken: String): String? =
+    tokenImageUrl(serverUrl, printerId, cameraToken, BambuddyApi.printerCoverPath(printerId))
+
+/** Live camera snapshot (OpenAPI: GET …/camera/snapshot?token=). */
+fun printerCameraSnapshotUrl(
+    serverUrl: String,
+    printerId: Int,
+    cameraToken: String,
+    cacheBust: Long? = null,
+): String? =
+    tokenImageUrl(
+        serverUrl,
+        printerId,
+        cameraToken,
+        BambuddyApi.cameraSnapshotPath(printerId),
+        cacheBust = cacheBust,
+    )

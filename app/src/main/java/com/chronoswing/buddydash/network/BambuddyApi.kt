@@ -55,6 +55,9 @@ object BambuddyApi {
     fun printerCoverPath(printerId: Int): String =
         PRINTER_COVER_PATH.replace("{printer_id}", printerId.toString())
 
+    fun cameraSnapshotPath(printerId: Int): String =
+        CAMERA_SNAPSHOT_PATH.replace("{printer_id}", printerId.toString())
+
     fun chamberLightPath(printerId: Int, on: Boolean): String =
         "${CHAMBER_LIGHT_PATH.replace("{printer_id}", printerId.toString())}?on=$on"
 
