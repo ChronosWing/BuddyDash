@@ -27,6 +27,7 @@ data class PrinterCardLabels(
     val filamentSlots: List<FilamentSlot>,
     val activeFilamentSlot: SlotInventoryKey? = null,
     val printerRawState: String? = null,
+    val cardMicroMotion: CardMicroMotion = CardMicroMotion.None,
 )
 
 fun Printer.toCardLabels(): PrinterCardLabels {
@@ -56,6 +57,7 @@ fun Printer.toCardLabels(): PrinterCardLabels {
             filamentSlots = emptyList(),
             activeFilamentSlot = null,
             printerRawState = null,
+            cardMicroMotion = CardMicroMotion.None,
         )
     }
     val detail = status.toDetailLabels()
@@ -116,5 +118,6 @@ fun Printer.toCardLabels(): PrinterCardLabels {
         filamentSlots = status.filamentSlots,
         activeFilamentSlot = status.activeFilamentSlot,
         printerRawState = status.rawState,
+        cardMicroMotion = resolveCardMicroMotion(activityKind, status.rawState),
     )
 }

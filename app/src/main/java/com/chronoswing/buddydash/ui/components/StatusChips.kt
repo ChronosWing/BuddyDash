@@ -33,6 +33,7 @@ import com.chronoswing.buddydash.ui.theme.CyanAccent
 import com.chronoswing.buddydash.ui.theme.OfflineRed
 import com.chronoswing.buddydash.ui.theme.OnlineGreen
 import com.chronoswing.buddydash.ui.theme.TextSecondary
+import com.chronoswing.buddydash.util.CardMicroMotion
 import com.chronoswing.buddydash.util.PlateIndicatorKind
 import com.chronoswing.buddydash.util.PrinterActivityKind
 
@@ -42,7 +43,9 @@ fun PrinterQuickStatusRow(
     progressCompact: String?,
     plateKind: PlateIndicatorKind?,
     modifier: Modifier = Modifier,
+    cardMicroMotion: CardMicroMotion = CardMicroMotion.None,
 ) {
+    val chipBreath = rememberPrintingChipBreath(cardMicroMotion == CardMicroMotion.Printing)
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -51,6 +54,7 @@ fun PrinterQuickStatusRow(
         ActivityStatusChip(
             kind = activityKind,
             progressCompact = progressCompact,
+            breathPhase = chipBreath,
         )
         plateKind?.let { PlateStatusChip(kind = it) }
     }
@@ -61,16 +65,22 @@ fun ActivityStatusChip(
     kind: PrinterActivityKind,
     progressCompact: String?,
     modifier: Modifier = Modifier,
+    breathPhase: Float = 0f,
 ) {
     val style = activityChipStyle(kind = kind)
     val label = activityChipLabel(kind, progressCompact)
+    val breathe = kind == PrinterActivityKind.Printing
+    val containerAlpha = if (breathe) 0.12f + breathPhase * 0.05f else null
+    val borderAlpha = if (breathe) 0.48f + breathPhase * 0.12f else 0.55f
     StatusPill(
         label = label,
         icon = style.icon,
-        iconTint = style.accent,
-        containerColor = style.container,
+        iconTint = style.accent.copy(alpha = if (breathe) 0.88f + breathPhase * 0.1f else 1f),
+        containerColor = style.container.copy(
+            alpha = containerAlpha ?: style.container.alpha,
+        ),
         contentColor = style.content,
-        borderColor = style.accent.copy(alpha = 0.55f),
+        borderColor = style.accent.copy(alpha = borderAlpha),
         modifier = modifier,
     )
 }
