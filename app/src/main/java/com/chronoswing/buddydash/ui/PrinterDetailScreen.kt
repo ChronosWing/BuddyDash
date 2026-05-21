@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +49,7 @@ import com.chronoswing.buddydash.ui.components.FilamentChipRow
 import com.chronoswing.buddydash.ui.components.FilamentSlotDetailHeader
 import com.chronoswing.buddydash.ui.components.HighlightValue
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
+import com.chronoswing.buddydash.ui.components.PrinterCoverImage
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
@@ -84,7 +86,11 @@ fun PrinterDetailScreen(
 
     PrinterDetailScreenContent(
         title = uiState.printerName.ifBlank { printerName },
+        printerId = printerId,
+        serverUrl = uiState.serverUrl,
+        apiKey = uiState.apiKey,
         isLoading = uiState.isLoading,
+        isRefreshing = uiState.isRefreshing,
         error = uiState.error,
         labels = labels,
         isClearingPlate = uiState.isClearingPlate,
@@ -92,6 +98,7 @@ fun PrinterDetailScreen(
         onBack = onBack,
         onRetry = viewModel::loadStatus,
         onRefresh = { viewModel.loadStatus(showLoading = false) },
+        onPullRefresh = { viewModel.loadStatus(showLoading = false, fromPull = true) },
         onMarkPlateClear = viewModel::markPlateClear,
         onPlateClearSnackbarShown = viewModel::onPlateClearSnackbarShown,
     )
@@ -101,7 +108,11 @@ fun PrinterDetailScreen(
 @Composable
 private fun PrinterDetailScreenContent(
     title: String,
+    printerId: Int,
+    serverUrl: String,
+    apiKey: String,
     isLoading: Boolean,
+    isRefreshing: Boolean,
     error: String?,
     labels: PrinterDetailLabels?,
     isClearingPlate: Boolean,
@@ -109,6 +120,7 @@ private fun PrinterDetailScreenContent(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
+    onPullRefresh: () -> Unit,
     onMarkPlateClear: () -> Unit,
     onPlateClearSnackbarShown: () -> Unit,
 ) {
@@ -166,26 +178,35 @@ private fun PrinterDetailScreenContent(
                             )
                         }
                     }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = onPullRefresh,
+                        modifier = Modifier.fillMaxSize(),
                     ) {
-                        when (selectedTab) {
-                            0 -> StatusTab(
-                                labels = labels,
-                                isClearingPlate = isClearingPlate,
-                                onMarkPlateClear = onMarkPlateClear,
-                            )
-                            1 -> FilamentTab(slots = labels.filamentSlots)
-                            2 -> ControlsTab(
-                                labels = labels,
-                                isClearingPlate = isClearingPlate,
-                                onRefresh = onRefresh,
-                                onMarkPlateClear = onMarkPlateClear,
-                            )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            when (selectedTab) {
+                                0 -> StatusTab(
+                                    labels = labels,
+                                    printerId = printerId,
+                                    serverUrl = serverUrl,
+                                    apiKey = apiKey,
+                                    isClearingPlate = isClearingPlate,
+                                    onMarkPlateClear = onMarkPlateClear,
+                                )
+                                1 -> FilamentTab(slots = labels.filamentSlots)
+                                2 -> ControlsTab(
+                                    labels = labels,
+                                    isClearingPlate = isClearingPlate,
+                                    onRefresh = onRefresh,
+                                    onMarkPlateClear = onMarkPlateClear,
+                                )
+                            }
                         }
                     }
                 }
@@ -197,18 +218,27 @@ private fun PrinterDetailScreenContent(
 @Composable
 private fun StatusTab(
     labels: PrinterDetailLabels,
+    printerId: Int,
+    serverUrl: String,
+    apiKey: String,
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
 ) {
     if (labels.isActivePrint) {
         ActivePrintStatusTab(
             labels = labels,
+            printerId = printerId,
+            serverUrl = serverUrl,
+            apiKey = apiKey,
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
         )
     } else {
         IdleStatusTab(
             labels = labels,
+            printerId = printerId,
+            serverUrl = serverUrl,
+            apiKey = apiKey,
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
         )
@@ -218,9 +248,18 @@ private fun StatusTab(
 @Composable
 private fun ActivePrintStatusTab(
     labels: PrinterDetailLabels,
+    printerId: Int,
+    serverUrl: String,
+    apiKey: String,
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
 ) {
+    PrinterCoverImage(
+        serverUrl = serverUrl,
+        apiKey = apiKey,
+        printerId = printerId,
+        height = 160.dp,
+    )
     DetailInfoCard {
         SectionHeader(stringResource(R.string.section_print))
         HighlightValue(
@@ -293,9 +332,18 @@ private fun ActivePrintStatusTab(
 @Composable
 private fun IdleStatusTab(
     labels: PrinterDetailLabels,
+    printerId: Int,
+    serverUrl: String,
+    apiKey: String,
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
 ) {
+    PrinterCoverImage(
+        serverUrl = serverUrl,
+        apiKey = apiKey,
+        printerId = printerId,
+        height = 160.dp,
+    )
     DetailInfoCard {
         SectionHeader(stringResource(R.string.section_overview))
         HighlightValue(

@@ -10,6 +10,9 @@ object BambuddyApi {
     /** GET — PrinterStatus includes awaiting_plate_clear */
     const val PRINTER_STATUS_PATH = "/api/v1/printers/{printer_id}/status"
 
+    /** GET — current print job cover / thumbnail (operationId: get_printer_cover_…). */
+    const val PRINTER_COVER_PATH = "/api/v1/printers/{printer_id}/cover"
+
     const val LIST_PRINTERS_PATH = "/api/v1/printers/"
 
     const val INVENTORY_ASSIGNMENTS_PATH = "/api/v1/inventory/assignments"
@@ -36,4 +39,7 @@ object BambuddyApi {
 
     fun printerStatusPath(printerId: Int): String =
         PRINTER_STATUS_PATH.replace("{printer_id}", printerId.toString())
+
+    fun printerCoverPath(printerId: Int): String =
+        PRINTER_COVER_PATH.replace("{printer_id}", printerId.toString())
 }

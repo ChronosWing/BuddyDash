@@ -17,6 +17,7 @@ data class PrinterDetailUiState(
     val printerName: String = "",
     val status: PrinterStatus? = null,
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val serverUrl: String = "",
     val apiKey: String = "",
@@ -74,13 +75,14 @@ class PrinterDetailViewModel(
         loadStatus()
     }
 
-    fun loadStatus(showLoading: Boolean = true) {
+    fun loadStatus(showLoading: Boolean = true, fromPull: Boolean = false) {
         if (printerId < 0) return
         val state = _uiState.value
         if (!state.hasCredentials) {
             _uiState.update {
                 it.copy(
                     isLoading = false,
+                    isRefreshing = false,
                     error = "Configure server URL and API key in Settings",
                 )
             }
@@ -89,20 +91,28 @@ class PrinterDetailViewModel(
 
         fetchJob?.cancel()
         fetchJob = viewModelScope.launch {
-            if (showLoading) {
-                _uiState.update { it.copy(isLoading = showLoading, error = null) }
+            if (fromPull) {
+                _uiState.update { it.copy(isRefreshing = true, error = null) }
+            } else if (showLoading) {
+                _uiState.update { it.copy(isLoading = true, error = null) }
             }
 
             apiClient.fetchPrinterStatus(state.serverUrl, state.apiKey, printerId).fold(
                 onSuccess = { status ->
                     _uiState.update {
-                        it.copy(isLoading = false, status = status, error = null)
+                        it.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            status = status,
+                            error = null,
+                        )
                     }
                 },
                 onFailure = { error ->
                     _uiState.update {
                         it.copy(
                             isLoading = false,
+                            isRefreshing = false,
                             status = null,
                             error = error.message ?: "Failed to load printer status",
                         )
