@@ -301,6 +301,7 @@ private fun GlancePrinterCard(
             FilamentHomeGroupsRow(
                 slots = labels.filamentSlots,
                 activeKey = labels.activeFilamentSlot,
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
     }
