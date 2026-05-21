@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,17 +28,26 @@ import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
@@ -169,27 +181,38 @@ private fun FanCompactStat(
 }
 
 @Composable
-private fun MaintenanceStatusRow(line: MaintenanceLine) {
-    val (icon, tint, label) = when (line.kind) {
-        MaintenanceLineKind.Healthy -> Triple(
-            Icons.Default.CheckCircle,
-            MaterialTheme.colorScheme.primary,
-            line.name,
-        )
-        MaintenanceLineKind.Warning -> Triple(
-            Icons.Default.Warning,
-            MaterialTheme.colorScheme.error,
-            line.name,
-        )
-        MaintenanceLineKind.Due -> Triple(
-            Icons.Default.Build,
-            MaterialTheme.colorScheme.error,
-            "${line.name} ${stringResource(R.string.maintenance_due_suffix)}",
-        )
+private fun MaintenanceStatusRow(
+    line: MaintenanceLine,
+    resetBusy: Boolean,
+    onResetClick: (() -> Unit)?,
+) {
+    val dueSoonTint = Color(0xFFFBBF24)
+    val icon: ImageVector
+    val tint: Color
+    val label: String
+    val textColor: Color
+    when (line.kind) {
+        MaintenanceLineKind.Ok -> {
+            icon = Icons.Default.CheckCircle
+            tint = MaterialTheme.colorScheme.primary
+            label = line.name
+            textColor = MaterialTheme.colorScheme.onSurface
+        }
+        MaintenanceLineKind.DueSoon -> {
+            icon = Icons.Default.Warning
+            tint = dueSoonTint
+            label = "${line.name} ${stringResource(R.string.maintenance_soon_suffix)}"
+            textColor = dueSoonTint
+        }
+        MaintenanceLineKind.Due -> {
+            icon = Icons.Default.Build
+            tint = MaterialTheme.colorScheme.error
+            label = "${line.name} ${stringResource(R.string.maintenance_due_suffix)}"
+            textColor = MaterialTheme.colorScheme.error
+        }
     }
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -198,27 +221,79 @@ private fun MaintenanceStatusRow(line: MaintenanceLine) {
             modifier = Modifier.size(16.dp),
             tint = tint,
         )
+        Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = if (line.kind == MaintenanceLineKind.Healthy) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.error
-            },
+            color = textColor,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .padding(end = if (onResetClick != null) 4.dp else 0.dp),
         )
+        if (onResetClick != null) {
+            TextButton(
+                onClick = onResetClick,
+                enabled = !resetBusy,
+                modifier = Modifier.heightIn(max = 32.dp),
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.maintenance_reset),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
     }
 }
 
 @Composable
-fun DetailMaintenanceCard(labels: PrinterDetailLabels) {
+fun DetailMaintenanceCard(
+    labels: PrinterDetailLabels,
+    resetBusy: Boolean,
+    onPerformReset: (itemId: Int) -> Unit,
+) {
     val lines = maintenanceDisplayLines(labels.maintenanceItems)
     if (lines.isEmpty()) return
+    var pendingReset by remember { mutableStateOf<MaintenanceLine?>(null) }
+
+    pendingReset?.let { line ->
+        AlertDialog(
+            onDismissRequest = { pendingReset = null },
+            title = { Text(stringResource(R.string.maintenance_reset_confirm_title)) },
+            text = { Text(stringResource(R.string.maintenance_reset_confirm_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingReset = null
+                        onPerformReset(line.itemId)
+                    },
+                ) {
+                    Text(stringResource(R.string.maintenance_reset))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingReset = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
     DetailInfoCard {
         SectionHeader(stringResource(R.string.section_maintenance))
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             lines.forEach { line ->
-                MaintenanceStatusRow(line)
+                MaintenanceStatusRow(
+                    line = line,
+                    resetBusy = resetBusy,
+                    onResetClick = if (line.canReset) {
+                        { pendingReset = line }
+                    } else {
+                        null
+                    },
+                )
             }
         }
     }

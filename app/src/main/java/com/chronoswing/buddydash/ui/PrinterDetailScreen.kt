@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chronoswing.buddydash.ControlSnackbar
+import com.chronoswing.buddydash.MaintenanceResetSnackbar
 import com.chronoswing.buddydash.PlateClearSnackbar
 import com.chronoswing.buddydash.PrinterDetailViewModel
 import com.chronoswing.buddydash.R
@@ -120,6 +121,8 @@ fun PrinterDetailScreen(
         isControlBusy = uiState.isControlBusy,
         plateClearSnackbar = uiState.plateClearSnackbar,
         controlSnackbar = uiState.controlSnackbar,
+        isMaintenanceResetBusy = uiState.isMaintenanceResetBusy,
+        maintenanceResetSnackbar = uiState.maintenanceResetSnackbar,
         onBack = onBack,
         onRetry = viewModel::loadStatus,
         onRefresh = { viewModel.loadStatus(showLoading = false) },
@@ -134,6 +137,8 @@ fun PrinterDetailScreen(
         onToggleLight = viewModel::toggleChamberLight,
         onJogBedUp = viewModel::jogBedUp,
         onJogBedDown = viewModel::jogBedDown,
+        onPerformMaintenanceReset = viewModel::performMaintenanceReset,
+        onMaintenanceResetSnackbarShown = viewModel::onMaintenanceResetSnackbarShown,
     )
 }
 
@@ -152,6 +157,8 @@ private fun PrinterDetailScreenContent(
     isControlBusy: Boolean,
     plateClearSnackbar: PlateClearSnackbar?,
     controlSnackbar: ControlSnackbar?,
+    isMaintenanceResetBusy: Boolean,
+    maintenanceResetSnackbar: MaintenanceResetSnackbar?,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
@@ -166,6 +173,8 @@ private fun PrinterDetailScreenContent(
     onToggleLight: () -> Unit,
     onJogBedUp: () -> Unit,
     onJogBedDown: () -> Unit,
+    onPerformMaintenanceReset: (Int) -> Unit,
+    onMaintenanceResetSnackbarShown: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val plateClearSuccessMessage = stringResource(R.string.plate_clear_success)
@@ -174,6 +183,8 @@ private fun PrinterDetailScreenContent(
     val controlFailedMessage = stringResource(R.string.control_failed)
     val printStoppedSuccessMessage = stringResource(R.string.print_stopped_success)
     val printStoppedFailedMessage = stringResource(R.string.print_stopped_failed)
+    val maintenanceResetSuccessMessage = stringResource(R.string.maintenance_reset_success)
+    val maintenanceResetFailedMessage = stringResource(R.string.maintenance_reset_failed)
     var selectedTab by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(plateClearSnackbar) {
@@ -196,6 +207,16 @@ private fun PrinterDetailScreenContent(
         }
         snackbarHostState.showSnackbar(message)
         onControlSnackbarShown()
+    }
+
+    LaunchedEffect(maintenanceResetSnackbar) {
+        val message = when (maintenanceResetSnackbar) {
+            MaintenanceResetSnackbar.Success -> maintenanceResetSuccessMessage
+            MaintenanceResetSnackbar.Failed -> maintenanceResetFailedMessage
+            null -> return@LaunchedEffect
+        }
+        snackbarHostState.showSnackbar(message)
+        onMaintenanceResetSnackbarShown()
     }
 
     Scaffold(
@@ -256,7 +277,9 @@ private fun PrinterDetailScreenContent(
                                     serverUrl = serverUrl,
                                     cameraToken = cameraToken,
                                     isClearingPlate = isClearingPlate,
+                                    isMaintenanceResetBusy = isMaintenanceResetBusy,
                                     onMarkPlateClear = onMarkPlateClear,
+                                    onPerformMaintenanceReset = onPerformMaintenanceReset,
                                 )
                                 1 -> FilamentTab(labels = labels)
                                 2 -> ControlsTab(
@@ -289,7 +312,9 @@ private fun StatusTab(
     serverUrl: String,
     cameraToken: String,
     isClearingPlate: Boolean,
+    isMaintenanceResetBusy: Boolean,
     onMarkPlateClear: () -> Unit,
+    onPerformMaintenanceReset: (Int) -> Unit,
 ) {
     if (labels.isActivePrint) {
         ActivePrintStatusTab(
@@ -310,15 +335,27 @@ private fun StatusTab(
             onMarkPlateClear = onMarkPlateClear,
         )
     }
-    DetailOperationalStats(labels)
+    DetailOperationalStats(
+        labels = labels,
+        isMaintenanceResetBusy = isMaintenanceResetBusy,
+        onPerformMaintenanceReset = onPerformMaintenanceReset,
+    )
 }
 
 @Composable
-private fun DetailOperationalStats(labels: PrinterDetailLabels) {
+private fun DetailOperationalStats(
+    labels: PrinterDetailLabels,
+    isMaintenanceResetBusy: Boolean,
+    onPerformMaintenanceReset: (Int) -> Unit,
+) {
     DetailConnectivityCard(labels)
     DetailFansCard(labels)
     DetailPrintSpeedCard(labels)
-    DetailMaintenanceCard(labels)
+    DetailMaintenanceCard(
+        labels = labels,
+        resetBusy = isMaintenanceResetBusy,
+        onPerformReset = onPerformMaintenanceReset,
+    )
 }
 
 @Composable

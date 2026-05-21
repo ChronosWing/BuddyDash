@@ -25,6 +25,8 @@ object BambuddyApi {
     const val PRINT_STOP_PATH = "/api/v1/printers/{printer_id}/print/stop"
     const val PRINT_SPEED_PATH = "/api/v1/printers/{printer_id}/print-speed"
     const val MAINTENANCE_PRINTER_PATH = "/api/v1/maintenance/printers/{printer_id}"
+    /** POST — mark maintenance performed (operationId: perform_maintenance_…). */
+    const val MAINTENANCE_PERFORM_PATH = "/api/v1/maintenance/items/{item_id}/perform"
     const val BED_JOG_PATH = "/api/v1/printers/{printer_id}/bed-jog"
 
     val hasClearPlateEndpoint: Boolean = true
@@ -32,6 +34,7 @@ object BambuddyApi {
     val hasPrintControlEndpoints: Boolean = true
     val hasPrintSpeedEndpoint: Boolean = true
     val hasMaintenanceEndpoint: Boolean = true
+    val hasMaintenancePerformEndpoint: Boolean = true
     val hasBedJogEndpoint: Boolean = true
     val hasCameraEndpoint: Boolean = true
     val hasFilesEndpoint: Boolean = true
@@ -69,6 +72,9 @@ object BambuddyApi {
 
     fun maintenancePrinterPath(printerId: Int): String =
         MAINTENANCE_PRINTER_PATH.replace("{printer_id}", printerId.toString())
+
+    fun maintenancePerformPath(itemId: Int): String =
+        MAINTENANCE_PERFORM_PATH.replace("{item_id}", itemId.toString())
 
     /** Relative Z jog in mm (positive = bed down, negative = bed up). */
     fun bedJogPath(printerId: Int, distanceMm: Float, force: Boolean = false): String {
