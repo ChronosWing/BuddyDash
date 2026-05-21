@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -68,7 +67,6 @@ import com.chronoswing.buddydash.util.toCardLabels
 fun HomeScreen(
     viewModel: HomeViewModel,
     onPrinterClick: (Printer) -> Unit,
-    onSettingsClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -96,7 +94,6 @@ fun HomeScreen(
             viewModel.loadPrinters(showLoading = false, fromPull = true)
         },
         onPrinterClick = onPrinterClick,
-        onSettingsClick = onSettingsClick,
     )
 }
 
@@ -113,7 +110,6 @@ private fun HomeScreenContent(
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
     onPrinterClick: (Printer) -> Unit,
-    onSettingsClick: () -> Unit,
 ) {
     val showPrinterSearch = printers.size >= HOME_PRINTER_SEARCH_MIN_COUNT
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
@@ -163,9 +159,6 @@ private fun HomeScreenContent(
                     }
                     IconButton(onClick = onRefresh, enabled = hasCredentials && !isLoading) {
                         Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
-                    }
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title))
                     }
                 },
             )
