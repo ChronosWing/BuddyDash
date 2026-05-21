@@ -14,7 +14,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -36,6 +35,7 @@ import com.chronoswing.buddydash.PlateClearSnackbar
 import com.chronoswing.buddydash.PrinterDetailViewModel
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.FilamentSlot
+import com.chronoswing.buddydash.ui.components.ComingSoonActionButton
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.ErrorContent
@@ -313,22 +313,41 @@ private fun ControlsTab(
     onRefresh: () -> Unit,
     onMarkPlateClear: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.refresh_status))
+    val comingSoon = stringResource(R.string.coming_soon)
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionHeader(stringResource(R.string.controls_section_status))
+        DetailInfoCard {
+            Button(
+                onClick = onRefresh,
+                enabled = !isClearingPlate,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.refresh_status))
+            }
+            if (labels.showPlateClearAction) {
+                PlateClearButton(
+                    labels = labels,
+                    isClearingPlate = isClearingPlate,
+                    onClick = onMarkPlateClear,
+                )
+            }
         }
-        if (labels.showPlateClearAction) {
-            PlateClearButton(
-                labels = labels,
-                isClearingPlate = isClearingPlate,
-                onClick = onMarkPlateClear,
+
+        SectionHeader(stringResource(R.string.controls_section_quick_actions))
+        DetailInfoCard {
+            ComingSoonActionButton(
+                label = stringResource(R.string.toggle_light),
+                helperText = comingSoon,
             )
-        }
-        OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.pause_print_placeholder))
-        }
-        OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.cancel_print_placeholder))
+            ComingSoonActionButton(
+                label = stringResource(R.string.camera_view),
+                helperText = comingSoon,
+            )
+            ComingSoonActionButton(
+                label = stringResource(R.string.printer_files),
+                helperText = comingSoon,
+            )
         }
     }
 }

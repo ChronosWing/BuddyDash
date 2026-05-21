@@ -14,7 +14,15 @@ object BambuddyApi {
 
     const val INVENTORY_ASSIGNMENTS_PATH = "/api/v1/inventory/assignments"
 
+    const val CHAMBER_LIGHT_PATH = "/api/v1/printers/{printer_id}/chamber-light"
+    const val CAMERA_SNAPSHOT_PATH = "/api/v1/printers/{printer_id}/camera/snapshot"
+    const val PRINTER_FILES_PATH = "/api/v1/printers/{printer_id}/files"
+
     val hasClearPlateEndpoint: Boolean = true
+    /** Present in OpenAPI; not wired in BuddyDash v1. */
+    val hasChamberLightEndpoint: Boolean = true
+    val hasCameraEndpoint: Boolean = true
+    val hasFilesEndpoint: Boolean = true
 
     fun inventoryAssignmentsPath(printerId: Int? = null): String =
         if (printerId != null) {
