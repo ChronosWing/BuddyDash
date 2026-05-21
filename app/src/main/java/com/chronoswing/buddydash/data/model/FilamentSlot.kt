@@ -5,7 +5,10 @@ import com.chronoswing.buddydash.util.SlotInventoryKey
 data class FilamentSlot(
     val label: String,
     val filamentType: String?,
-    val colorHex: String?,
+    /** All swatch colors (1 = solid, 2 = diagonal, 3+ = pie segments). */
+    val swatchColorHexes: List<String> = emptyList(),
+    val isTranslucent: Boolean = false,
+    val colorAlpha: Float = 1f,
     /** Remaining % from Bambuddy inventory assignment when available. */
     val remainPercent: Int? = null,
     val metadata: String? = null,
@@ -14,6 +17,9 @@ data class FilamentSlot(
     val amsId: Int? = null,
     val trayId: Int? = null,
 ) {
+    val colorHex: String?
+        get() = swatchColorHexes.firstOrNull()
+
     val inventoryKey: SlotInventoryKey?
         get() = if (amsId != null && trayId != null) SlotInventoryKey(amsId, trayId) else null
 }

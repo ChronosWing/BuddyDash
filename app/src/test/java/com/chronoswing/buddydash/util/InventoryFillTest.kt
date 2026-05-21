@@ -3,6 +3,7 @@ package com.chronoswing.buddydash.util
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InventoryFillTest {
@@ -23,12 +24,12 @@ class InventoryFillTest {
     }
 
     @Test
-    fun applyInventory_usesInventoryColorOverTray() {
+    fun applyInventory_usesInventoryColors() {
         val slots = listOf(
             FilamentSlot(
                 label = "A1",
                 filamentType = "PLA",
-                colorHex = "#0000FF",
+                swatchColorHexes = listOf("#0000FF"),
                 amsId = 0,
                 trayId = 0,
                 isLoaded = true,
@@ -39,7 +40,7 @@ class InventoryFillTest {
             inventoryBySlot = mapOf(
                 SlotInventoryKey(0, 0) to SlotInventoryInfo(
                     remainPercent = 42,
-                    colorHex = "#FF0000",
+                    swatch = FilamentSwatchColors(colorHexes = listOf("#FF0000")),
                     spoolId = 7,
                     spoolName = "Bambu PLA Red",
                 ),
@@ -48,36 +49,17 @@ class InventoryFillTest {
             logColors = false,
         )
         assertEquals(42, merged.first().remainPercent)
-        assertEquals("#FF0000", merged.first().colorHex)
+        assertEquals(listOf("#FF0000"), merged.first().swatchColorHexes)
     }
 
     @Test
-    fun applyInventory_colorWithoutFill() {
-        val slots = listOf(
-            FilamentSlot(
-                label = "B2",
-                filamentType = "PETG",
-                colorHex = "#0000FF",
-                amsId = 0,
-                trayId = 1,
-                isLoaded = true,
-            ),
+    fun mergeFilamentColorHexes_triColor() {
+        val colors = mergeFilamentColorHexes(
+            primary = "#FF0000",
+            extraStops = listOf("#00FF00", "#0000FF"),
         )
-        val merged = applyInventoryToSlots(
-            slots = slots,
-            inventoryBySlot = mapOf(
-                SlotInventoryKey(0, 1) to SlotInventoryInfo(
-                    remainPercent = null,
-                    colorHex = "#00FF00",
-                    spoolId = 3,
-                    spoolName = "Green PETG",
-                ),
-            ),
-            printerName = "Test",
-            logColors = false,
-        )
-        assertNull(merged.first().remainPercent)
-        assertEquals("#00FF00", merged.first().colorHex)
+        assertEquals(3, colors.size)
+        assertTrue(FilamentSwatchColors(colorHexes = colors).isMultiColor)
     }
 
     @Test
