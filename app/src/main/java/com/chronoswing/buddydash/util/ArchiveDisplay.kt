@@ -97,6 +97,7 @@ fun parsePrintArchive(
         filamentUsage = filamentUsage,
         filamentType = jsonOptionalString(json, "filament_type"),
         filamentColor = jsonOptionalString(json, "filament_color"),
+        spoolId = resolveArchiveSpoolId(json),
         failureReason = jsonOptionalString(json, "failure_reason"),
         totalLayers = json.optInt("total_layers", -1).takeIf { it > 0 },
         quantity = json.optInt("quantity", -1).takeIf { it > 0 },
@@ -165,7 +166,7 @@ fun logArchiveDetailFieldMapping(archive: PrintArchive) {
         TAG_ARCHIVE_DETAIL,
         "detailFields id=${archive.id} failure=${archive.failureReason} project=${archive.projectName} " +
             "notes=${archive.notes} material=${archive.filamentType}/${archive.filamentColor} " +
-            "showFailure=${shouldShowArchiveFailureReason(archive)}",
+            "spoolId=${archive.spoolId} showFailure=${shouldShowArchiveFailureReason(archive)}",
     )
 }
 

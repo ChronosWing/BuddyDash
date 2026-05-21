@@ -67,6 +67,11 @@ class SpoolsViewModel(
         _uiState.update { it.copy(filter = filter) }
     }
 
+    fun applyInitialSearchQuery(query: String) {
+        if (query.isBlank()) return
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
     fun loadSpools(showLoading: Boolean = false, fromPull: Boolean = false) {
         val state = _uiState.value
         if (!state.hasCredentials) {

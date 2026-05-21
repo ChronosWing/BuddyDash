@@ -31,15 +31,17 @@ fun isSpoolLowStock(
 
 fun parseSpoolFromResponse(json: JSONObject): SpoolInventoryItem {
     val id = json.optInt("id", -1)
-    val material = json.optString("material").trim().ifBlank { "Unknown" }
-    val subtype = json.optString("subtype").takeIf { it.isNotBlank() }
-    val colorName = json.optString("color_name").takeIf { it.isNotBlank() }
-    val brand = json.optString("brand").takeIf { it.isNotBlank() }
+    val material = spoolJsonOptionalString(json, "material") ?: "Unknown"
+    val subtype = spoolJsonOptionalString(json, "subtype")
+    val colorName = spoolJsonOptionalString(json, "color_name")
+    val brand = spoolJsonOptionalString(json, "brand")
     val swatch = parseFilamentSwatchFromSpool(json)
     val remainPercent = inventoryFillPercentFromSpool(json)
     val lowThreshold = json.optInt("low_stock_threshold_pct", -1).takeIf { it in 1..99 }
-    val displayName = spoolDisplayName(json)
-    return SpoolInventoryItem(
+    val labelWeight = json.optInt("label_weight", 0).takeIf { it > 0 }
+    val weightUsed = jsonPositiveDouble(json, "weight_used")
+    val remainingGrams = computeSpoolRemainingGrams(labelWeight, weightUsed)
+    val item = SpoolInventoryItem(
         id = id,
         material = material,
         subtype = subtype,
@@ -49,8 +51,15 @@ fun parseSpoolFromResponse(json: JSONObject): SpoolInventoryItem {
         remainPercent = remainPercent,
         lowStockThresholdPct = lowThreshold,
         isLowStock = false,
-        displayName = displayName,
+        displayName = spoolDisplayName(json),
+        labelWeightGrams = labelWeight,
+        weightUsedGrams = weightUsed,
+        remainingGrams = remainingGrams,
+        tagType = spoolJsonOptionalString(json, "tag_type"),
+        dataOrigin = spoolJsonOptionalString(json, "data_origin"),
+        lastUsedIso = spoolJsonOptionalString(json, "last_used"),
     )
+    return item.copy(displayName = formatSpoolCardTitle(item))
 }
 
 fun parseSpoolInventoryList(body: String, globalLowStockThresholdPct: Float): List<SpoolInventoryItem> {
@@ -78,11 +87,12 @@ fun parseSpoolAssignments(body: String): Map<Int, SpoolSlotAssignment> {
         if (printerId < 0) continue
         val printerName = row.optString("printer_name").trim()
             .ifBlank { "Printer $printerId" }
+            .takeIf { isMeaningfulSpoolField(it) } ?: "Printer $printerId"
         val amsId = row.optInt("ams_id")
         val trayId = row.optInt("tray_id")
-        val slotLabel = row.optString("ams_label").trim().ifBlank {
-            formatAssignmentSlotLabel(amsId, trayId)
-        }
+        val slotLabel = spoolJsonOptionalString(row, "ams_label")
+            ?: formatAssignmentSlotLabel(amsId, trayId).takeIf { isMeaningfulSpoolField(it) }
+            ?: "Slot"
         bySpoolId[spoolId] = SpoolSlotAssignment(
             printerId = printerId,
             printerName = printerName,
@@ -134,18 +144,45 @@ fun applySpoolInventorySearch(
         if (normalizedQuery.isEmpty()) return@filter true
         val haystack = buildList {
             add(spool.displayName)
+            add(formatSpoolCardTitle(spool))
             add(spool.material)
             spool.subtype?.let { add(it) }
             spool.colorName?.let { add(it) }
             spool.brand?.let { add(it) }
-            spool.assignment?.let {
-                add(it.printerName)
-                add(it.slotLabel)
+            spool.swatch.colorHexes.forEach { add(it) }
+            if (spool.assignment != null) {
+                add("loaded")
+                spool.assignment?.let {
+                    add(it.printerName)
+                    add(it.slotLabel)
+                }
+            } else {
+                add("storage")
             }
         }.joinToString(" ").lowercase()
         haystack.contains(normalizedQuery)
     }
 }
 
-fun formatSpoolMaterialLabel(material: String, subtype: String?): String =
-    if (subtype.isNullOrBlank()) material else "$material · $subtype"
+fun formatSpoolMaterialLabel(material: String, subtype: String?): String? =
+    formatSpoolMaterialSubtitle(
+        SpoolInventoryItem(
+            id = 0,
+            material = material,
+            subtype = subtype,
+            swatch = FilamentSwatchColors(emptyList()),
+            remainPercent = null,
+            lowStockThresholdPct = null,
+            isLowStock = false,
+            displayName = material,
+        ),
+    )
+
+private fun jsonPositiveDouble(json: JSONObject, key: String): Double? {
+    if (!json.has(key) || json.isNull(key)) return null
+    return when (val value = json.opt(key)) {
+        is Number -> value.toDouble().takeIf { it >= 0.0 }
+        is String -> value.toDoubleOrNull()?.takeIf { it >= 0.0 }
+        else -> null
+    }
+}

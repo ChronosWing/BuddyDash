@@ -41,7 +41,7 @@ fun BuddyDashBottomNav(
             label = { Text(stringResource(R.string.nav_printers)) },
         )
         NavigationBarItem(
-            selected = currentRoute == Routes.SPOOLS,
+            selected = currentRoute?.substringBefore('?') == Routes.SPOOLS_BASE,
             onClick = onSpools,
             icon = {
                 Icon(
@@ -52,7 +52,7 @@ fun BuddyDashBottomNav(
             label = { Text(stringResource(R.string.nav_spools)) },
         )
         NavigationBarItem(
-            selected = currentRoute == Routes.ARCHIVES,
+            selected = currentRoute?.substringBefore('?') == Routes.ARCHIVES_BASE,
             onClick = onArchives,
             icon = {
                 Icon(

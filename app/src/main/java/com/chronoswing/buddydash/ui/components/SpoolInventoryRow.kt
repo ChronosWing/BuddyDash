@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,15 +19,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
-import com.chronoswing.buddydash.util.formatSpoolMaterialLabel
+import com.chronoswing.buddydash.util.formatSpoolCardTitle
+import com.chronoswing.buddydash.util.formatSpoolLocationLine
+import com.chronoswing.buddydash.util.formatSpoolMaterialSubtitle
 
 @Composable
 fun SpoolInventoryRow(
     spool: SpoolInventoryItem,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val title = formatSpoolCardTitle(spool)
+    val materialLine = formatSpoolMaterialSubtitle(spool)
+    val locationLine = formatSpoolLocationLine(spool)
+
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
@@ -52,7 +62,7 @@ fun SpoolInventoryRow(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = spool.displayName,
+                        text = title,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
@@ -63,26 +73,22 @@ fun SpoolInventoryRow(
                         LowSpoolChip()
                     }
                 }
-                Text(
-                    text = formatSpoolMaterialLabel(spool.material, spool.subtype),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                spool.assignment?.let { assignment ->
+                materialLine?.let { material ->
                     Text(
-                        text = stringResource(
-                            R.string.spool_loaded_slot,
-                            assignment.printerName,
-                            assignment.slotLabel,
-                        ),
+                        text = material,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Text(
+                    text = locationLine,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 spool.remainPercent?.let { percent ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -110,7 +116,7 @@ fun SpoolInventoryRow(
 }
 
 @Composable
-private fun LowSpoolChip(modifier: Modifier = Modifier) {
+fun LowSpoolChip(modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
         shape = MaterialTheme.shapes.extraSmall,

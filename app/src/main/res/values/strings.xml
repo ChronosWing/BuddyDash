@@ -112,6 +112,16 @@
     <string name="spool_low_stock">Low</string>
     <string name="spool_remain_percent">%1$d%%</string>
     <string name="spool_loaded_slot">%1$s · %2$s</string>
+    <string name="spool_detail_title">Spool</string>
+    <string name="spool_detail_brand">Brand</string>
+    <string name="spool_detail_material">Material</string>
+    <string name="spool_detail_color">Color</string>
+    <string name="spool_detail_remaining">Remaining</string>
+    <string name="spool_detail_source">Source</string>
+    <string name="spool_detail_last_used">Last used</string>
+    <string name="spool_detail_used_in_prints">Used in prints</string>
+    <string name="spool_detail_matching_archives">Matching archived prints</string>
+    <string name="spool_detail_view_all_archives">View all (%1$d more)</string>
     <string name="online">Online</string>
     <string name="offline">Offline</string>
     <string name="printer_status_label">Status: %1$s</string>

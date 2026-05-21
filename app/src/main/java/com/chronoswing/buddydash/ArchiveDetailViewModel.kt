@@ -15,8 +15,10 @@ import com.chronoswing.buddydash.util.TAG_ARCHIVE_DETAIL
 import com.chronoswing.buddydash.util.TAG_ARCHIVE_REPRINT
 import com.chronoswing.buddydash.util.defaultArchiveReprintPrinterId
 import com.chronoswing.buddydash.util.defaultArchiveReprintQuantity
+import com.chronoswing.buddydash.util.ArchiveMaterialNavigation
 import com.chronoswing.buddydash.util.evaluateQueueAndStartReadiness
 import com.chronoswing.buddydash.util.logArchiveDetailFieldMapping
+import com.chronoswing.buddydash.util.resolveArchiveMaterialNavigation
 import com.chronoswing.buddydash.util.resolveActivityKind
 import com.chronoswing.buddydash.util.resolveArchiveReprintPrinters
 import com.chronoswing.buddydash.util.resolvePlateKind
@@ -64,6 +66,7 @@ data class ArchiveDetailUiState(
     val queuedPrinterId: Int? = null,
     val queuedPrinterName: String? = null,
     val queuedPrinterModel: String? = null,
+    val materialNavigation: ArchiveMaterialNavigation = ArchiveMaterialNavigation.None,
 )
 
 class ArchiveDetailViewModel(
@@ -76,6 +79,7 @@ class ArchiveDetailViewModel(
     private var printersJob: Job? = null
     private var readinessJob: Job? = null
     private var queueJob: Job? = null
+    private var spoolsJob: Job? = null
 
     private val _uiState = MutableStateFlow(ArchiveDetailUiState())
     val uiState: StateFlow<ArchiveDetailUiState> = _uiState.asStateFlow()
@@ -155,6 +159,7 @@ class ArchiveDetailViewModel(
                     _uiState.update {
                         it.copy(isLoading = false, archive = archive, error = null)
                     }
+                    loadSpoolsForMaterialLink(archive)
                 },
                 onFailure = { error ->
                     if (DEBUG_LOG_ARCHIVE_DETAIL) {
@@ -344,6 +349,21 @@ class ArchiveDetailViewModel(
                     }
                 },
             )
+        }
+    }
+
+    private fun loadSpoolsForMaterialLink(archive: PrintArchive) {
+        val state = _uiState.value
+        if (!state.hasCredentials) return
+
+        spoolsJob?.cancel()
+        spoolsJob = viewModelScope.launch {
+            val spoolsResult = apiClient.fetchSpoolInventory(state.serverUrl, state.apiKey)
+            val navigation = spoolsResult.fold(
+                onSuccess = { spools -> resolveArchiveMaterialNavigation(archive, spools) },
+                onFailure = { ArchiveMaterialNavigation.None },
+            )
+            _uiState.update { it.copy(materialNavigation = navigation) }
         }
     }
 
