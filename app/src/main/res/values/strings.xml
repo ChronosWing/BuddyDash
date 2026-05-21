@@ -111,6 +111,8 @@
     <string name="cd_door">Door %1$s</string>
     <string name="cd_firmware">Firmware %1$s</string>
     <string name="cd_chamber_temp">Chamber temperature %1$s</string>
+    <string name="cd_total_print_time">Total print time %1$s</string>
+    <string name="cd_nozzle_diameter">Nozzle diameter %1$s</string>
     <string name="cd_part_fan">Part cooling fan %1$s</string>
     <string name="cd_aux_fan">Auxiliary fan %1$s</string>
     <string name="cd_chamber_fan">Chamber fan %1$s</string>

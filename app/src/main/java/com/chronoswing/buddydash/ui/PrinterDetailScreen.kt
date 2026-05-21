@@ -103,6 +103,7 @@ fun PrinterDetailScreen(
 
     val labels = uiState.status?.toDetailLabels(
         maintenanceItems = uiState.maintenanceItems,
+        totalPrintHours = uiState.totalPrintHours,
         printerModel = uiState.printerModel ?: printerModel,
     )
 

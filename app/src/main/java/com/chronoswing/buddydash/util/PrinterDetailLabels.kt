@@ -45,6 +45,8 @@ data class PrinterDetailLabels(
     val wifiCompact: String?,
     val doorLine: String?,
     val firmwareLine: String?,
+    val totalPrintTimeCompact: String? = null,
+    val nozzleDiameterCompact: String? = null,
     val chamberTempCompact: String?,
     val showFansSection: Boolean,
     val partFanPercent: Int?,
@@ -67,6 +69,7 @@ data class PrinterDetailLabels(
 
 fun PrinterStatus.toDetailLabels(
     maintenanceItems: List<MaintenanceItem> = emptyList(),
+    totalPrintHours: Double? = null,
     printerModel: String? = null,
 ): PrinterDetailLabels {
     val raw = rawState?.uppercase()
@@ -138,10 +141,12 @@ fun PrinterStatus.toDetailLabels(
         printerRawState = rawState,
         cardMicroMotion = resolveCardMicroMotion(activityKind, rawState),
         amsUnits = amsUnits,
-        showConnectivitySection = hasConnectivitySection(),
+        showConnectivitySection = hasConnectivitySection(totalPrintHours),
         wifiCompact = wifiCompact,
         doorLine = doorLine,
         firmwareLine = firmwareLine,
+        totalPrintTimeCompact = formatTotalPrintTimeCompact(totalPrintHours),
+        nozzleDiameterCompact = nozzleDiameterDisplay,
         chamberTempCompact = chamberTempCompact,
         showFansSection = hasFansSection(),
         partFanPercent = partFanPercent,

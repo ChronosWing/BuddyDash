@@ -18,8 +18,10 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DoorFront
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Wifi
@@ -74,6 +76,20 @@ fun DetailConnectivityCard(labels: PrinterDetailLabels) {
                         icon = Icons.Default.Thermostat,
                         value = value,
                         contentDescription = stringResource(R.string.cd_chamber_temp, value),
+                    )
+                }
+                labels.totalPrintTimeCompact?.let { value ->
+                    CompactIconStat(
+                        icon = Icons.Default.Schedule,
+                        value = value,
+                        contentDescription = stringResource(R.string.cd_total_print_time, value),
+                    )
+                }
+                labels.nozzleDiameterCompact?.let { value ->
+                    CompactIconStat(
+                        icon = Icons.Outlined.Circle,
+                        value = value,
+                        contentDescription = stringResource(R.string.cd_nozzle_diameter, value),
                     )
                 }
             }

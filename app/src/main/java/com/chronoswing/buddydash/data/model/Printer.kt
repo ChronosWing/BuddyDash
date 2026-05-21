@@ -35,4 +35,6 @@ data class PrinterStatus(
     /** Bambuddy speed_level: 1=silent, 2=standard, 3=sport, 4=ludicrous */
     val speedLevel: Int? = null,
     val chamberLightOn: Boolean? = null,
+    /** Formatted nozzle diameter for display, e.g. "0.4 mm"; from `nozzles` / `nozzle_rack`. */
+    val nozzleDiameterDisplay: String? = null,
 )

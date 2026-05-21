@@ -23,6 +23,7 @@ data class PrinterDetailUiState(
     val printerModel: String? = null,
     val status: PrinterStatus? = null,
     val maintenanceItems: List<MaintenanceItem> = emptyList(),
+    val totalPrintHours: Double? = null,
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val error: String? = null,
@@ -121,10 +122,7 @@ class PrinterDetailViewModel(
                     apiClient.fetchPrinterStatus(state.serverUrl, state.apiKey, printerId)
                 }
                 val maintenanceDeferred = async {
-                    apiClient.fetchMaintenance(state.serverUrl, state.apiKey, printerId)
-                        .getOrNull()
-                        ?.items
-                        .orEmpty()
+                    apiClient.fetchMaintenance(state.serverUrl, state.apiKey, printerId).getOrNull()
                 }
                 statusDeferred.await() to maintenanceDeferred.await()
             }
@@ -136,7 +134,8 @@ class PrinterDetailViewModel(
                             isLoading = false,
                             isRefreshing = false,
                             status = status,
-                            maintenanceItems = statusResult.second,
+                            maintenanceItems = statusResult.second?.items.orEmpty(),
+                            totalPrintHours = statusResult.second?.totalPrintHours,
                             error = null,
                         )
                     }
@@ -148,6 +147,7 @@ class PrinterDetailViewModel(
                             isRefreshing = false,
                             status = null,
                             maintenanceItems = emptyList(),
+                            totalPrintHours = null,
                             error = error.message ?: "Failed to load printer status",
                         )
                     }
