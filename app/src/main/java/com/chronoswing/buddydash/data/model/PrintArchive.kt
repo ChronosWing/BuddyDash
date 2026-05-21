@@ -22,6 +22,8 @@ data class PrintArchive(
     val filamentUsage: FilamentUsage?,
     val filamentType: String?,
     val filamentColor: String?,
+    /** From archive JSON or [extra_data] when present at runtime (not in OpenAPI schema). */
+    val spoolId: Int? = null,
     val failureReason: String?,
     val totalLayers: Int?,
     val quantity: Int?,

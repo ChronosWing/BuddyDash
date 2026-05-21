@@ -58,11 +58,11 @@ fun inventoryFillPercentFromSpool(spool: JSONObject): Int? {
 fun spoolDisplayName(spool: JSONObject): String {
     val id = spool.optInt("id", -1)
     val label = listOfNotNull(
-        spool.optString("brand").takeIf { it.isNotBlank() },
-        spool.optString("material").takeIf { it.isNotBlank() },
-        spool.optString("color_name").takeIf { it.isNotBlank() },
+        spoolJsonOptionalString(spool, "brand"),
+        spoolJsonOptionalString(spool, "material"),
+        spoolJsonOptionalString(spool, "color_name"),
     ).joinToString(" ")
-    return label.ifBlank { if (id >= 0) "spool#$id" else "spool" }
+    return label.ifBlank { if (id >= 0) "Spool #$id" else "Spool" }
 }
 
 fun parseSlotInventoryInfo(spool: JSONObject): SlotInventoryInfo {

@@ -77,6 +77,11 @@ class ArchivesViewModel(
         _uiState.update { it.copy(searchQuery = query) }
     }
 
+    fun applyInitialSearchQuery(query: String) {
+        if (query.isBlank()) return
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
     fun onFilterChange(filter: ArchiveResultFilter) {
         _uiState.update { it.copy(filter = filter) }
     }

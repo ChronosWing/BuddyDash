@@ -23,6 +23,17 @@ class SpoolInventoryDisplayTest {
     }
 
     @Test
+    fun formatSpoolCardTitle_doesNotIncludeNullLiteral() {
+        val spool = sampleSpool(
+            id = 1,
+            material = "PETG",
+            displayName = "KINGROON PETG",
+            assignment = null,
+        ).copy(brand = "KINGROON", colorName = null)
+        assertEquals("KINGROON PETG", formatSpoolCardTitle(spool))
+    }
+
+    @Test
     fun applySpoolInventorySearch_matchesMaterialAndAssignment() {
         val spools = listOf(
             sampleSpool(id = 1, material = "PLA", displayName = "Bambu PLA", assignment = null),

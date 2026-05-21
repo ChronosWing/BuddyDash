@@ -23,17 +23,23 @@ import com.chronoswing.buddydash.ArchivesViewModel
 import com.chronoswing.buddydash.HomeViewModel
 import com.chronoswing.buddydash.PrinterDetailViewModel
 import com.chronoswing.buddydash.SettingsViewModel
+import com.chronoswing.buddydash.SpoolDetailViewModel
 import com.chronoswing.buddydash.SpoolsViewModel
+import com.chronoswing.buddydash.util.ArchiveMaterialNavigation
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.ui.components.BuddyDashBottomNav
 import java.net.URLDecoder
+import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 object Routes {
     const val HOME = "home"
-    const val ARCHIVES = "archives"
-    const val SPOOLS = "spools"
+    const val SPOOLS_BASE = "spools"
+    const val SPOOLS = "spools?search={search}"
+    const val ARCHIVES_BASE = "archives"
+    const val ARCHIVES = "archives?search={search}"
+    const val SPOOL_DETAIL = "spool/{spoolId}"
     const val SETTINGS = "settings"
     const val PRINTER_DETAIL = "printer/{printerId}/{printerName}/{printerModel}"
     const val PRINTER_QUEUE = "printer_queue"
@@ -46,6 +52,18 @@ object Routes {
     }
 
     fun archiveDetail(archiveId: Int): String = "archive/$archiveId"
+
+    fun spools(search: String = ""): String {
+        val encoded = URLEncoder.encode(search, StandardCharsets.UTF_8.toString())
+        return "spools?search=$encoded"
+    }
+
+    fun spoolDetail(spoolId: Int): String = "spool/$spoolId"
+
+    fun archives(search: String = ""): String {
+        val encoded = URLEncoder.encode(search, StandardCharsets.UTF_8.toString())
+        return "archives?search=$encoded"
+    }
 }
 
 /** Temporary: verify bottom-tab destinations. Set false before release. */
@@ -54,10 +72,15 @@ private const val TAG_NAV = "BuddyDash/Nav"
 
 private val bottomNavRoutes = setOf(
     Routes.HOME,
-    Routes.SPOOLS,
-    Routes.ARCHIVES,
+    Routes.SPOOLS_BASE,
+    Routes.ARCHIVES_BASE,
     Routes.SETTINGS,
 )
+
+private fun isBottomNavRoute(route: String?): Boolean {
+    val base = route?.substringBefore('?') ?: return false
+    return base in bottomNavRoutes
+}
 
 @Composable
 fun BuddyDashNav(
@@ -67,7 +90,7 @@ fun BuddyDashNav(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val showBottomBar = currentRoute in bottomNavRoutes
+    val showBottomBar = isBottomNavRoute(currentRoute)
 
     LaunchedEffect(Unit) {
         if (DEBUG_LOG_NAV_DESTINATIONS) {
@@ -94,7 +117,7 @@ fun BuddyDashNav(
                         }
                     },
                     onSpools = {
-                        navController.navigate(Routes.SPOOLS) {
+                        navController.navigate(Routes.spools()) {
                             popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = true
                             }
@@ -103,7 +126,7 @@ fun BuddyDashNav(
                         }
                     },
                     onArchives = {
-                        navController.navigate(Routes.ARCHIVES) {
+                        navController.navigate(Routes.archives()) {
                             popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = true
                             }
@@ -145,12 +168,27 @@ fun BuddyDashNav(
                 )
             }
 
-            composable(Routes.ARCHIVES) {
+            composable(
+                route = Routes.ARCHIVES,
+                arguments = listOf(
+                    navArgument("search") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+            ) { backStackEntry ->
+                val encodedSearch = backStackEntry.arguments?.getString("search").orEmpty()
+                val initialSearch = URLDecoder.decode(encodedSearch, StandardCharsets.UTF_8.toString())
                 val viewModel: ArchivesViewModel = viewModel(
                     factory = viewModelFactory {
                         ArchivesViewModel(settingsRepository, apiClient)
                     },
                 )
+                LaunchedEffect(initialSearch) {
+                    if (initialSearch.isNotBlank()) {
+                        viewModel.applyInitialSearchQuery(initialSearch)
+                    }
+                }
                 ArchivesScreen(
                     viewModel = viewModel,
                     onArchiveClick = { archive ->
@@ -159,13 +197,58 @@ fun BuddyDashNav(
                 )
             }
 
-            composable(Routes.SPOOLS) {
+            composable(
+                route = Routes.SPOOLS,
+                arguments = listOf(
+                    navArgument("search") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+            ) { backStackEntry ->
+                val encodedSearch = backStackEntry.arguments?.getString("search").orEmpty()
+                val initialSearch = URLDecoder.decode(encodedSearch, StandardCharsets.UTF_8.toString())
                 val viewModel: SpoolsViewModel = viewModel(
                     factory = viewModelFactory {
                         SpoolsViewModel(settingsRepository, apiClient)
                     },
                 )
-                SpoolsScreen(viewModel = viewModel)
+                SpoolsScreen(
+                    viewModel = viewModel,
+                    initialSearchQuery = initialSearch,
+                    onSpoolClick = { spoolId ->
+                        navController.navigate(Routes.spoolDetail(spoolId))
+                    },
+                )
+            }
+
+            composable(
+                route = Routes.SPOOL_DETAIL,
+                arguments = listOf(navArgument("spoolId") { type = NavType.IntType }),
+            ) { backStackEntry ->
+                val spoolId = backStackEntry.arguments?.getInt("spoolId") ?: return@composable
+                val viewModel: SpoolDetailViewModel = viewModel(
+                    factory = viewModelFactory {
+                        SpoolDetailViewModel(settingsRepository, apiClient)
+                    },
+                )
+                SpoolDetailScreen(
+                    spoolId = spoolId,
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                    onArchiveClick = { archive ->
+                        navController.navigate(Routes.archiveDetail(archive.id))
+                    },
+                    onViewAllArchives = { query ->
+                        navController.navigate(Routes.archives(query)) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
             }
 
             composable(Routes.SETTINGS) {
@@ -195,6 +278,17 @@ fun BuddyDashNav(
                         navController.navigate(
                             Routes.printerDetail(printerId, printerName, printerModel),
                         )
+                    },
+                    onMaterialNavigation = { navigation ->
+                        when (navigation) {
+                            is ArchiveMaterialNavigation.SpoolDetail -> {
+                                navController.navigate(Routes.spoolDetail(navigation.spoolId))
+                            }
+                            is ArchiveMaterialNavigation.SpoolsFiltered -> {
+                                navController.navigate(Routes.spools(navigation.searchQuery))
+                            }
+                            ArchiveMaterialNavigation.None -> Unit
+                        }
                     },
                 )
             }

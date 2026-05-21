@@ -1,8 +1,12 @@
 package com.chronoswing.buddydash.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,14 +31,23 @@ fun ArchiveMaterialRow(
     textStyle: TextStyle = MaterialTheme.typography.labelSmall,
     textColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f),
     fontWeight: FontWeight? = null,
+    tappable: Boolean = false,
+    onClick: (() -> Unit)? = null,
 ) {
     if (!archiveHasMaterialDisplay(archive)) return
 
     val typeLabel = formatArchiveDetailMaterialType(archive)
     val swatch = parseArchiveFilamentSwatch(archive)
+    val rowModifier = if (tappable && onClick != null) {
+        modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    } else {
+        modifier.fillMaxWidth()
+    }
 
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = rowModifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -46,6 +59,7 @@ fun ArchiveMaterialRow(
                 color = textColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
         }
         swatch?.takeIf { it.colorHexes.isNotEmpty() }?.let { colors ->
@@ -54,6 +68,13 @@ fun ArchiveMaterialRow(
                 isTranslucent = colors.isTranslucent,
                 alpha = colors.alpha,
                 size = swatchSize,
+            )
+        }
+        if (tappable && onClick != null) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
             )
         }
     }

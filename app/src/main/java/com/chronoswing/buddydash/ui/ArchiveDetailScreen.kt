@@ -48,6 +48,7 @@ import com.chronoswing.buddydash.ui.components.FilamentUsageText
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.util.ARCHIVE_DISPLAY_NAME_FALLBACK
+import com.chronoswing.buddydash.util.ArchiveMaterialNavigation
 import com.chronoswing.buddydash.util.archiveHasMaterialDisplay
 import com.chronoswing.buddydash.util.formatArchiveDetailMaterialType
 import com.chronoswing.buddydash.util.formatArchiveDuration
@@ -64,6 +65,7 @@ fun ArchiveDetailScreen(
     viewModel: ArchiveDetailViewModel,
     onBack: () -> Unit,
     onViewQueue: (printerId: Int, printerName: String, printerModel: String?) -> Unit,
+    onMaterialNavigation: (ArchiveMaterialNavigation) -> Unit,
 ) {
     LaunchedEffect(archiveId) {
         viewModel.init(archiveId)
@@ -81,6 +83,7 @@ fun ArchiveDetailScreen(
         hasCredentials = uiState.hasCredentials,
         reprintSheet = uiState.reprintSheet,
         reprintSnackbar = uiState.reprintSnackbar,
+        materialNavigation = uiState.materialNavigation,
         onBack = onBack,
         onRetry = viewModel::loadArchive,
         onQueueAgain = viewModel::onQueueAgainClick,
@@ -95,6 +98,7 @@ fun ArchiveDetailScreen(
             val name = uiState.queuedPrinterName ?: return@ArchiveDetailScreenContent
             onViewQueue(id, name, uiState.queuedPrinterModel)
         },
+        onMaterialNavigation = onMaterialNavigation,
     )
 }
 
@@ -110,6 +114,7 @@ private fun ArchiveDetailScreenContent(
     hasCredentials: Boolean,
     reprintSheet: ArchiveReprintSheetState,
     reprintSnackbar: ArchiveReprintSnackbar?,
+    materialNavigation: ArchiveMaterialNavigation,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onQueueAgain: () -> Unit,
@@ -120,6 +125,7 @@ private fun ArchiveDetailScreenContent(
     onConfirmQueueAndStart: () -> Unit,
     onReprintSnackbarShown: () -> Unit,
     onViewQueue: () -> Unit,
+    onMaterialNavigation: (ArchiveMaterialNavigation) -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val queuedMessage = stringResource(R.string.archive_reprint_success)
@@ -217,6 +223,8 @@ private fun ArchiveDetailScreenContent(
                         archive = archive,
                         serverUrl = serverUrl,
                         cameraToken = cameraToken,
+                        materialNavigation = materialNavigation,
+                        onMaterialNavigation = onMaterialNavigation,
                     )
                 }
                 ArchiveReprintSheet(
@@ -240,6 +248,8 @@ private fun ArchiveDetailBody(
     archive: PrintArchive,
     serverUrl: String,
     cameraToken: String,
+    materialNavigation: ArchiveMaterialNavigation,
+    onMaterialNavigation: (ArchiveMaterialNavigation) -> Unit,
 ) {
     val displayName = if (archive.displayName == ARCHIVE_DISPLAY_NAME_FALLBACK) {
         stringResource(R.string.archive_unnamed_print)
@@ -283,7 +293,15 @@ private fun ArchiveDetailBody(
             )
         }
         if (showMaterial) {
-            ArchiveDetailMaterialRow(archive = archive)
+            ArchiveDetailMaterialRow(
+                archive = archive,
+                tappable = materialNavigation !is ArchiveMaterialNavigation.None,
+                onMaterialClick = {
+                    if (materialNavigation !is ArchiveMaterialNavigation.None) {
+                        onMaterialNavigation(materialNavigation)
+                    }
+                },
+            )
         }
         formatArchivePlateLine(archive)?.let { plate ->
             CompactLabelValue(
@@ -350,6 +368,8 @@ private fun ArchiveResultBadge(
 @Composable
 private fun ArchiveDetailMaterialRow(
     archive: PrintArchive,
+    tappable: Boolean,
+    onMaterialClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -366,6 +386,8 @@ private fun ArchiveDetailMaterialRow(
             textStyle = MaterialTheme.typography.bodyMedium,
             textColor = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Medium,
+            tappable = tappable,
+            onClick = onMaterialClick,
         )
     }
 }
