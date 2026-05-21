@@ -23,6 +23,15 @@
     <string name="filter_needs_attention">Needs attention</string>
     <string name="no_active_printers">No active printers</string>
     <string name="no_printers_need_attention">No printers need attention</string>
+    <string name="queue_section_title">Queue (%1$d)</string>
+    <string name="queue_next">Next</string>
+    <string name="queue_then">Then</string>
+    <string name="queue_item_number">%1$d.</string>
+    <string name="queue_count_chip">Queue • %1$d</string>
+    <string name="queue_unnamed_print">Unnamed print</string>
+    <string name="queue_more_count">+%1$d more</string>
+    <string name="queue_view_full">View full queue →</string>
+    <string name="queue_empty">No jobs in queue</string>
     <string name="online">Online</string>
     <string name="offline">Offline</string>
     <string name="printer_status_label">Status: %1$s</string>

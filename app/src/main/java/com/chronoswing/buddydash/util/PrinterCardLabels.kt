@@ -30,6 +30,7 @@ data class PrinterCardLabels(
     val printerRawState: String? = null,
     val cardMicroMotion: CardMicroMotion = CardMicroMotion.None,
     val maintenanceIndicator: MaintenanceHomeIndicator = MaintenanceHomeIndicator.None,
+    val pendingQueueCount: Int = 0,
 )
 
 fun Printer.toCardLabels(): PrinterCardLabels {
@@ -61,6 +62,7 @@ fun Printer.toCardLabels(): PrinterCardLabels {
             printerRawState = null,
             cardMicroMotion = CardMicroMotion.None,
             maintenanceIndicator = MaintenanceHomeIndicator.None,
+            pendingQueueCount = pendingQueueCount,
         )
     }
     val detail = status.toDetailLabels(printerModel = model)
@@ -123,5 +125,6 @@ fun Printer.toCardLabels(): PrinterCardLabels {
         printerRawState = status.rawState,
         cardMicroMotion = resolveCardMicroMotion(activityKind, status.rawState),
         maintenanceIndicator = maintenanceIndicator,
+        pendingQueueCount = pendingQueueCount,
     )
 }

@@ -9,6 +9,8 @@ data class Printer(
     val model: String?,
     val liveStatus: PrinterStatus? = null,
     val maintenanceIndicator: MaintenanceHomeIndicator = MaintenanceHomeIndicator.None,
+    /** Count of pending queue jobs from GET /api/v1/queue (excludes currently printing). */
+    val pendingQueueCount: Int = 0,
 )
 
 data class PrinterStatus(

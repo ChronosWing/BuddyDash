@@ -4,6 +4,7 @@ import com.chronoswing.buddydash.data.model.AmsUnitInfo
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.Printer
+import com.chronoswing.buddydash.data.model.PrintQueueJob
 import com.chronoswing.buddydash.data.model.PrinterMaintenanceOverview
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.util.FilamentSwatchColors
@@ -27,6 +28,17 @@ import com.chronoswing.buddydash.util.normalizeTrayColor
 import com.chronoswing.buddydash.util.parseInventoryByPrinter
 import com.chronoswing.buddydash.util.etaDebugLogLine
 import com.chronoswing.buddydash.util.parseRemainingTimeSeconds
+import com.chronoswing.buddydash.util.queueDurationFieldCandidates
+import com.chronoswing.buddydash.util.queueImageIdFieldCandidates
+import com.chronoswing.buddydash.util.queueJsonPositiveInt
+import com.chronoswing.buddydash.util.queueNameFieldCandidates
+import com.chronoswing.buddydash.util.queueThumbnailHintCandidates
+import com.chronoswing.buddydash.util.resolveQueueDisplayName
+import com.chronoswing.buddydash.util.resolveQueueDurationSeconds
+import com.chronoswing.buddydash.util.queueHasThumbnailHint
+import com.chronoswing.buddydash.util.queueJsonPlateId
+import com.chronoswing.buddydash.util.resolveQueueThumbnailSource
+import com.chronoswing.buddydash.network.queueJobThumbnailUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -54,6 +66,10 @@ class BambuddyApiClient {
         private const val DEBUG_LOG_DETAIL_RAW = true
         private const val TAG_DETAIL = "BuddyDash/Detail"
         private const val TAG_MOTION = "BuddyDash/Motion"
+        /** Temporary: log queue API responses. Set false before release. */
+        private const val DEBUG_LOG_QUEUE = true
+        private const val TAG_QUEUE = "BuddyDash/Queue"
+        private const val QUEUE_STATUS_PENDING = "pending"
     }
 
     private val client = OkHttpClient.Builder()
@@ -128,9 +144,18 @@ class BambuddyApiClient {
                             } else {
                                 MaintenanceHomeIndicator.None
                             }
+                            val pendingQueueCount = if (BambuddyApi.hasQueueEndpoint) {
+                                fetchPrintQueue(serverUrl, apiKey, printer.id)
+                                    .getOrNull()
+                                    ?.size
+                                    ?: 0
+                            } else {
+                                0
+                            }
                             printer.copy(
                                 liveStatus = statusResult.getOrNull(),
                                 maintenanceIndicator = maintenanceIndicator,
+                                pendingQueueCount = pendingQueueCount,
                             )
                         }
                     }.awaitAll()
@@ -265,6 +290,23 @@ class BambuddyApiClient {
             }
             runApiCall(serverUrl, apiKey, BambuddyApi.maintenancePrinterPath(printerId)) { body ->
                 parseMaintenanceOverview(JSONObject(body))
+            }
+        }
+
+    /** Pending queue jobs for [printerId] (excludes status=printing). */
+    suspend fun fetchPrintQueue(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+    ): Result<List<PrintQueueJob>> =
+        withContext(Dispatchers.IO) {
+            if (!BambuddyApi.hasQueueEndpoint) {
+                return@withContext Result.failure(
+                    UnsupportedOperationException("Queue endpoint not found"),
+                )
+            }
+            runApiCall(serverUrl, apiKey, BambuddyApi.queuePath(printerId)) { body ->
+                parsePrintQueueResponse(body)
             }
         }
 
@@ -712,5 +754,64 @@ class BambuddyApiClient {
         }
         return null
     }
+
+    private fun parsePrintQueueResponse(body: String): List<PrintQueueJob> {
+        val array = JSONArray(body)
+        val parsed = mutableListOf<Triple<PrintQueueJob, String, JSONObject>>()
+        for (index in 0 until array.length()) {
+            val json = array.getJSONObject(index)
+            val status = json.optString("status", "")
+            val job = parsePrintQueueItem(json)
+            parsed.add(Triple(job, status, json))
+        }
+        if (DEBUG_LOG_QUEUE) {
+            Log.d(
+                TAG_QUEUE,
+                "GET queue rawCount=${array.length()} " +
+                    "statuses=${parsed.map { it.second }.distinct()} " +
+                    "fieldsSample=${parsed.firstOrNull()?.third?.names()?.let { arr ->
+                        (0 until arr.length()).map { i -> arr.getString(i) }.take(12)
+                    }}",
+            )
+            parsed.forEach { (job, status, json) ->
+                Log.d(TAG_QUEUE, "item raw=${json.toString()}")
+                Log.d(TAG_QUEUE, "item id=${job.id} pos=${job.position} status=$status resolvedName=${job.displayName}")
+                Log.d(TAG_QUEUE, "nameFields=${queueNameFieldCandidates(json)}")
+                Log.d(TAG_QUEUE, "thumbHints=${queueThumbnailHintCandidates(json)}")
+                Log.d(TAG_QUEUE, "imageIds=${queueImageIdFieldCandidates(json)}")
+                val thumbResolution = resolveQueueThumbnailSource(job)
+                Log.d(
+                    TAG_QUEUE,
+                    "thumbSource=${thumbResolution.source} apiPath=${thumbResolution.apiPath} " +
+                        "displayName=${job.displayName}",
+                )
+                Log.d(
+                    TAG_QUEUE,
+                    "durationFields=${queueDurationFieldCandidates(json)} resolvedSeconds=${job.estimatedDurationSeconds}",
+                )
+            }
+        }
+        return parsed
+            .filter { (_, status, _) -> status == QUEUE_STATUS_PENDING }
+            .map { (job, _, _) -> job }
+            .sortedBy { it.position }
+            .also { upcoming ->
+                if (DEBUG_LOG_QUEUE) {
+                    Log.d(TAG_QUEUE, "upcomingCount=${upcoming.size} (pending only, excludes printing)")
+                }
+            }
+    }
+
+    private fun parsePrintQueueItem(json: JSONObject): PrintQueueJob = PrintQueueJob(
+        id = json.getInt("id"),
+        position = json.optInt("position", 0),
+        displayName = resolveQueueDisplayName(json),
+        hasLibraryThumbnail = queueHasThumbnailHint(json, "library_file_thumbnail"),
+        hasArchiveThumbnail = queueHasThumbnailHint(json, "archive_thumbnail"),
+        libraryFileId = queueJsonPositiveInt(json, "library_file_id"),
+        archiveId = queueJsonPositiveInt(json, "archive_id"),
+        plateId = queueJsonPlateId(json),
+        estimatedDurationSeconds = resolveQueueDurationSeconds(json),
+    )
 
 }

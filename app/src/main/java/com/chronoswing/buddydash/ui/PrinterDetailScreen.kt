@@ -48,6 +48,7 @@ import com.chronoswing.buddydash.PlateClearSnackbar
 import com.chronoswing.buddydash.PrinterDetailViewModel
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.FilamentSlot
+import com.chronoswing.buddydash.data.model.PrintQueueJob
 import com.chronoswing.buddydash.ui.components.ComingSoonActionButton
 import com.chronoswing.buddydash.ui.components.DetailConnectivityCard
 import com.chronoswing.buddydash.ui.components.DetailFansCard
@@ -62,6 +63,7 @@ import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentDetailGroups
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
+import com.chronoswing.buddydash.ui.components.DetailPrintQueueSection
 import com.chronoswing.buddydash.ui.components.DetailStatusHeroImage
 import com.chronoswing.buddydash.ui.components.HighlightValue
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
@@ -88,6 +90,7 @@ fun PrinterDetailScreen(
     printerModel: String? = null,
     viewModel: PrinterDetailViewModel,
     onBack: () -> Unit,
+    onViewFullQueue: () -> Unit,
 ) {
     LaunchedEffect(printerId, printerName, printerModel) {
         viewModel.init(printerId, printerName, printerModel)
@@ -126,6 +129,7 @@ fun PrinterDetailScreen(
         isMaintenanceResetBusy = uiState.isMaintenanceResetBusy,
         maintenanceResetSnackbar = uiState.maintenanceResetSnackbar,
         lastStatusUpdatedAtMillis = uiState.lastStatusUpdatedAtMillis,
+        queueUpcoming = uiState.queueUpcoming,
         onBack = onBack,
         onRetry = viewModel::loadStatus,
         onRefresh = { viewModel.loadStatus(showLoading = false) },
@@ -142,6 +146,7 @@ fun PrinterDetailScreen(
         onJogBedDown = viewModel::jogBedDown,
         onPerformMaintenanceReset = viewModel::performMaintenanceReset,
         onMaintenanceResetSnackbarShown = viewModel::onMaintenanceResetSnackbarShown,
+        onViewFullQueue = onViewFullQueue,
     )
 }
 
@@ -163,7 +168,9 @@ private fun PrinterDetailScreenContent(
     isMaintenanceResetBusy: Boolean,
     maintenanceResetSnackbar: MaintenanceResetSnackbar?,
     lastStatusUpdatedAtMillis: Long?,
+    queueUpcoming: List<PrintQueueJob>,
     onBack: () -> Unit,
+    onViewFullQueue: () -> Unit,
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
@@ -300,10 +307,12 @@ private fun PrinterDetailScreenContent(
                                     printerId = printerId,
                                     serverUrl = serverUrl,
                                     cameraToken = cameraToken,
+                                    queueUpcoming = queueUpcoming,
                                     isClearingPlate = isClearingPlate,
                                     isMaintenanceResetBusy = isMaintenanceResetBusy,
                                     onMarkPlateClear = onMarkPlateClear,
                                     onPerformMaintenanceReset = onPerformMaintenanceReset,
+                                    onViewFullQueue = onViewFullQueue,
                                 )
                                 1 -> FilamentTab(labels = labels)
                                 2 -> ControlsTab(
@@ -333,10 +342,12 @@ private fun StatusTab(
     printerId: Int,
     serverUrl: String,
     cameraToken: String,
+    queueUpcoming: List<PrintQueueJob>,
     isClearingPlate: Boolean,
     isMaintenanceResetBusy: Boolean,
     onMarkPlateClear: () -> Unit,
     onPerformMaintenanceReset: (Int) -> Unit,
+    onViewFullQueue: () -> Unit,
 ) {
     if (labels.isActivePrint) {
         ActivePrintStatusTab(
@@ -355,6 +366,14 @@ private fun StatusTab(
             cameraToken = cameraToken,
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
+        )
+    }
+    if (queueUpcoming.isNotEmpty()) {
+        DetailPrintQueueSection(
+            jobs = queueUpcoming,
+            serverUrl = serverUrl,
+            cameraToken = cameraToken,
+            onViewFullQueue = onViewFullQueue,
         )
     }
     DetailOperationalStats(
