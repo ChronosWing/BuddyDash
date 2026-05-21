@@ -108,7 +108,7 @@ fun Printer.toCardLabels(): PrinterCardLabels {
         },
         fileLine = fileLine,
         etaLine = if (showEta) "ETA $etaFormatted" else null,
-        tempsLine = if (isActivePrint) {
+        tempsLine = if (status.showHomeCardTemps()) {
             formatPrintTempsLine(status.nozzleTemp, status.bedTemp)
         } else {
             null
