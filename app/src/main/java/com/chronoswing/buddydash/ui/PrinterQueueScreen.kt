@@ -15,18 +15,25 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
+import com.chronoswing.buddydash.StartQueuedPrintSnackbar
 import com.chronoswing.buddydash.data.model.PrintQueueJob
 import com.chronoswing.buddydash.ui.components.PrintQueueItemRow
+import com.chronoswing.buddydash.ui.components.StartNextPrintAction
+import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,9 +42,30 @@ fun PrinterQueueScreen(
     jobs: List<PrintQueueJob>,
     serverUrl: String,
     cameraToken: String,
+    showStartNextPrint: Boolean,
+    startNextQueuedPrintReadiness: StartNextQueuedPrintReadiness,
+    isStartingQueuedPrint: Boolean,
+    startQueuedPrintSnackbar: StartQueuedPrintSnackbar?,
     onBack: () -> Unit,
+    onStartNextQueuedPrint: () -> Unit,
+    onStartQueuedPrintSnackbarShown: () -> Unit,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val printStartedMessage = stringResource(R.string.archive_reprint_started)
+    val startNextPrintFailedMessage = stringResource(R.string.start_next_print_failed)
+
+    LaunchedEffect(startQueuedPrintSnackbar) {
+        val message = when (startQueuedPrintSnackbar) {
+            StartQueuedPrintSnackbar.Started -> printStartedMessage
+            StartQueuedPrintSnackbar.Failed -> startNextPrintFailedMessage
+            null -> return@LaunchedEffect
+        }
+        snackbarHostState.showSnackbar(message)
+        onStartQueuedPrintSnackbarShown()
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -84,6 +112,17 @@ fun PrinterQueueScreen(
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (showStartNextPrint) {
+                    item(key = "start_next_print") {
+                        StartNextPrintAction(
+                            printerName = printerName,
+                            readiness = startNextQueuedPrintReadiness,
+                            isSubmitting = isStartingQueuedPrint,
+                            onConfirmStart = onStartNextQueuedPrint,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
+                    }
+                }
                 itemsIndexed(
                     items = jobs,
                     key = { _, job -> job.id },

@@ -43,12 +43,12 @@ import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
-import com.chronoswing.buddydash.ui.components.FilamentColorSwatch
+import com.chronoswing.buddydash.ui.components.ArchiveMaterialRow
 import com.chronoswing.buddydash.ui.components.FilamentUsageText
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.util.ARCHIVE_DISPLAY_NAME_FALLBACK
-import com.chronoswing.buddydash.util.archiveFilamentColorHexes
+import com.chronoswing.buddydash.util.archiveHasMaterialDisplay
 import com.chronoswing.buddydash.util.formatArchiveDetailMaterialType
 import com.chronoswing.buddydash.util.formatArchiveDuration
 import com.chronoswing.buddydash.util.formatArchivePlateLine
@@ -87,7 +87,8 @@ fun ArchiveDetailScreen(
         onDismissReprintSheet = viewModel::onDismissReprintSheet,
         onReprintPrinterSelected = viewModel::onReprintPrinterSelected,
         onReprintQuantityChange = viewModel::onReprintQuantityChange,
-        onConfirmQueuePrint = viewModel::onConfirmQueuePrint,
+        onConfirmQueueOnly = viewModel::onConfirmQueueOnly,
+        onConfirmQueueAndStart = viewModel::onConfirmQueueAndStart,
         onReprintSnackbarShown = viewModel::onReprintSnackbarShown,
         onViewQueue = {
             val id = uiState.queuedPrinterId ?: return@ArchiveDetailScreenContent
@@ -115,20 +116,32 @@ private fun ArchiveDetailScreenContent(
     onDismissReprintSheet: () -> Unit,
     onReprintPrinterSelected: (Int) -> Unit,
     onReprintQuantityChange: (Int) -> Unit,
-    onConfirmQueuePrint: () -> Unit,
+    onConfirmQueueOnly: () -> Unit,
+    onConfirmQueueAndStart: () -> Unit,
     onReprintSnackbarShown: () -> Unit,
     onViewQueue: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
-    val successMessage = stringResource(R.string.archive_reprint_success)
+    val queuedMessage = stringResource(R.string.archive_reprint_success)
+    val startedMessage = stringResource(R.string.archive_reprint_started)
+    val queuedStartFailedMessage = stringResource(R.string.archive_reprint_queued_start_failed)
     val failedMessage = stringResource(R.string.archive_reprint_failed)
     val viewQueueAction = stringResource(R.string.archive_reprint_view_queue)
 
     LaunchedEffect(reprintSnackbar) {
         when (reprintSnackbar) {
-            ArchiveReprintSnackbar.Success -> {
+            ArchiveReprintSnackbar.Queued,
+            ArchiveReprintSnackbar.Started,
+            ArchiveReprintSnackbar.QueuedStartFailed,
+            -> {
+                val message = when (reprintSnackbar) {
+                    ArchiveReprintSnackbar.Queued -> queuedMessage
+                    ArchiveReprintSnackbar.Started -> startedMessage
+                    ArchiveReprintSnackbar.QueuedStartFailed -> queuedStartFailedMessage
+                    else -> queuedMessage
+                }
                 val result = snackbarHostState.showSnackbar(
-                    message = successMessage,
+                    message = message,
                     actionLabel = viewQueueAction,
                     withDismissAction = true,
                 )
@@ -214,7 +227,8 @@ private fun ArchiveDetailScreenContent(
                     onDismiss = onDismissReprintSheet,
                     onPrinterSelected = onReprintPrinterSelected,
                     onQuantityChange = onReprintQuantityChange,
-                    onConfirm = onConfirmQueuePrint,
+                    onQueueOnly = onConfirmQueueOnly,
+                    onQueueAndStart = onConfirmQueueAndStart,
                 )
             }
         }
@@ -233,8 +247,7 @@ private fun ArchiveDetailBody(
         archive.displayName
     }
     val statusLabel = formatArchiveStatusLabel(archive.resultKind, archive.statusRaw)
-    val materialType = formatArchiveDetailMaterialType(archive)
-    val colorHexes = archiveFilamentColorHexes(archive)
+    val showMaterial = archiveHasMaterialDisplay(archive)
 
     DetailInfoCard {
         ArchiveDetailHeroImage(
@@ -269,11 +282,8 @@ private fun ArchiveDetailBody(
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
-        if (materialType != null || colorHexes.isNotEmpty()) {
-            ArchiveDetailMaterialRow(
-                typeLabel = materialType,
-                colorHexes = colorHexes,
-            )
+        if (showMaterial) {
+            ArchiveDetailMaterialRow(archive = archive)
         }
         formatArchivePlateLine(archive)?.let { plate ->
             CompactLabelValue(
@@ -339,8 +349,7 @@ private fun ArchiveResultBadge(
 
 @Composable
 private fun ArchiveDetailMaterialRow(
-    typeLabel: String?,
-    colorHexes: List<String>,
+    archive: PrintArchive,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -351,23 +360,12 @@ private fun ArchiveDetailMaterialRow(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
         )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (colorHexes.isNotEmpty()) {
-                FilamentColorSwatch(
-                    colorHexes = colorHexes,
-                    size = 22.dp,
-                )
-            }
-            typeLabel?.let { type ->
-                Text(
-                    text = type,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-        }
+        ArchiveMaterialRow(
+            archive = archive,
+            swatchSize = 22.dp,
+            textStyle = MaterialTheme.typography.bodyMedium,
+            textColor = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }

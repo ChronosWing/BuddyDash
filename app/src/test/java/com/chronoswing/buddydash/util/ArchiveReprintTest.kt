@@ -3,7 +3,10 @@ package com.chronoswing.buddydash.util
 import com.chronoswing.buddydash.data.model.ArchiveResultKind
 import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.data.model.Printer
+import com.chronoswing.buddydash.data.model.PrinterStatus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ArchiveReprintTest {
@@ -34,6 +37,37 @@ class ArchiveReprintTest {
     }
 
     @Test
+    fun evaluateQueueAndStartReadiness_readyWhenIdleAndPlateClear() {
+        val status = reprintStatus(connected = true, rawState = "IDLE", awaitingPlateClear = false)
+        val readiness = evaluateQueueAndStartReadiness(status, hasStartEndpoint = true)
+        assertTrue(readiness.canQueueAndStart)
+        assertEquals(QueueAndStartBlockReason.None, readiness.blockReason)
+    }
+
+    @Test
+    fun evaluateQueueAndStartReadiness_blockedWhenPlateNotClear() {
+        val status = reprintStatus(connected = true, rawState = "IDLE", awaitingPlateClear = true)
+        val readiness = evaluateQueueAndStartReadiness(status, hasStartEndpoint = true)
+        assertFalse(readiness.canQueueAndStart)
+        assertEquals(QueueAndStartBlockReason.PlateNotClear, readiness.blockReason)
+    }
+
+    @Test
+    fun evaluateQueueAndStartReadiness_blockedWhenPrinting() {
+        val status = reprintStatus(connected = true, rawState = "RUNNING", awaitingPlateClear = false)
+        val readiness = evaluateQueueAndStartReadiness(status, hasStartEndpoint = true)
+        assertFalse(readiness.canQueueAndStart)
+        assertEquals(QueueAndStartBlockReason.PrinterNotReady, readiness.blockReason)
+    }
+
+    @Test
+    fun evaluateQueueAndStartReadiness_blockedWithoutStartEndpoint() {
+        val status = reprintStatus(connected = true, rawState = "IDLE", awaitingPlateClear = false)
+        val readiness = evaluateQueueAndStartReadiness(status, hasStartEndpoint = false)
+        assertFalse(readiness.canQueueAndStart)
+    }
+
+    @Test
     fun defaultArchiveReprintPrinterId_prefersArchivePrinter() {
         val archive = sampleArchive(slicedForModel = null, printerId = 2)
         val compatible = listOf(
@@ -42,6 +76,22 @@ class ArchiveReprintTest {
         )
         assertEquals(2, defaultArchiveReprintPrinterId(archive, compatible))
     }
+
+    private fun reprintStatus(
+        connected: Boolean,
+        rawState: String,
+        awaitingPlateClear: Boolean?,
+    ) = PrinterStatus(
+        connected = connected,
+        rawState = rawState,
+        progress = null,
+        fileName = null,
+        remainingTimeSeconds = null,
+        nozzleTemp = null,
+        bedTemp = null,
+        hmsErrorCount = 0,
+        awaitingPlateClear = awaitingPlateClear,
+    )
 
     private fun sampleArchive(
         slicedForModel: String?,

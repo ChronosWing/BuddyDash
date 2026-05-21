@@ -456,7 +456,7 @@ class BambuddyApiClient {
         archiveId: Int,
         printerId: Int,
         quantity: Int = 1,
-    ): Result<Unit> = withContext(Dispatchers.IO) {
+    ): Result<Int> = withContext(Dispatchers.IO) {
         if (!BambuddyApi.hasQueueAddEndpoint) {
             return@withContext Result.failure(
                 UnsupportedOperationException("Queue add endpoint not found"),
@@ -479,10 +479,41 @@ class BambuddyApiClient {
             if (DEBUG_LOG_ARCHIVE_REPRINT) {
                 Log.d(TAG_ARCHIVE_REPRINT, "response=$body")
             }
+            val json = JSONObject(body)
+            val itemId = json.optInt("id", -1)
+            if (itemId < 0) {
+                throw IllegalStateException("Invalid queue item response")
+            }
+            itemId
         }
     }.onFailure { error ->
         if (DEBUG_LOG_ARCHIVE_REPRINT) {
             Log.e(TAG_ARCHIVE_REPRINT, "queueArchive failed", error)
+        }
+    }
+
+    suspend fun startQueueItem(
+        serverUrl: String,
+        apiKey: String,
+        queueItemId: Int,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasQueueStartEndpoint) {
+            return@withContext Result.failure(
+                UnsupportedOperationException("Queue start endpoint not found"),
+            )
+        }
+        val path = BambuddyApi.queueItemStartPath(queueItemId)
+        if (DEBUG_LOG_ARCHIVE_REPRINT) {
+            Log.d(TAG_ARCHIVE_REPRINT, "endpoint=POST $path")
+        }
+        runApiCall(serverUrl, apiKey, path, method = "POST", postBody = "{}") { body ->
+            if (DEBUG_LOG_ARCHIVE_REPRINT) {
+                Log.d(TAG_ARCHIVE_REPRINT, "startQueueItem response=$body")
+            }
+        }
+    }.onFailure { error ->
+        if (DEBUG_LOG_ARCHIVE_REPRINT) {
+            Log.e(TAG_ARCHIVE_REPRINT, "startQueueItem failed itemId=$queueItemId", error)
         }
     }
 

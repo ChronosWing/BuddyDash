@@ -8,11 +8,18 @@ import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.ArchiveReprintPrinter
 import com.chronoswing.buddydash.util.DEBUG_LOG_ARCHIVE_DETAIL
+import com.chronoswing.buddydash.util.DEBUG_LOG_ARCHIVE_REPRINT
+import com.chronoswing.buddydash.util.QueueAndStartBlockReason
+import com.chronoswing.buddydash.util.QueueAndStartReadiness
 import com.chronoswing.buddydash.util.TAG_ARCHIVE_DETAIL
+import com.chronoswing.buddydash.util.TAG_ARCHIVE_REPRINT
 import com.chronoswing.buddydash.util.defaultArchiveReprintPrinterId
 import com.chronoswing.buddydash.util.defaultArchiveReprintQuantity
+import com.chronoswing.buddydash.util.evaluateQueueAndStartReadiness
 import com.chronoswing.buddydash.util.logArchiveDetailFieldMapping
+import com.chronoswing.buddydash.util.resolveActivityKind
 import com.chronoswing.buddydash.util.resolveArchiveReprintPrinters
+import com.chronoswing.buddydash.util.resolvePlateKind
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,20 +29,26 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 enum class ArchiveReprintSnackbar {
-    Success,
+    Queued,
+    Started,
+    QueuedStartFailed,
     Failed,
 }
 
 data class ArchiveReprintSheetState(
     val isOpen: Boolean = false,
     val isLoadingPrinters: Boolean = false,
+    val isLoadingReadiness: Boolean = false,
     val isSubmitting: Boolean = false,
     val compatiblePrinters: List<ArchiveReprintPrinter> = emptyList(),
     val hiddenIncompatibleCount: Int = 0,
     val selectedPrinterId: Int? = null,
     val quantity: Int = 1,
-    val canSubmit: Boolean = false,
-)
+    val canQueueOnly: Boolean = false,
+    val queueAndStartReadiness: QueueAndStartReadiness = QueueAndStartReadiness(canQueueAndStart = false),
+) {
+    val canQueueAndStart: Boolean get() = queueAndStartReadiness.canQueueAndStart
+}
 
 data class ArchiveDetailUiState(
     val archive: PrintArchive? = null,
@@ -61,6 +74,7 @@ class ArchiveDetailViewModel(
     private var archiveId: Int = -1
     private var fetchJob: Job? = null
     private var printersJob: Job? = null
+    private var readinessJob: Job? = null
     private var queueJob: Job? = null
 
     private val _uiState = MutableStateFlow(ArchiveDetailUiState())
@@ -173,6 +187,7 @@ class ArchiveDetailViewModel(
 
     fun onDismissReprintSheet() {
         if (_uiState.value.reprintSheet.isSubmitting) return
+        readinessJob?.cancel()
         _uiState.update {
             it.copy(reprintSheet = ArchiveReprintSheetState())
         }
@@ -183,10 +198,11 @@ class ArchiveDetailViewModel(
             state.copy(
                 reprintSheet = state.reprintSheet.copy(
                     selectedPrinterId = printerId,
-                    canSubmit = state.reprintSheet.compatiblePrinters.isNotEmpty(),
+                    canQueueOnly = true,
                 ),
             )
         }
+        refreshPrinterReadiness(printerId)
     }
 
     fun onReprintQuantityChange(delta: Int) {
@@ -196,11 +212,24 @@ class ArchiveDetailViewModel(
         }
     }
 
-    fun onConfirmQueuePrint() {
+    fun onConfirmQueueOnly() {
+        submitQueue(startAfterQueue = false)
+    }
+
+    fun onConfirmQueueAndStart() {
+        submitQueue(startAfterQueue = true)
+    }
+
+    fun onReprintSnackbarShown() {
+        _uiState.update { it.copy(reprintSnackbar = null) }
+    }
+
+    private fun submitQueue(startAfterQueue: Boolean) {
         val state = _uiState.value
         val archive = state.archive ?: return
         val printerId = state.reprintSheet.selectedPrinterId ?: return
         if (!state.hasCredentials || state.reprintSheet.isSubmitting) return
+        if (startAfterQueue && !state.reprintSheet.canQueueAndStart) return
 
         queueJob?.cancel()
         queueJob = viewModelScope.launch {
@@ -208,24 +237,50 @@ class ArchiveDetailViewModel(
                 it.copy(reprintSheet = it.reprintSheet.copy(isSubmitting = true))
             }
             val printer = state.reprintSheet.compatiblePrinters.find { it.id == printerId }
-            val result = apiClient.addArchiveToQueue(
+            val queueResult = apiClient.addArchiveToQueue(
                 serverUrl = state.serverUrl,
                 apiKey = state.apiKey,
                 archiveId = archive.id,
                 printerId = printerId,
                 quantity = state.reprintSheet.quantity,
             )
-            result.fold(
-                onSuccess = {
-                    _uiState.update {
-                        it.copy(
-                            reprintSheet = ArchiveReprintSheetState(),
-                            reprintSnackbar = ArchiveReprintSnackbar.Success,
-                            queuedPrinterId = printerId,
-                            queuedPrinterName = printer?.name,
-                            queuedPrinterModel = printer?.model,
-                        )
+            queueResult.fold(
+                onSuccess = { queueItemId ->
+                    if (!startAfterQueue) {
+                        finishQueueSuccess(printerId, printer)
+                        return@fold
                     }
+                    val startResult = apiClient.startQueueItem(
+                        serverUrl = state.serverUrl,
+                        apiKey = state.apiKey,
+                        queueItemId = queueItemId,
+                    )
+                    apiClient.fetchPrinterStatus(state.serverUrl, state.apiKey, printerId)
+                    apiClient.fetchPrinterQueueSnapshot(state.serverUrl, state.apiKey, printerId)
+                    startResult.fold(
+                        onSuccess = {
+                            _uiState.update {
+                                it.copy(
+                                    reprintSheet = ArchiveReprintSheetState(),
+                                    reprintSnackbar = ArchiveReprintSnackbar.Started,
+                                    queuedPrinterId = printerId,
+                                    queuedPrinterName = printer?.name,
+                                    queuedPrinterModel = printer?.model,
+                                )
+                            }
+                        },
+                        onFailure = {
+                            _uiState.update {
+                                it.copy(
+                                    reprintSheet = ArchiveReprintSheetState(),
+                                    reprintSnackbar = ArchiveReprintSnackbar.QueuedStartFailed,
+                                    queuedPrinterId = printerId,
+                                    queuedPrinterName = printer?.name,
+                                    queuedPrinterModel = printer?.model,
+                                )
+                            }
+                        },
+                    )
                 },
                 onFailure = {
                     _uiState.update {
@@ -239,8 +294,16 @@ class ArchiveDetailViewModel(
         }
     }
 
-    fun onReprintSnackbarShown() {
-        _uiState.update { it.copy(reprintSnackbar = null) }
+    private fun finishQueueSuccess(printerId: Int, printer: ArchiveReprintPrinter?) {
+        _uiState.update {
+            it.copy(
+                reprintSheet = ArchiveReprintSheetState(),
+                reprintSnackbar = ArchiveReprintSnackbar.Queued,
+                queuedPrinterId = printerId,
+                queuedPrinterName = printer?.name,
+                queuedPrinterModel = printer?.model,
+            )
+        }
     }
 
     private fun loadReprintPrinters() {
@@ -262,10 +325,11 @@ class ArchiveDetailViewModel(
                                 compatiblePrinters = options.compatible,
                                 hiddenIncompatibleCount = options.hiddenIncompatibleCount,
                                 selectedPrinterId = selectedId,
-                                canSubmit = selectedId != null,
+                                canQueueOnly = selectedId != null,
                             ),
                         )
                     }
+                    selectedId?.let { refreshPrinterReadiness(it) }
                 },
                 onFailure = {
                     _uiState.update {
@@ -273,13 +337,57 @@ class ArchiveDetailViewModel(
                             reprintSheet = it.reprintSheet.copy(
                                 isLoadingPrinters = false,
                                 compatiblePrinters = emptyList(),
-                                canSubmit = false,
+                                canQueueOnly = false,
                             ),
                             reprintSnackbar = ArchiveReprintSnackbar.Failed,
                         )
                     }
                 },
             )
+        }
+    }
+
+    private fun refreshPrinterReadiness(printerId: Int) {
+        val state = _uiState.value
+        if (!state.hasCredentials) return
+
+        readinessJob?.cancel()
+        readinessJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(reprintSheet = it.reprintSheet.copy(isLoadingReadiness = true))
+            }
+            val statusResult = apiClient.fetchPrinterStatus(
+                serverUrl = state.serverUrl,
+                apiKey = state.apiKey,
+                printerId = printerId,
+            )
+            val readiness = statusResult.fold(
+                onSuccess = { status ->
+                    if (DEBUG_LOG_ARCHIVE_REPRINT) {
+                        Log.d(
+                            TAG_ARCHIVE_REPRINT,
+                            "readiness printerId=$printerId connected=${status.connected} " +
+                                "raw=${status.rawState} activity=${status.resolveActivityKind()} " +
+                                "plate=${status.resolvePlateKind()}",
+                        )
+                    }
+                    evaluateQueueAndStartReadiness(status)
+                },
+                onFailure = { error ->
+                    if (DEBUG_LOG_ARCHIVE_REPRINT) {
+                        Log.e(TAG_ARCHIVE_REPRINT, "readiness fetch failed printerId=$printerId", error)
+                    }
+                    QueueAndStartReadiness(canQueueAndStart = false)
+                },
+            )
+            _uiState.update {
+                it.copy(
+                    reprintSheet = it.reprintSheet.copy(
+                        isLoadingReadiness = false,
+                        queueAndStartReadiness = readiness,
+                    ),
+                )
+            }
         }
     }
 }

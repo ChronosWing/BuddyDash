@@ -135,10 +135,29 @@ fun formatArchiveDetailMaterialType(archive: PrintArchive): String? {
     return type?.let { normalizeFilamentType(it)?.uppercase() ?: type.uppercase() }
 }
 
-fun archiveFilamentColorHexes(archive: PrintArchive): List<String> {
-    val color = archive.filamentColor?.trim()?.takeIf { isMeaningfulArchiveField(it) } ?: return emptyList()
-    return listOfNotNull(color)
+/** Parsed swatch for archive filament color (solid, multi-stop, translucent). */
+fun parseArchiveFilamentSwatch(archive: PrintArchive): FilamentSwatchColors? {
+    val raw = archive.filamentColor?.trim()?.takeIf { isMeaningfulArchiveField(it) } ?: return null
+    val hexes = if (raw.contains(',')) {
+        parseExtraColorStops(raw)
+    } else {
+        listOfNotNull(normalizeInventoryColor(raw))
+    }
+    if (hexes.isEmpty()) return null
+    val alphaSource = raw.split(',').firstOrNull()?.trim()
+    val alpha = parseRgbaAlpha(alphaSource)
+    return FilamentSwatchColors(
+        colorHexes = hexes,
+        isTranslucent = isTranslucentEffect(null, alpha),
+        alpha = alpha,
+    )
 }
+
+fun archiveFilamentColorHexes(archive: PrintArchive): List<String> =
+    parseArchiveFilamentSwatch(archive)?.colorHexes.orEmpty()
+
+fun archiveHasMaterialDisplay(archive: PrintArchive): Boolean =
+    formatArchiveDetailMaterialType(archive) != null || parseArchiveFilamentSwatch(archive) != null
 
 fun logArchiveDetailFieldMapping(archive: PrintArchive) {
     if (!DEBUG_LOG_ARCHIVE_DETAIL) return
@@ -278,16 +297,9 @@ fun formatArchiveListMetaLine(archive: PrintArchive, nowMillis: Long = System.cu
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 }
 
-fun formatArchiveMaterialLine(archive: PrintArchive): String? {
-    val type = archive.filamentType?.trim()?.takeIf { it.isNotBlank() }
-    val color = archive.filamentColor?.trim()?.takeIf { it.isNotBlank() }
-    return when {
-        type != null && color != null -> "$type • $color"
-        type != null -> type
-        color != null -> color
-        else -> null
-    }
-}
+/** List/detail material type label only (no raw hex). */
+fun formatArchiveMaterialLine(archive: PrintArchive): String? =
+    formatArchiveDetailMaterialType(archive)
 
 fun formatArchivePlateLine(archive: PrintArchive): String? {
     val layers = archive.totalLayers?.let { "$it layers" }

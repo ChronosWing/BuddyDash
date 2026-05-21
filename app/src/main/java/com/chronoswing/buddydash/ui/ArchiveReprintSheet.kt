@@ -40,6 +40,7 @@ import com.chronoswing.buddydash.ui.components.ArchiveThumbnail
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.util.ARCHIVE_DISPLAY_NAME_FALLBACK
 import com.chronoswing.buddydash.util.ArchiveReprintPrinter
+import com.chronoswing.buddydash.util.QueueAndStartBlockReason
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +52,8 @@ fun ArchiveReprintSheet(
     onDismiss: () -> Unit,
     onPrinterSelected: (Int) -> Unit,
     onQuantityChange: (Int) -> Unit,
-    onConfirm: () -> Unit,
+    onQueueOnly: () -> Unit,
+    onQueueAndStart: () -> Unit,
 ) {
     if (!sheetState.isOpen) return
 
@@ -60,6 +62,27 @@ fun ArchiveReprintSheet(
         stringResource(R.string.archive_unnamed_print)
     } else {
         archive.displayName
+    }
+    val selectedPrinter = sheetState.compatiblePrinters.find { it.id == sheetState.selectedPrinterId }
+    val printerNameForMessage = selectedPrinter?.name ?: "—"
+    val canQueueOnly = sheetState.canQueueOnly &&
+        sheetState.selectedPrinterId != null &&
+        sheetState.compatiblePrinters.isNotEmpty() &&
+        !sheetState.isLoadingPrinters
+    val queueAndStartEnabled = sheetState.canQueueAndStart &&
+        !sheetState.isSubmitting &&
+        !sheetState.isLoadingPrinters &&
+        !sheetState.isLoadingReadiness
+    val queueAndStartDisabledReason = when {
+        sheetState.isLoadingReadiness -> null
+        !queueAndStartEnabled -> when (sheetState.queueAndStartReadiness.blockReason) {
+            QueueAndStartBlockReason.PlateNotClear ->
+                stringResource(R.string.archive_reprint_queue_and_start_blocked_plate)
+            QueueAndStartBlockReason.PrinterNotReady,
+            QueueAndStartBlockReason.None,
+            -> stringResource(R.string.archive_reprint_queue_and_start_blocked_printer)
+        }
+        else -> null
     }
 
     ModalBottomSheet(
@@ -76,6 +99,27 @@ fun ArchiveReprintSheet(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Text(
+                text = stringResource(R.string.archive_reprint_confirm_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(
+                    R.string.archive_reprint_confirm_message,
+                    printerNameForMessage,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (sheetState.canQueueAndStart && !sheetState.isLoadingReadiness) {
+                Text(
+                    text = stringResource(R.string.archive_reprint_queue_and_start_helper),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                )
+            }
+
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -135,20 +179,20 @@ fun ArchiveReprintSheet(
                 }
             }
 
+            OutlinedButton(
+                onClick = onDismiss,
+                enabled = !sheetState.isSubmitting,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.cancel))
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    enabled = !sheetState.isSubmitting,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.cancel))
-                }
                 Button(
-                    onClick = onConfirm,
-                    enabled = sheetState.canSubmit && !sheetState.isSubmitting && !sheetState.isLoadingPrinters,
+                    onClick = onQueueOnly,
+                    enabled = canQueueOnly && !sheetState.isSubmitting,
                     modifier = Modifier.weight(1f),
                 ) {
                     if (sheetState.isSubmitting) {
@@ -158,7 +202,24 @@ fun ArchiveReprintSheet(
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
                     } else {
-                        Text(stringResource(R.string.archive_reprint_queue_print))
+                        Text(stringResource(R.string.archive_reprint_queue_only))
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Button(
+                        onClick = onQueueAndStart,
+                        enabled = queueAndStartEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.archive_reprint_queue_and_start))
+                    }
+                    queueAndStartDisabledReason?.let { reason ->
+                        Text(
+                            text = reason,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
                     }
                 }
             }
