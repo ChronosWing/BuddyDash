@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -39,6 +40,8 @@ class PrinterDetailViewModel(
     private val _uiState = MutableStateFlow(PrinterDetailUiState())
     val uiState: StateFlow<PrinterDetailUiState> = _uiState.asStateFlow()
 
+    private var fetchJob: Job? = null
+
     init {
         viewModelScope.launch {
             combine(
@@ -61,9 +64,8 @@ class PrinterDetailViewModel(
     fun init(printerId: Int, printerName: String) {
         this.printerId = printerId
         _uiState.update {
-            it.copy(printerName = printerName, error = null, isLoading = true)
+            it.copy(printerName = printerName, error = null)
         }
-        maybeLoadStatus()
     }
 
     private fun maybeLoadStatus() {
@@ -85,8 +87,11 @@ class PrinterDetailViewModel(
             return
         }
 
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = showLoading, error = null) }
+        fetchJob?.cancel()
+        fetchJob = viewModelScope.launch {
+            if (showLoading) {
+                _uiState.update { it.copy(isLoading = showLoading, error = null) }
+            }
 
             apiClient.fetchPrinterStatus(state.serverUrl, state.apiKey, printerId).fold(
                 onSuccess = { status ->

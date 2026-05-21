@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -29,6 +30,8 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    private var fetchJob: Job? = null
+
     init {
         viewModelScope.launch {
             combine(
@@ -48,15 +51,18 @@ class HomeViewModel(
         }
     }
 
-    fun loadPrinters() {
+    fun loadPrinters(showLoading: Boolean = false) {
         val state = _uiState.value
         if (!state.hasCredentials) {
             _uiState.update { it.copy(error = "Configure server URL and API key in Settings") }
             return
         }
 
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+        fetchJob?.cancel()
+        fetchJob = viewModelScope.launch {
+            if (showLoading) {
+                _uiState.update { it.copy(isLoading = true, error = null) }
+            }
             val result = apiClient.fetchPrintersWithStatus(state.serverUrl, state.apiKey)
             _uiState.update {
                 it.copy(

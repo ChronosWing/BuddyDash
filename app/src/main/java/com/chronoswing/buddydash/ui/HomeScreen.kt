@@ -27,7 +27,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +43,7 @@ import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentChipRow
 import com.chronoswing.buddydash.ui.components.InlineProgress
+import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.theme.OnlineGreen
 import com.chronoswing.buddydash.ui.theme.OfflineRed
@@ -58,18 +58,23 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(uiState.hasCredentials) {
-        if (uiState.hasCredentials) {
-            viewModel.loadPrinters()
-        }
-    }
+    LifecyclePollingEffect(
+        enabled = uiState.hasCredentials,
+        intervalMs = 15_000L,
+        onPoll = {
+            val showLoading = uiState.printers.isEmpty() && uiState.error == null
+            viewModel.loadPrinters(showLoading = showLoading)
+        },
+    )
 
     HomeScreenContent(
         printers = uiState.printers,
         isLoading = uiState.isLoading,
         error = uiState.error,
         hasCredentials = uiState.hasCredentials,
-        onRefresh = viewModel::loadPrinters,
+        onRefresh = {
+            viewModel.loadPrinters(showLoading = uiState.printers.isEmpty())
+        },
         onPrinterClick = onPrinterClick,
         onSettingsClick = onSettingsClick,
     )

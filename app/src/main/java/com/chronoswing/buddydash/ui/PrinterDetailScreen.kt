@@ -43,6 +43,7 @@ import com.chronoswing.buddydash.ui.components.FilamentChipRow
 import com.chronoswing.buddydash.ui.components.FilamentSlotDetailHeader
 import com.chronoswing.buddydash.ui.components.HighlightValue
 import com.chronoswing.buddydash.ui.components.InlineProgress
+import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
@@ -64,6 +65,16 @@ fun PrinterDetailScreen(
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LifecyclePollingEffect(
+        enabled = uiState.hasCredentials && printerId >= 0,
+        intervalMs = 5_000L,
+        onPoll = {
+            val showLoading = uiState.status == null && uiState.error == null && !uiState.isClearingPlate
+            viewModel.loadStatus(showLoading = showLoading)
+        },
+    )
+
     val labels = uiState.status?.toDetailLabels()
 
     PrinterDetailScreenContent(
