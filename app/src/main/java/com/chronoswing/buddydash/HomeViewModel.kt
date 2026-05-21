@@ -22,6 +22,8 @@ data class HomeUiState(
     val apiKey: String = "",
     val cameraToken: String = "",
     val hasCredentials: Boolean = false,
+    /** Epoch millis of last successful printers fetch (for passive refresh indicator). */
+    val lastUpdatedAtMillis: Long? = null,
 )
 
 class HomeViewModel(
@@ -70,14 +72,29 @@ class HomeViewModel(
                 _uiState.update { it.copy(isLoading = true, error = null) }
             }
             val result = apiClient.fetchPrintersWithStatus(state.serverUrl, state.apiKey)
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    isRefreshing = false,
-                    printers = result.getOrElse { emptyList() },
-                    error = result.exceptionOrNull()?.message,
-                )
-            }
+            result.fold(
+                onSuccess = { printers ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            printers = printers,
+                            error = null,
+                            lastUpdatedAtMillis = System.currentTimeMillis(),
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            printers = emptyList(),
+                            error = error.message ?: "Failed to load printers",
+                        )
+                    }
+                },
+            )
         }
     }
 }
