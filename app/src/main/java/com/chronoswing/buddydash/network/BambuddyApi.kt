@@ -20,6 +20,9 @@ object BambuddyApi {
     /** GET — list spools (operationId: list_spools_api_v1_inventory_spools_get). */
     const val INVENTORY_SPOOLS_PATH = "/api/v1/inventory/spools"
 
+    /** GET — spool usage history (operationId: get_spool_usage_history_…). */
+    const val INVENTORY_SPOOL_USAGE_PATH = "/api/v1/inventory/spools/{spool_id}/usage"
+
     /** GET — application settings including low_stock_threshold (AppSettings). */
     const val SETTINGS_PATH = "/api/v1/settings"
 
@@ -74,6 +77,7 @@ object BambuddyApi {
     val hasCameraEndpoint: Boolean = true
     val hasFilesEndpoint: Boolean = true
     val hasSpoolInventoryEndpoint: Boolean = true
+    val hasSpoolUsageEndpoint: Boolean = true
     val hasArchivesEndpoint: Boolean = true
     val hasQueueAddEndpoint: Boolean = true
     val hasQueueStartEndpoint: Boolean = true
@@ -151,6 +155,11 @@ object BambuddyApi {
         } else {
             INVENTORY_SPOOLS_PATH
         }
+
+    fun spoolUsagePath(spoolId: Int, limit: Int = 50): String =
+        INVENTORY_SPOOL_USAGE_PATH
+            .replace("{spool_id}", spoolId.toString()) +
+            "?limit=$limit"
 
     fun archiveThumbnailPath(archiveId: Int): String =
         ARCHIVE_THUMBNAIL_PATH.replace("{archive_id}", archiveId.toString())

@@ -83,7 +83,6 @@ fun ArchiveDetailScreen(
         hasCredentials = uiState.hasCredentials,
         reprintSheet = uiState.reprintSheet,
         reprintSnackbar = uiState.reprintSnackbar,
-        materialNavigation = uiState.materialNavigation,
         onBack = onBack,
         onRetry = viewModel::loadArchive,
         onQueueAgain = viewModel::onQueueAgainClick,
@@ -98,6 +97,7 @@ fun ArchiveDetailScreen(
             val name = uiState.queuedPrinterName ?: return@ArchiveDetailScreenContent
             onViewQueue(id, name, uiState.queuedPrinterModel)
         },
+        onMaterialTap = viewModel::onMaterialTap,
         onMaterialNavigation = onMaterialNavigation,
     )
 }
@@ -114,7 +114,6 @@ private fun ArchiveDetailScreenContent(
     hasCredentials: Boolean,
     reprintSheet: ArchiveReprintSheetState,
     reprintSnackbar: ArchiveReprintSnackbar?,
-    materialNavigation: ArchiveMaterialNavigation,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onQueueAgain: () -> Unit,
@@ -125,6 +124,7 @@ private fun ArchiveDetailScreenContent(
     onConfirmQueueAndStart: () -> Unit,
     onReprintSnackbarShown: () -> Unit,
     onViewQueue: () -> Unit,
+    onMaterialTap: (onNavigate: (ArchiveMaterialNavigation) -> Unit) -> Unit,
     onMaterialNavigation: (ArchiveMaterialNavigation) -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -223,7 +223,8 @@ private fun ArchiveDetailScreenContent(
                         archive = archive,
                         serverUrl = serverUrl,
                         cameraToken = cameraToken,
-                        materialNavigation = materialNavigation,
+                        hasCredentials = hasCredentials,
+                        onMaterialTap = onMaterialTap,
                         onMaterialNavigation = onMaterialNavigation,
                     )
                 }
@@ -248,7 +249,8 @@ private fun ArchiveDetailBody(
     archive: PrintArchive,
     serverUrl: String,
     cameraToken: String,
-    materialNavigation: ArchiveMaterialNavigation,
+    hasCredentials: Boolean,
+    onMaterialTap: (onNavigate: (ArchiveMaterialNavigation) -> Unit) -> Unit,
     onMaterialNavigation: (ArchiveMaterialNavigation) -> Unit,
 ) {
     val displayName = if (archive.displayName == ARCHIVE_DISPLAY_NAME_FALLBACK) {
@@ -295,11 +297,9 @@ private fun ArchiveDetailBody(
         if (showMaterial) {
             ArchiveDetailMaterialRow(
                 archive = archive,
-                tappable = materialNavigation !is ArchiveMaterialNavigation.None,
+                tappable = hasCredentials,
                 onMaterialClick = {
-                    if (materialNavigation !is ArchiveMaterialNavigation.None) {
-                        onMaterialNavigation(materialNavigation)
-                    }
+                    onMaterialTap(onMaterialNavigation)
                 },
             )
         }
@@ -389,5 +389,12 @@ private fun ArchiveDetailMaterialRow(
             tappable = tappable,
             onClick = onMaterialClick,
         )
+        if (tappable) {
+            Text(
+                text = stringResource(R.string.archive_material_lookup_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+            )
+        }
     }
 }

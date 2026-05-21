@@ -32,7 +32,10 @@ import com.chronoswing.buddydash.util.mergeSpoolsWithAssignments
 import com.chronoswing.buddydash.util.parseInventoryByPrinter
 import com.chronoswing.buddydash.util.parseLowStockThreshold
 import com.chronoswing.buddydash.util.parseSpoolAssignments
+import com.chronoswing.buddydash.util.logSpoolUsageFetch
 import com.chronoswing.buddydash.util.parseSpoolInventoryList
+import com.chronoswing.buddydash.util.parseSpoolUsageHistoryList
+import com.chronoswing.buddydash.data.model.SpoolUsageEntry
 import com.chronoswing.buddydash.util.etaDebugLogLine
 import com.chronoswing.buddydash.util.parseRemainingTimeSeconds
 import com.chronoswing.buddydash.util.DEBUG_LOG_FILAMENT_USAGE
@@ -380,6 +383,37 @@ class BambuddyApiClient {
                                 .thenBy { it.displayName.lowercase() },
                         )
                 }
+            }
+        }
+
+    /**
+     * Exact usage history for one spool (GET /api/v1/inventory/spools/{spool_id}/usage).
+     * Returns an empty list when the endpoint is missing or the request fails.
+     */
+    suspend fun fetchSpoolUsageHistory(
+        serverUrl: String,
+        apiKey: String,
+        spoolId: Int,
+        limit: Int = 50,
+    ): Result<List<SpoolUsageEntry>> =
+        withContext(Dispatchers.IO) {
+            if (!BambuddyApi.hasSpoolUsageEndpoint) {
+                return@withContext Result.success(emptyList())
+            }
+            val path = BambuddyApi.spoolUsagePath(spoolId, limit)
+            runApiCall(serverUrl, apiKey, path) { body ->
+                val entries = parseSpoolUsageHistoryList(body)
+                logSpoolUsageFetch(spoolId, path, rawBodyPreview = body.take(200), entries = entries)
+                entries
+            }.recover { error ->
+                logSpoolUsageFetch(
+                    spoolId = spoolId,
+                    path = path,
+                    rawBodyPreview = null,
+                    entries = emptyList(),
+                    error = error,
+                )
+                emptyList()
             }
         }
 

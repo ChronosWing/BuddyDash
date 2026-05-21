@@ -106,6 +106,12 @@
     <string name="spools_search_hint">Search material, color, brand…</string>
     <string name="spools_empty">No spools in inventory</string>
     <string name="spools_no_match">No spools match your search</string>
+    <string name="spools_archive_no_matching_filament">No matching filament found</string>
+    <string name="spools_matching_filament_header">Likely filament matches</string>
+    <string name="spools_matching_material_header">Matching material</string>
+    <string name="spools_archive_no_exact_color_match">No exact color match found</string>
+    <string name="spools_clear_archive_filter">Clear filter</string>
+    <string name="archive_material_lookup_hint">Find matching filament in inventory</string>
     <string name="spool_filter_all">All</string>
     <string name="spool_filter_low">Low</string>
     <string name="spool_filter_loaded">Loaded</string>
@@ -121,7 +127,6 @@
     <string name="spool_detail_source">Source</string>
     <string name="spool_detail_last_used">Last used</string>
     <string name="spool_detail_used_in_prints">Used in prints</string>
-    <string name="spool_detail_matching_archives">Matching archived prints</string>
     <string name="spool_detail_view_all_archives">View all (%1$d more)</string>
     <string name="online">Online</string>
     <string name="offline">Offline</string>

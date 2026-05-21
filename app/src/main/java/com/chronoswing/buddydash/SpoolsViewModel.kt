@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.network.BambuddyApiClient
+import com.chronoswing.buddydash.util.ArchiveSpoolLookupFilter
 import com.chronoswing.buddydash.util.SpoolInventoryFilter
 import com.chronoswing.buddydash.util.applySpoolInventorySearch
+import com.chronoswing.buddydash.util.spoolMatchesArchiveLookupFilter
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,9 +27,17 @@ data class SpoolsUiState(
     val hasCredentials: Boolean = false,
     val searchQuery: String = "",
     val filter: SpoolInventoryFilter = SpoolInventoryFilter.All,
+    val archiveLookupFilter: ArchiveSpoolLookupFilter? = null,
 ) {
-    val filteredSpools: List<SpoolInventoryItem> =
-        applySpoolInventorySearch(spools, searchQuery, filter)
+    val showArchiveMatchHeader: Boolean get() = archiveLookupFilter != null
+
+    fun filteredSpools(): List<SpoolInventoryItem> {
+        var pool = spools
+        archiveLookupFilter?.let { lookup ->
+            pool = pool.filter { spoolMatchesArchiveLookupFilter(it, lookup) }
+        }
+        return applySpoolInventorySearch(pool, searchQuery, filter)
+    }
 }
 
 class SpoolsViewModel(
@@ -70,6 +80,24 @@ class SpoolsViewModel(
     fun applyInitialSearchQuery(query: String) {
         if (query.isBlank()) return
         _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun applyArchiveMaterialLookup(lookupFilter: ArchiveSpoolLookupFilter) {
+        _uiState.update {
+            it.copy(
+                searchQuery = "",
+                archiveLookupFilter = lookupFilter,
+            )
+        }
+    }
+
+    fun clearArchiveLookupFilter() {
+        _uiState.update {
+            it.copy(
+                archiveLookupFilter = null,
+                searchQuery = "",
+            )
+        }
     }
 
     fun loadSpools(showLoading: Boolean = false, fromPull: Boolean = false) {
