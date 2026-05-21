@@ -50,6 +50,7 @@ import com.chronoswing.buddydash.ui.components.FilamentSlotDetailHeader
 import com.chronoswing.buddydash.ui.components.HighlightValue
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.PrinterCoverImage
+import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
@@ -262,6 +263,11 @@ private fun ActivePrintStatusTab(
     )
     DetailInfoCard {
         SectionHeader(stringResource(R.string.section_print))
+        PrinterQuickStatusRow(
+            activityKind = labels.activityKind,
+            progressCompact = labels.progressCompact,
+            plateKind = labels.plateKind,
+        )
         HighlightValue(
             label = labels.progressTitle,
             value = buildPrintHeadline(labels.currentActivity, labels.progressValue),
@@ -346,6 +352,11 @@ private fun IdleStatusTab(
     )
     DetailInfoCard {
         SectionHeader(stringResource(R.string.section_overview))
+        PrinterQuickStatusRow(
+            activityKind = labels.activityKind,
+            progressCompact = labels.progressCompact,
+            plateKind = labels.plateKind,
+        )
         HighlightValue(
             label = stringResource(R.string.current_activity),
             value = labels.currentActivity,

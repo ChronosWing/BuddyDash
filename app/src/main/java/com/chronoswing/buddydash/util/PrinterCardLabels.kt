@@ -10,6 +10,9 @@ data class PrinterCardLabels(
     val connection: String,
     val isConnected: Boolean,
     val isActivePrint: Boolean,
+    val activityKind: PrinterActivityKind,
+    val progressCompact: String?,
+    val plateKind: PlateIndicatorKind?,
     val currentActivity: String,
     val plateStatus: String?,
     val lastPrintResult: String?,
@@ -37,6 +40,9 @@ fun Printer.toCardLabels(): PrinterCardLabels {
             connection = "—",
             isConnected = false,
             isActivePrint = false,
+            activityKind = PrinterActivityKind.Offline,
+            progressCompact = null,
+            plateKind = null,
             currentActivity = "—",
             plateStatus = null,
             lastPrintResult = null,
@@ -65,6 +71,9 @@ fun Printer.toCardLabels(): PrinterCardLabels {
     }
 
     val progressText = if (isActivePrint) formatProgress(status.progress) else null
+    val activityKind = status.resolveActivityKind()
+    val progressCompact = activityKind.progressSuffix(status.progress)
+    val plateKind = status.resolvePlateKind()
     val etaFormatted = formatEta(status.remainingTimeSeconds)
     val showEta = isActivePrint && etaFormatted != "—"
 
@@ -74,6 +83,9 @@ fun Printer.toCardLabels(): PrinterCardLabels {
         connection = if (status.connected) "Connected" else "Offline",
         isConnected = status.connected,
         isActivePrint = isActivePrint,
+        activityKind = activityKind,
+        progressCompact = progressCompact,
+        plateKind = plateKind,
         currentActivity = detail.currentActivity,
         plateStatus = detail.plateStatus?.let { plate ->
             when (plate) {

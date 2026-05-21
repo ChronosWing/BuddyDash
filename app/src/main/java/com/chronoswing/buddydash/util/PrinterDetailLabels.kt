@@ -9,6 +9,9 @@ private const val DEBUG_ALWAYS_SHOW_CLEAR_BUTTON = false
 
 data class PrinterDetailLabels(
     val isActivePrint: Boolean,
+    val activityKind: PrinterActivityKind,
+    val progressCompact: String?,
+    val plateKind: PlateIndicatorKind?,
     val connection: String,
     val currentActivity: String,
     val lastPrintResult: String?,
@@ -59,8 +62,12 @@ fun PrinterStatus.toDetailLabels(): PrinterDetailLabels {
         if (awaiting) "Not clear" else "Clear"
     }
 
+    val activityKind = resolveActivityKind()
     return PrinterDetailLabels(
         isActivePrint = isActivePrint,
+        activityKind = activityKind,
+        progressCompact = activityKind.progressSuffix(progress),
+        plateKind = resolvePlateKind(),
         connection = formatConnection(connected),
         currentActivity = state.currentActivity,
         lastPrintResult = state.lastPrintResult,
