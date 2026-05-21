@@ -46,6 +46,18 @@ fun PrinterActivityKind.progressSuffix(progress: Float?): String? {
     return text.takeIf { it != "—" }
 }
 
+/** Home cards only — hide idle/ready temps; detail Status tab always shows them. */
+fun PrinterStatus.showHomeCardTemps(): Boolean {
+    if (!connected) return false
+    val raw = rawState?.uppercase() ?: return false
+    if (raw in IDLE_LIKE_STATES || raw == "IDLE") return false
+    if (raw == "RUNNING" || raw == "PAUSE") return true
+    if (raw in BUSY_LIKE_STATES) return true
+    if (raw.contains("HEAT") || raw.contains("COOL")) return true
+    if (hmsErrorCount > 0) return true
+    return false
+}
+
 private val IDLE_LIKE_STATES = setOf("IDLE", "FINISH", "FAILED")
 private val BUSY_LIKE_STATES = setOf(
     "PREPARE", "PREPARING", "SLICING", "CALIBRATING", "BUSY", "INITIALIZING",

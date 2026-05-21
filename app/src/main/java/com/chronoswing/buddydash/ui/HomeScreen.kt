@@ -259,12 +259,6 @@ private fun GlancePrinterCard(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        labels.tempsLine?.let { temps ->
-                            Text(
-                                text = temps,
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                        }
                     }
                     PrinterCoverImage(
                         serverUrl = serverUrl,
@@ -294,20 +288,13 @@ private fun GlancePrinterCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.nozzle_short, labels.nozzleTemp),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                    Text(
-                        text = stringResource(R.string.bed_short, labels.bedTemp),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
+            labels.tempsLine?.let { temps ->
+                Text(
+                    text = temps,
+                    style = MaterialTheme.typography.labelMedium,
+                )
             }
 
             FilamentChipRow(slots = labels.filamentSlots, compact = true)
