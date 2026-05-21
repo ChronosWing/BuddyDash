@@ -9,10 +9,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -25,7 +28,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -39,6 +46,7 @@ import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentHomeGroupsRow
+import com.chronoswing.buddydash.ui.components.HomePrinterSearchField
 import com.chronoswing.buddydash.ui.components.HomeCardMicroMotionFrame
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
 import com.chronoswing.buddydash.ui.components.MicroMotionThumbnailFrame
@@ -48,7 +56,9 @@ import com.chronoswing.buddydash.ui.components.PrinterCoverImage
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.LoadingContent
+import com.chronoswing.buddydash.util.HOME_PRINTER_SEARCH_MIN_COUNT
 import com.chronoswing.buddydash.util.PrinterCardLabels
+import com.chronoswing.buddydash.util.filterPrintersForSearch
 import com.chronoswing.buddydash.util.toCardLabels
 
 @Composable
@@ -102,11 +112,46 @@ private fun HomeScreenContent(
     onPrinterClick: (Printer) -> Unit,
     onSettingsClick: () -> Unit,
 ) {
+    val showPrinterSearch = printers.size >= HOME_PRINTER_SEARCH_MIN_COUNT
+    var searchExpanded by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val listState = rememberLazyListState()
+
+    if (searchExpanded) {
+        BackHandler {
+            searchExpanded = false
+            searchQuery = ""
+        }
+    }
+
+    LaunchedEffect(showPrinterSearch) {
+        if (!showPrinterSearch) {
+            searchExpanded = false
+            searchQuery = ""
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
+                    if (showPrinterSearch) {
+                        IconButton(
+                            onClick = {
+                                searchExpanded = !searchExpanded
+                                if (!searchExpanded) searchQuery = ""
+                            },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = stringResource(R.string.search_printers),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                    alpha = if (searchExpanded) 0.95f else 0.65f,
+                                ),
+                            )
+                        }
+                    }
                     IconButton(onClick = onRefresh, enabled = hasCredentials && !isLoading) {
                         Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                     }
@@ -148,35 +193,56 @@ private fun HomeScreenContent(
                 )
             }
             else -> {
-                PullToRefreshBox(
-                    isRefreshing = isRefreshing,
-                    onRefresh = onPullRefresh,
+                val filteredPrinters = filterPrintersForSearch(printers, searchQuery)
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
                 ) {
-                    LazyColumn(
+                    HomePrinterSearchField(
+                        expanded = searchExpanded,
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                    )
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = onPullRefresh,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        if (error != null) {
-                            item {
-                                Text(
-                                    text = error,
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodySmall,
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            if (error != null) {
+                                item {
+                                    Text(
+                                        text = error,
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                            }
+                            if (searchExpanded && searchQuery.isNotBlank() && filteredPrinters.isEmpty()) {
+                                item(key = "search_empty") {
+                                    Text(
+                                        text = stringResource(R.string.no_printers_match_search),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(vertical = 12.dp),
+                                    )
+                                }
+                            }
+                            items(filteredPrinters, key = { it.id }) { printer ->
+                                GlancePrinterCard(
+                                    labels = printer.toCardLabels(),
+                                    printerId = printer.id,
+                                    serverUrl = serverUrl,
+                                    cameraToken = cameraToken,
+                                    onClick = { onPrinterClick(printer) },
                                 )
                             }
-                        }
-                        items(printers, key = { it.id }) { printer ->
-                            GlancePrinterCard(
-                                labels = printer.toCardLabels(),
-                                printerId = printer.id,
-                                serverUrl = serverUrl,
-                                cameraToken = cameraToken,
-                                onClick = { onPrinterClick(printer) },
-                            )
                         }
                     }
                 }
