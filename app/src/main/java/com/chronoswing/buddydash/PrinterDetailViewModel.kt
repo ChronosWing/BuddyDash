@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
@@ -10,6 +11,10 @@ import com.chronoswing.buddydash.data.model.PrinterQueueSnapshot
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
+import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
+import com.chronoswing.buddydash.util.DEBUG_LOG_ARCHIVE_REPRINT
+import com.chronoswing.buddydash.util.TAG_ARCHIVE_REPRINT
+import com.chronoswing.buddydash.util.evaluateStartNextQueuedPrintReadiness
 import com.chronoswing.buddydash.util.motionDebugLog
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -43,9 +48,18 @@ data class PrinterDetailUiState(
     /** Epoch millis of last successful status fetch (for passive refresh indicator). */
     val lastStatusUpdatedAtMillis: Long? = null,
     val queueUpcoming: List<PrintQueueJob> = emptyList(),
+    val startNextQueuedPrintReadiness: StartNextQueuedPrintReadiness =
+        StartNextQueuedPrintReadiness(canStart = false),
+    val isStartingQueuedPrint: Boolean = false,
+    val startQueuedPrintSnackbar: StartQueuedPrintSnackbar? = null,
     /** Filament for active print: status JSON, else queue job with status=printing. */
     val activePrintFilamentUsage: FilamentUsage? = null,
 )
+
+enum class StartQueuedPrintSnackbar {
+    Started,
+    Failed,
+}
 
 enum class PlateClearSnackbar {
     Success,
@@ -152,6 +166,7 @@ class PrinterDetailViewModel(
                     val queueSnapshot = statusResult.third
                     val activeFilament = status.filamentUsage
                         ?: queueSnapshot.printing?.filamentUsage
+                    val upcoming = queueSnapshot.upcoming
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -159,7 +174,11 @@ class PrinterDetailViewModel(
                             status = status,
                             maintenanceItems = statusResult.second?.items.orEmpty(),
                             totalPrintHours = statusResult.second?.totalPrintHours,
-                            queueUpcoming = queueSnapshot.upcoming,
+                            queueUpcoming = upcoming,
+                            startNextQueuedPrintReadiness = evaluateStartNextQueuedPrintReadiness(
+                                status = status,
+                                queuedItemCount = upcoming.size,
+                            ),
                             activePrintFilamentUsage = activeFilament,
                             error = null,
                             lastStatusUpdatedAtMillis = System.currentTimeMillis(),
@@ -175,6 +194,7 @@ class PrinterDetailViewModel(
                             maintenanceItems = emptyList(),
                             totalPrintHours = null,
                             queueUpcoming = emptyList(),
+                            startNextQueuedPrintReadiness = StartNextQueuedPrintReadiness(canStart = false),
                             activePrintFilamentUsage = null,
                             error = error.message ?: "Failed to load printer status",
                         )
@@ -323,5 +343,51 @@ class PrinterDetailViewModel(
 
     fun onMaintenanceResetSnackbarShown() {
         _uiState.update { it.copy(maintenanceResetSnackbar = null) }
+    }
+
+    fun startNextQueuedPrint() {
+        if (printerId < 0) return
+        val state = _uiState.value
+        if (!state.hasCredentials || state.isStartingQueuedPrint) return
+        if (!state.startNextQueuedPrintReadiness.canStart) return
+        val nextItemId = state.queueUpcoming.firstOrNull()?.id ?: return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isStartingQueuedPrint = true) }
+            apiClient.startQueueItem(
+                serverUrl = state.serverUrl,
+                apiKey = state.apiKey,
+                queueItemId = nextItemId,
+            ).fold(
+                onSuccess = {
+                    loadStatus(showLoading = false)
+                    _uiState.update {
+                        it.copy(
+                            isStartingQueuedPrint = false,
+                            startQueuedPrintSnackbar = StartQueuedPrintSnackbar.Started,
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    if (DEBUG_LOG_ARCHIVE_REPRINT) {
+                        Log.e(
+                            TAG_ARCHIVE_REPRINT,
+                            "startNextQueuedPrint failed printerId=$printerId itemId=$nextItemId",
+                            error,
+                        )
+                    }
+                    _uiState.update {
+                        it.copy(
+                            isStartingQueuedPrint = false,
+                            startQueuedPrintSnackbar = StartQueuedPrintSnackbar.Failed,
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    fun onStartQueuedPrintSnackbarShown() {
+        _uiState.update { it.copy(startQueuedPrintSnackbar = null) }
     }
 }

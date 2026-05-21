@@ -18,8 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.util.ARCHIVE_DISPLAY_NAME_FALLBACK
+import com.chronoswing.buddydash.util.archiveHasMaterialDisplay
 import com.chronoswing.buddydash.util.formatArchiveListMetaLine
-import com.chronoswing.buddydash.util.formatArchiveMaterialLine
 import com.chronoswing.buddydash.util.formatArchiveStatusPrinterLine
 
 @Composable
@@ -36,7 +36,7 @@ fun ArchiveListRow(
     }
     val statusLine = formatArchiveStatusPrinterLine(archive)
     val metaLine = formatArchiveListMetaLine(archive)
-    val materialLine = formatArchiveMaterialLine(archive)
+    val showMaterial = archiveHasMaterialDisplay(archive)
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -81,14 +81,8 @@ fun ArchiveListRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                materialLine?.let { material ->
-                    Text(
-                        text = material,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                if (showMaterial) {
+                    ArchiveMaterialRow(archive = archive)
                 }
             }
         }

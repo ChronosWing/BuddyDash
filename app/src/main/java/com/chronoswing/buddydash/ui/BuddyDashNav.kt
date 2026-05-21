@@ -245,12 +245,21 @@ fun BuddyDashNav(
                     },
                 )
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+                val isActivePrint = uiState.status?.rawState?.uppercase() in setOf("RUNNING", "PAUSE")
                 PrinterQueueScreen(
                     printerName = uiState.printerName,
                     jobs = uiState.queueUpcoming,
                     serverUrl = uiState.serverUrl,
                     cameraToken = uiState.cameraToken,
+                    showStartNextPrint = uiState.queueUpcoming.isNotEmpty() &&
+                        !isActivePrint &&
+                        com.chronoswing.buddydash.network.BambuddyApi.hasQueueStartEndpoint,
+                    startNextQueuedPrintReadiness = uiState.startNextQueuedPrintReadiness,
+                    isStartingQueuedPrint = uiState.isStartingQueuedPrint,
+                    startQueuedPrintSnackbar = uiState.startQueuedPrintSnackbar,
                     onBack = { navController.popBackStack() },
+                    onStartNextQueuedPrint = viewModel::startNextQueuedPrint,
+                    onStartQueuedPrintSnackbarShown = viewModel::onStartQueuedPrintSnackbarShown,
                 )
             }
         }

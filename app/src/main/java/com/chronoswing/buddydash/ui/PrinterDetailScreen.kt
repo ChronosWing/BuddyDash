@@ -47,6 +47,8 @@ import com.chronoswing.buddydash.MaintenanceResetSnackbar
 import com.chronoswing.buddydash.PlateClearSnackbar
 import com.chronoswing.buddydash.PrinterDetailViewModel
 import com.chronoswing.buddydash.R
+import com.chronoswing.buddydash.StartQueuedPrintSnackbar
+import com.chronoswing.buddydash.network.BambuddyApi
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.PrintQueueJob
 import com.chronoswing.buddydash.ui.components.ComingSoonActionButton
@@ -65,6 +67,7 @@ import com.chronoswing.buddydash.ui.components.FilamentDetailGroups
 import com.chronoswing.buddydash.ui.components.FilamentUsageText
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
 import com.chronoswing.buddydash.ui.components.DetailPrintQueueSection
+import com.chronoswing.buddydash.ui.components.StartNextPrintAction
 import com.chronoswing.buddydash.ui.components.DetailStatusHeroImage
 import com.chronoswing.buddydash.ui.components.HighlightValue
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
@@ -80,6 +83,7 @@ import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildPrintHeadline
 import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
+import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
 import com.chronoswing.buddydash.util.toDetailLabels
 
 private val detailTabs = listOf("Status", "Filament", "Controls")
@@ -132,6 +136,9 @@ fun PrinterDetailScreen(
         maintenanceResetSnackbar = uiState.maintenanceResetSnackbar,
         lastStatusUpdatedAtMillis = uiState.lastStatusUpdatedAtMillis,
         queueUpcoming = uiState.queueUpcoming,
+        startNextQueuedPrintReadiness = uiState.startNextQueuedPrintReadiness,
+        isStartingQueuedPrint = uiState.isStartingQueuedPrint,
+        startQueuedPrintSnackbar = uiState.startQueuedPrintSnackbar,
         onBack = onBack,
         onRetry = viewModel::loadStatus,
         onRefresh = { viewModel.loadStatus(showLoading = false) },
@@ -149,6 +156,8 @@ fun PrinterDetailScreen(
         onPerformMaintenanceReset = viewModel::performMaintenanceReset,
         onMaintenanceResetSnackbarShown = viewModel::onMaintenanceResetSnackbarShown,
         onViewFullQueue = onViewFullQueue,
+        onStartNextQueuedPrint = viewModel::startNextQueuedPrint,
+        onStartQueuedPrintSnackbarShown = viewModel::onStartQueuedPrintSnackbarShown,
     )
 }
 
@@ -171,8 +180,13 @@ private fun PrinterDetailScreenContent(
     maintenanceResetSnackbar: MaintenanceResetSnackbar?,
     lastStatusUpdatedAtMillis: Long?,
     queueUpcoming: List<PrintQueueJob>,
+    startNextQueuedPrintReadiness: StartNextQueuedPrintReadiness,
+    isStartingQueuedPrint: Boolean,
+    startQueuedPrintSnackbar: StartQueuedPrintSnackbar?,
     onBack: () -> Unit,
     onViewFullQueue: () -> Unit,
+    onStartNextQueuedPrint: () -> Unit,
+    onStartQueuedPrintSnackbarShown: () -> Unit,
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
@@ -198,6 +212,8 @@ private fun PrinterDetailScreenContent(
     val printStoppedFailedMessage = stringResource(R.string.print_stopped_failed)
     val maintenanceResetSuccessMessage = stringResource(R.string.maintenance_reset_success)
     val maintenanceResetFailedMessage = stringResource(R.string.maintenance_reset_failed)
+    val printStartedMessage = stringResource(R.string.archive_reprint_started)
+    val startNextPrintFailedMessage = stringResource(R.string.start_next_print_failed)
     var selectedTab by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(plateClearSnackbar) {
@@ -230,6 +246,16 @@ private fun PrinterDetailScreenContent(
         }
         snackbarHostState.showSnackbar(message)
         onMaintenanceResetSnackbarShown()
+    }
+
+    LaunchedEffect(startQueuedPrintSnackbar) {
+        val message = when (startQueuedPrintSnackbar) {
+            StartQueuedPrintSnackbar.Started -> printStartedMessage
+            StartQueuedPrintSnackbar.Failed -> startNextPrintFailedMessage
+            null -> return@LaunchedEffect
+        }
+        snackbarHostState.showSnackbar(message)
+        onStartQueuedPrintSnackbarShown()
     }
 
     Scaffold(
@@ -306,15 +332,22 @@ private fun PrinterDetailScreenContent(
                             when (selectedTab) {
                                 0 -> StatusTab(
                                     labels = labels,
+                                    printerName = title,
                                     printerId = printerId,
                                     serverUrl = serverUrl,
                                     cameraToken = cameraToken,
                                     queueUpcoming = queueUpcoming,
+                                    showStartNextPrint = queueUpcoming.isNotEmpty() &&
+                                        !labels.isActivePrint &&
+                                        BambuddyApi.hasQueueStartEndpoint,
+                                    startNextQueuedPrintReadiness = startNextQueuedPrintReadiness,
+                                    isStartingQueuedPrint = isStartingQueuedPrint,
                                     isClearingPlate = isClearingPlate,
                                     isMaintenanceResetBusy = isMaintenanceResetBusy,
                                     onMarkPlateClear = onMarkPlateClear,
                                     onPerformMaintenanceReset = onPerformMaintenanceReset,
                                     onViewFullQueue = onViewFullQueue,
+                                    onStartNextQueuedPrint = onStartNextQueuedPrint,
                                 )
                                 1 -> FilamentTab(labels = labels)
                                 2 -> ControlsTab(
@@ -341,15 +374,20 @@ private fun PrinterDetailScreenContent(
 @Composable
 private fun StatusTab(
     labels: PrinterDetailLabels,
+    printerName: String,
     printerId: Int,
     serverUrl: String,
     cameraToken: String,
     queueUpcoming: List<PrintQueueJob>,
+    showStartNextPrint: Boolean,
+    startNextQueuedPrintReadiness: StartNextQueuedPrintReadiness,
+    isStartingQueuedPrint: Boolean,
     isClearingPlate: Boolean,
     isMaintenanceResetBusy: Boolean,
     onMarkPlateClear: () -> Unit,
     onPerformMaintenanceReset: (Int) -> Unit,
     onViewFullQueue: () -> Unit,
+    onStartNextQueuedPrint: () -> Unit,
 ) {
     if (labels.isActivePrint) {
         ActivePrintStatusTab(
@@ -368,6 +406,14 @@ private fun StatusTab(
             cameraToken = cameraToken,
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
+        )
+    }
+    if (showStartNextPrint) {
+        StartNextPrintAction(
+            printerName = printerName,
+            readiness = startNextQueuedPrintReadiness,
+            isSubmitting = isStartingQueuedPrint,
+            onConfirmStart = onStartNextQueuedPrint,
         )
     }
     if (queueUpcoming.isNotEmpty()) {

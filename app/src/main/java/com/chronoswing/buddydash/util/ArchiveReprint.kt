@@ -2,6 +2,8 @@ package com.chronoswing.buddydash.util
 
 import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.data.model.Printer
+import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.network.BambuddyApi
 
 /** Temporary: log archive queue/reprint API calls. Set false before release. */
 const val DEBUG_LOG_ARCHIVE_REPRINT = true
@@ -54,6 +56,66 @@ fun defaultArchiveReprintPrinterId(
 
 fun defaultArchiveReprintQuantity(archive: PrintArchive): Int =
     archive.quantity?.coerceIn(1, 99) ?: 1
+
+enum class QueueAndStartBlockReason {
+    None,
+    PrinterNotReady,
+    PlateNotClear,
+}
+
+data class QueueAndStartReadiness(
+    val canQueueAndStart: Boolean,
+    val blockReason: QueueAndStartBlockReason = QueueAndStartBlockReason.PrinterNotReady,
+)
+
+fun evaluateQueueAndStartReadiness(
+    status: PrinterStatus?,
+    hasStartEndpoint: Boolean = BambuddyApi.hasQueueStartEndpoint,
+): QueueAndStartReadiness {
+    if (!hasStartEndpoint || status == null) {
+        return QueueAndStartReadiness(
+            canQueueAndStart = false,
+            blockReason = QueueAndStartBlockReason.PrinterNotReady,
+        )
+    }
+    if (!status.connected) {
+        return QueueAndStartReadiness(
+            canQueueAndStart = false,
+            blockReason = QueueAndStartBlockReason.PrinterNotReady,
+        )
+    }
+    when (status.resolveActivityKind()) {
+        PrinterActivityKind.Idle -> Unit
+        else -> {
+            return QueueAndStartReadiness(
+                canQueueAndStart = false,
+                blockReason = QueueAndStartBlockReason.PrinterNotReady,
+            )
+        }
+    }
+    when (status.resolvePlateKind()) {
+        PlateIndicatorKind.Clear -> {
+            return QueueAndStartReadiness(
+                canQueueAndStart = true,
+                blockReason = QueueAndStartBlockReason.None,
+            )
+        }
+        PlateIndicatorKind.NotClear -> {
+            return QueueAndStartReadiness(
+                canQueueAndStart = false,
+                blockReason = QueueAndStartBlockReason.PlateNotClear,
+            )
+        }
+        PlateIndicatorKind.InUse,
+        null,
+        -> {
+            return QueueAndStartReadiness(
+                canQueueAndStart = false,
+                blockReason = QueueAndStartBlockReason.PrinterNotReady,
+            )
+        }
+    }
+}
 
 private fun Printer.toReprintPrinter() = ArchiveReprintPrinter(
     id = id,
