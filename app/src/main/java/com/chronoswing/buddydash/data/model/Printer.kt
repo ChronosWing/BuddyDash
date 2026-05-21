@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.data.model
 
+import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
 import com.chronoswing.buddydash.util.SlotInventoryKey
 
 data class Printer(
@@ -7,6 +8,7 @@ data class Printer(
     val name: String,
     val model: String?,
     val liveStatus: PrinterStatus? = null,
+    val maintenanceIndicator: MaintenanceHomeIndicator = MaintenanceHomeIndicator.None,
 )
 
 data class PrinterStatus(

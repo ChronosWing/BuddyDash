@@ -13,7 +13,9 @@ import com.chronoswing.buddydash.util.applyInventoryToSlots
 import com.chronoswing.buddydash.util.EXTERNAL_AMS_ID
 import com.chronoswing.buddydash.util.externalInventoryTrayId
 import com.chronoswing.buddydash.util.formatAmsSlotLabel
+import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
 import com.chronoswing.buddydash.util.formatAmsUnitLabel
+import com.chronoswing.buddydash.util.resolveMaintenanceHomeIndicator
 import com.chronoswing.buddydash.util.isAmsLiteModule
 import com.chronoswing.buddydash.util.isMeaningfulAmsHumidity
 import com.chronoswing.buddydash.util.isMeaningfulAmsTemp
@@ -117,7 +119,19 @@ class BambuddyApiClient {
                                 printerId = printer.id,
                                 inventoryBySlot = inventoryByPrinter[printer.id],
                             )
-                            mergePrinterWithStatus(printer, statusResult.getOrNull())
+                            val maintenanceIndicator = if (BambuddyApi.hasMaintenanceEndpoint) {
+                                fetchMaintenance(serverUrl, apiKey, printer.id)
+                                    .getOrNull()
+                                    ?.items
+                                    ?.let { resolveMaintenanceHomeIndicator(it) }
+                                    ?: MaintenanceHomeIndicator.None
+                            } else {
+                                MaintenanceHomeIndicator.None
+                            }
+                            printer.copy(
+                                liveStatus = statusResult.getOrNull(),
+                                maintenanceIndicator = maintenanceIndicator,
+                            )
                         }
                     }.awaitAll()
                 }
@@ -199,9 +213,6 @@ class BambuddyApiClient {
         name = json.optString("name", "Printer ${json.getInt("id")}"),
         model = json.optString("model").takeIf { it.isNotBlank() },
     )
-
-    private fun mergePrinterWithStatus(printer: Printer, status: PrinterStatus?): Printer =
-        printer.copy(liveStatus = status)
 
     suspend fun clearPlate(serverUrl: String, apiKey: String, printerId: Int): Result<String> =
         withContext(Dispatchers.IO) {

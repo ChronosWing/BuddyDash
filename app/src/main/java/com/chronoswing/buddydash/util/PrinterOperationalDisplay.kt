@@ -25,6 +25,36 @@ fun formatWifiCompact(signalDbm: Int?, wiredNetwork: Boolean?): String? {
     return signalDbm?.let { "$it dBm" }
 }
 
+enum class WifiSignalLevel {
+    Strong,
+    Good,
+    Weak,
+}
+
+/** dBm-based Wi-Fi cue; null for wired or missing signal (no fake styling). */
+fun resolveWifiSignalLevel(signalDbm: Int?, wiredNetwork: Boolean?): WifiSignalLevel? {
+    if (wiredNetwork == true || signalDbm == null) return null
+    return when {
+        signalDbm >= -55 -> WifiSignalLevel.Strong
+        signalDbm >= -71 -> WifiSignalLevel.Good
+        else -> WifiSignalLevel.Weak
+    }
+}
+
+enum class MaintenanceHomeIndicator {
+    None,
+    DueSoon,
+    Due,
+}
+
+/** Home card maintenance cue from API `is_warning` / `is_due` (not color alone). */
+fun resolveMaintenanceHomeIndicator(items: List<MaintenanceItem>): MaintenanceHomeIndicator {
+    val enabled = items.filter { it.enabled }
+    if (enabled.any { it.isDue }) return MaintenanceHomeIndicator.Due
+    if (enabled.any { it.isWarning }) return MaintenanceHomeIndicator.DueSoon
+    return MaintenanceHomeIndicator.None
+}
+
 fun formatDoorState(doorOpen: Boolean?): String? = doorOpen?.let { open ->
     if (open) "Open" else "Closed"
 }

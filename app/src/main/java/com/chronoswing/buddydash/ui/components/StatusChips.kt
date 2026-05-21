@@ -35,6 +35,7 @@ import com.chronoswing.buddydash.ui.theme.OnlineGreen
 import com.chronoswing.buddydash.ui.theme.TextSecondary
 import com.chronoswing.buddydash.util.CardMicroMotion
 import com.chronoswing.buddydash.util.PlateIndicatorKind
+import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
 import com.chronoswing.buddydash.util.PrinterActivityKind
 
 @Composable
@@ -44,6 +45,7 @@ fun PrinterQuickStatusRow(
     plateKind: PlateIndicatorKind?,
     modifier: Modifier = Modifier,
     cardMicroMotion: CardMicroMotion = CardMicroMotion.None,
+    maintenanceIndicator: MaintenanceHomeIndicator = MaintenanceHomeIndicator.None,
 ) {
     val chipBreath = rememberPrintingChipBreath(cardMicroMotion == CardMicroMotion.Printing)
     Row(
@@ -57,6 +59,33 @@ fun PrinterQuickStatusRow(
             breathPhase = chipBreath,
         )
         plateKind?.let { PlateStatusChip(kind = it) }
+        MaintenanceHomeIndicatorIcon(indicator = maintenanceIndicator)
+    }
+}
+
+@Composable
+fun MaintenanceHomeIndicatorIcon(
+    indicator: MaintenanceHomeIndicator,
+    modifier: Modifier = Modifier,
+) {
+    when (indicator) {
+        MaintenanceHomeIndicator.None -> Unit
+        MaintenanceHomeIndicator.DueSoon -> {
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = stringResource(R.string.cd_maintenance_due_soon_home),
+                modifier = modifier.size(16.dp),
+                tint = Color(0xFFFBBF24).copy(alpha = 0.9f),
+            )
+        }
+        MaintenanceHomeIndicator.Due -> {
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = stringResource(R.string.cd_maintenance_due_home),
+                modifier = modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.92f),
+            )
+        }
     }
 }
 
