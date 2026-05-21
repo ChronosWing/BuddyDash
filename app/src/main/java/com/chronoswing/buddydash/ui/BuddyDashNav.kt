@@ -26,6 +26,8 @@ import com.chronoswing.buddydash.SettingsViewModel
 import com.chronoswing.buddydash.SpoolDetailViewModel
 import com.chronoswing.buddydash.SpoolsViewModel
 import com.chronoswing.buddydash.util.ArchiveMaterialNavigation
+import com.chronoswing.buddydash.util.ArchiveSpoolLookupFilter
+import com.chronoswing.buddydash.util.parseArchiveLookupColorHexesArg
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.ui.components.BuddyDashBottomNav
@@ -36,7 +38,10 @@ import java.nio.charset.StandardCharsets
 object Routes {
     const val HOME = "home"
     const val SPOOLS_BASE = "spools"
-    const val SPOOLS = "spools?search={search}"
+    const val SPOOLS =
+        "spools?search={search}&archiveMatch={archiveMatch}" +
+            "&lookupMaterial={lookupMaterial}&lookupMaterialKey={lookupMaterialKey}" +
+            "&lookupColorLabel={lookupColorLabel}&lookupColorHexes={lookupColorHexes}"
     const val ARCHIVES_BASE = "archives"
     const val ARCHIVES = "archives?search={search}"
     const val SPOOL_DETAIL = "spool/{spoolId}"
@@ -55,7 +60,20 @@ object Routes {
 
     fun spools(search: String = ""): String {
         val encoded = URLEncoder.encode(search, StandardCharsets.UTF_8.toString())
-        return "spools?search=$encoded"
+        return "spools?search=$encoded&archiveMatch=false&lookupMaterial=&lookupMaterialKey=" +
+            "&lookupColorLabel=&lookupColorHexes="
+    }
+
+    fun spoolsArchiveLookup(filter: ArchiveSpoolLookupFilter): String {
+        val enc = { value: String ->
+            URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
+        }
+        val hexArg = filter.colorHexes.joinToString(",") { it.removePrefix("#") }
+        return "spools?search=&archiveMatch=true" +
+            "&lookupMaterial=${enc(filter.materialLabel)}" +
+            "&lookupMaterialKey=${enc(filter.materialKey)}" +
+            "&lookupColorLabel=${enc(filter.colorDisplayLabel.orEmpty())}" +
+            "&lookupColorHexes=${enc(hexArg)}"
     }
 
     fun spoolDetail(spoolId: Int): String = "spool/$spoolId"
@@ -204,10 +222,46 @@ fun BuddyDashNav(
                         type = NavType.StringType
                         defaultValue = ""
                     },
+                    navArgument("archiveMatch") {
+                        type = NavType.StringType
+                        defaultValue = "false"
+                    },
+                    navArgument("lookupMaterial") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("lookupMaterialKey") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("lookupColorLabel") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("lookupColorHexes") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
                 ),
             ) { backStackEntry ->
-                val encodedSearch = backStackEntry.arguments?.getString("search").orEmpty()
-                val initialSearch = URLDecoder.decode(encodedSearch, StandardCharsets.UTF_8.toString())
+                val decode = { key: String ->
+                    URLDecoder.decode(
+                        backStackEntry.arguments?.getString(key).orEmpty(),
+                        StandardCharsets.UTF_8.toString(),
+                    )
+                }
+                val initialSearch = decode("search")
+                val archiveMatch = backStackEntry.arguments?.getString("archiveMatch") == "true"
+                val initialArchiveLookup = if (archiveMatch) {
+                    ArchiveSpoolLookupFilter(
+                        materialLabel = decode("lookupMaterial"),
+                        materialKey = decode("lookupMaterialKey"),
+                        colorHexes = parseArchiveLookupColorHexesArg(decode("lookupColorHexes")),
+                        colorDisplayLabel = decode("lookupColorLabel").ifBlank { null },
+                    )
+                } else {
+                    null
+                }
                 val viewModel: SpoolsViewModel = viewModel(
                     factory = viewModelFactory {
                         SpoolsViewModel(settingsRepository, apiClient)
@@ -216,6 +270,7 @@ fun BuddyDashNav(
                 SpoolsScreen(
                     viewModel = viewModel,
                     initialSearchQuery = initialSearch,
+                    initialArchiveLookupFilter = initialArchiveLookup,
                     onSpoolClick = { spoolId ->
                         navController.navigate(Routes.spoolDetail(spoolId))
                     },
@@ -236,18 +291,6 @@ fun BuddyDashNav(
                     spoolId = spoolId,
                     viewModel = viewModel,
                     onBack = { navController.popBackStack() },
-                    onArchiveClick = { archive ->
-                        navController.navigate(Routes.archiveDetail(archive.id))
-                    },
-                    onViewAllArchives = { query ->
-                        navController.navigate(Routes.archives(query)) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
                 )
             }
 
@@ -285,7 +328,9 @@ fun BuddyDashNav(
                                 navController.navigate(Routes.spoolDetail(navigation.spoolId))
                             }
                             is ArchiveMaterialNavigation.SpoolsFiltered -> {
-                                navController.navigate(Routes.spools(navigation.searchQuery))
+                                navController.navigate(
+                                    Routes.spoolsArchiveLookup(navigation.lookupFilter),
+                                )
                             }
                             ArchiveMaterialNavigation.None -> Unit
                         }

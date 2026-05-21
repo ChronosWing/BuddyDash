@@ -16,9 +16,12 @@ import com.chronoswing.buddydash.util.TAG_ARCHIVE_REPRINT
 import com.chronoswing.buddydash.util.defaultArchiveReprintPrinterId
 import com.chronoswing.buddydash.util.defaultArchiveReprintQuantity
 import com.chronoswing.buddydash.util.ArchiveMaterialNavigation
+import com.chronoswing.buddydash.util.archiveHasMaterialDisplay
+import com.chronoswing.buddydash.util.buildArchiveSpoolLookupFilter
 import com.chronoswing.buddydash.util.evaluateQueueAndStartReadiness
 import com.chronoswing.buddydash.util.logArchiveDetailFieldMapping
 import com.chronoswing.buddydash.util.resolveArchiveMaterialNavigation
+import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.util.resolveActivityKind
 import com.chronoswing.buddydash.util.resolveArchiveReprintPrinters
 import com.chronoswing.buddydash.util.resolvePlateKind
@@ -66,7 +69,6 @@ data class ArchiveDetailUiState(
     val queuedPrinterId: Int? = null,
     val queuedPrinterName: String? = null,
     val queuedPrinterModel: String? = null,
-    val materialNavigation: ArchiveMaterialNavigation = ArchiveMaterialNavigation.None,
 )
 
 class ArchiveDetailViewModel(
@@ -80,6 +82,7 @@ class ArchiveDetailViewModel(
     private var readinessJob: Job? = null
     private var queueJob: Job? = null
     private var spoolsJob: Job? = null
+    private var cachedSpools: List<SpoolInventoryItem>? = null
 
     private val _uiState = MutableStateFlow(ArchiveDetailUiState())
     val uiState: StateFlow<ArchiveDetailUiState> = _uiState.asStateFlow()
@@ -352,20 +355,43 @@ class ArchiveDetailViewModel(
         }
     }
 
+    fun onMaterialTap(onNavigate: (ArchiveMaterialNavigation) -> Unit) {
+        val state = _uiState.value
+        val archive = state.archive ?: return
+        if (!state.hasCredentials || !archiveHasMaterialDisplay(archive)) return
+
+        spoolsJob?.cancel()
+        spoolsJob = viewModelScope.launch {
+            val spools = cachedSpools ?: fetchSpoolInventoryCached(state.serverUrl, state.apiKey)
+            val navigation = spools?.let { resolveArchiveMaterialNavigation(archive, it) }
+                ?: ArchiveMaterialNavigation.SpoolsFiltered(
+                    buildArchiveSpoolLookupFilter(archive),
+                )
+            onNavigate(navigation)
+        }
+    }
+
     private fun loadSpoolsForMaterialLink(archive: PrintArchive) {
         val state = _uiState.value
         if (!state.hasCredentials) return
 
         spoolsJob?.cancel()
         spoolsJob = viewModelScope.launch {
-            val spoolsResult = apiClient.fetchSpoolInventory(state.serverUrl, state.apiKey)
-            val navigation = spoolsResult.fold(
-                onSuccess = { spools -> resolveArchiveMaterialNavigation(archive, spools) },
-                onFailure = { ArchiveMaterialNavigation.None },
-            )
-            _uiState.update { it.copy(materialNavigation = navigation) }
+            fetchSpoolInventoryCached(state.serverUrl, state.apiKey)
         }
     }
+
+    private suspend fun fetchSpoolInventoryCached(
+        serverUrl: String,
+        apiKey: String,
+    ): List<SpoolInventoryItem>? =
+        apiClient.fetchSpoolInventory(serverUrl, apiKey).fold(
+            onSuccess = { spools ->
+                cachedSpools = spools
+                spools
+            },
+            onFailure = { null },
+        )
 
     private fun refreshPrinterReadiness(printerId: Int) {
         val state = _uiState.value

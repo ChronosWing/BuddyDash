@@ -4,9 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
+import com.chronoswing.buddydash.data.model.SpoolUsageEntry
 import com.chronoswing.buddydash.network.BambuddyApiClient
-import com.chronoswing.buddydash.util.SpoolArchiveMatches
-import com.chronoswing.buddydash.util.matchArchivesForSpool
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -19,15 +18,12 @@ import kotlinx.coroutines.launch
 
 data class SpoolDetailUiState(
     val spool: SpoolInventoryItem? = null,
-    val archiveMatches: SpoolArchiveMatches = SpoolArchiveMatches(
-        isExactSpoolId = false,
-        archives = emptyList(),
-    ),
+    val usageHistory: List<SpoolUsageEntry> = emptyList(),
+    val printerNamesById: Map<Int, String> = emptyMap(),
     val isLoading: Boolean = false,
     val error: String? = null,
     val serverUrl: String = "",
     val apiKey: String = "",
-    val cameraToken: String = "",
     val hasCredentials: Boolean = false,
 )
 
@@ -47,15 +43,13 @@ class SpoolDetailViewModel(
             combine(
                 settingsRepository.serverUrl,
                 settingsRepository.apiKey,
-                settingsRepository.cameraToken,
-            ) { url, key, cameraToken ->
-                Triple(url, key, cameraToken)
-            }.collect { (url, key, cameraToken) ->
+            ) { url, key ->
+                url to key
+            }.collect { (url, key) ->
                 _uiState.update {
                     it.copy(
                         serverUrl = url,
                         apiKey = key,
-                        cameraToken = cameraToken,
                         hasCredentials = url.isNotBlank() && key.isNotBlank(),
                     )
                 }
@@ -86,13 +80,21 @@ class SpoolDetailViewModel(
                 val spoolsDeferred = async {
                     apiClient.fetchSpoolInventory(state.serverUrl, state.apiKey)
                 }
-                val archivesDeferred = async {
-                    apiClient.fetchArchives(state.serverUrl, state.apiKey)
+                val usageDeferred = async {
+                    apiClient.fetchSpoolUsageHistory(state.serverUrl, state.apiKey, spoolId)
                 }
-                spoolsDeferred.await() to archivesDeferred.await()
+                val printersDeferred = async {
+                    apiClient.fetchPrinters(state.serverUrl, state.apiKey)
+                }
+                Triple(
+                    spoolsDeferred.await(),
+                    usageDeferred.await(),
+                    printersDeferred.await(),
+                )
             }
             val spoolsResult = result.first
-            val archivesResult = result.second
+            val usageResult = result.second
+            val printersResult = result.third
             spoolsResult.fold(
                 onSuccess = { spools ->
                     val spool = spools.find { it.id == spoolId }
@@ -101,18 +103,21 @@ class SpoolDetailViewModel(
                             it.copy(
                                 isLoading = false,
                                 spool = null,
+                                usageHistory = emptyList(),
                                 error = "Spool not found",
                             )
                         }
                         return@fold
                     }
-                    val archives = archivesResult.getOrElse { emptyList() }
-                    val matches = matchArchivesForSpool(spool, archives)
+                    val usageHistory = usageResult.getOrElse { emptyList() }
+                    val printerNamesById = printersResult.getOrElse { emptyList() }
+                        .associate { it.id to it.name }
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             spool = spool,
-                            archiveMatches = matches,
+                            usageHistory = usageHistory,
+                            printerNamesById = printerNamesById,
                             error = null,
                         )
                     }

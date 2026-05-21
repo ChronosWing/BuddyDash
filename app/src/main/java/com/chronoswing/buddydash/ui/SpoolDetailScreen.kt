@@ -1,6 +1,5 @@
 package com.chronoswing.buddydash.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,7 +15,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -31,39 +29,33 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.SpoolDetailViewModel
-import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
-import com.chronoswing.buddydash.ui.components.ArchiveThumbnail
-import com.chronoswing.buddydash.ui.components.FilamentUsageText
+import com.chronoswing.buddydash.data.model.SpoolUsageEntry
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
-import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentColorSwatch
 import com.chronoswing.buddydash.ui.components.FilamentRemainingBar
+import com.chronoswing.buddydash.ui.components.FilamentUsageText
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.components.LowSpoolChip
 import com.chronoswing.buddydash.ui.components.SectionHeader
-import com.chronoswing.buddydash.util.ARCHIVE_DISPLAY_NAME_FALLBACK
-import com.chronoswing.buddydash.util.SPOOL_ARCHIVE_MATCH_PREVIEW_LIMIT
-import com.chronoswing.buddydash.util.SpoolArchiveMatches
-import com.chronoswing.buddydash.util.formatArchiveDuration
-import com.chronoswing.buddydash.util.formatArchiveStatusLabel
-import com.chronoswing.buddydash.util.formatFilamentUsageCompact
 import com.chronoswing.buddydash.util.formatSpoolCardTitle
 import com.chronoswing.buddydash.util.formatSpoolLastUsed
 import com.chronoswing.buddydash.util.formatSpoolLocationLine
 import com.chronoswing.buddydash.util.formatSpoolMaterialSubtitle
 import com.chronoswing.buddydash.util.formatSpoolRemainingGrams
 import com.chronoswing.buddydash.util.formatSpoolTagIndicator
+import com.chronoswing.buddydash.util.formatSpoolUsageDate
+import com.chronoswing.buddydash.util.formatSpoolUsagePrintName
+import com.chronoswing.buddydash.util.formatSpoolUsagePrinterLine
+import com.chronoswing.buddydash.util.formatSpoolUsageWeight
 
 @Composable
 fun SpoolDetailScreen(
     spoolId: Int,
     viewModel: SpoolDetailViewModel,
     onBack: () -> Unit,
-    onArchiveClick: (PrintArchive) -> Unit,
-    onViewAllArchives: (String) -> Unit,
 ) {
     LaunchedEffect(spoolId) {
         viewModel.init(spoolId)
@@ -73,15 +65,12 @@ fun SpoolDetailScreen(
 
     SpoolDetailScreenContent(
         spool = uiState.spool,
-        archiveMatches = uiState.archiveMatches,
+        usageHistory = uiState.usageHistory,
+        printerNamesById = uiState.printerNamesById,
         isLoading = uiState.isLoading,
         error = uiState.error,
-        serverUrl = uiState.serverUrl,
-        cameraToken = uiState.cameraToken,
         onBack = onBack,
         onRetry = { viewModel.load(force = true) },
-        onArchiveClick = onArchiveClick,
-        onViewAllArchives = onViewAllArchives,
     )
 }
 
@@ -89,15 +78,12 @@ fun SpoolDetailScreen(
 @Composable
 private fun SpoolDetailScreenContent(
     spool: SpoolInventoryItem?,
-    archiveMatches: SpoolArchiveMatches,
+    usageHistory: List<SpoolUsageEntry>,
+    printerNamesById: Map<Int, String>,
     isLoading: Boolean,
     error: String?,
-    serverUrl: String,
-    cameraToken: String,
     onBack: () -> Unit,
     onRetry: () -> Unit,
-    onArchiveClick: (PrintArchive) -> Unit,
-    onViewAllArchives: (String) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -139,13 +125,9 @@ private fun SpoolDetailScreenContent(
                 ) {
                     SpoolDetailHero(spool = spool)
                     SpoolDetailFields(spool = spool)
-                    SpoolArchiveUsageSection(
-                        spool = spool,
-                        matches = archiveMatches,
-                        serverUrl = serverUrl,
-                        cameraToken = cameraToken,
-                        onArchiveClick = onArchiveClick,
-                        onViewAllArchives = onViewAllArchives,
+                    SpoolUsageHistorySection(
+                        usageHistory = usageHistory,
+                        printerNamesById = printerNamesById,
                     )
                 }
             }
@@ -264,96 +246,55 @@ private fun SpoolDetailFields(spool: SpoolInventoryItem) {
 }
 
 @Composable
-private fun SpoolArchiveUsageSection(
-    spool: SpoolInventoryItem,
-    matches: SpoolArchiveMatches,
-    serverUrl: String,
-    cameraToken: String,
-    onArchiveClick: (PrintArchive) -> Unit,
-    onViewAllArchives: (String) -> Unit,
+private fun SpoolUsageHistorySection(
+    usageHistory: List<SpoolUsageEntry>,
+    printerNamesById: Map<Int, String>,
 ) {
-    if (matches.archives.isEmpty()) return
-
-    val sectionTitle = if (matches.isExactSpoolId) {
-        stringResource(R.string.spool_detail_used_in_prints)
-    } else {
-        stringResource(R.string.spool_detail_matching_archives)
-    }
-    val preview = matches.archives.take(SPOOL_ARCHIVE_MATCH_PREVIEW_LIMIT)
-    val moreCount = matches.archives.size - preview.size
-    val viewAllQuery = buildList {
-        add(formatSpoolCardTitle(spool))
-        spool.colorName?.let { add(it) }
-        spool.swatch.colorHexes.forEach { add(it) }
-    }.joinToString(" ")
+    if (usageHistory.isEmpty()) return
 
     DetailInfoCard {
-        SectionHeader(sectionTitle)
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            preview.forEach { archive ->
-                val displayName = if (archive.displayName == ARCHIVE_DISPLAY_NAME_FALLBACK) {
-                    stringResource(R.string.archive_unnamed_print)
-                } else {
-                    archive.displayName
-                }
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onArchiveClick(archive) },
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.surface,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        ArchiveThumbnail(
-                            archiveId = archive.id,
-                            serverUrl = serverUrl,
-                            cameraToken = cameraToken,
-                            size = 44.dp,
-                        )
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            Text(
-                                text = displayName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = formatArchiveStatusLabel(archive.resultKind, archive.statusRaw),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            formatArchiveDuration(archive.durationSeconds)?.let { duration ->
-                                Text(
-                                    text = duration,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                                )
-                            }
-                            formatFilamentUsageCompact(archive.filamentUsage)?.let { usage ->
-                                FilamentUsageText(text = usage)
-                            }
-                        }
-                    }
-                }
-            }
-            if (moreCount > 0) {
-                Text(
-                    text = stringResource(R.string.spool_detail_view_all_archives, moreCount),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .clickable { onViewAllArchives(viewAllQuery) }
-                        .padding(top = 4.dp),
+        SectionHeader(stringResource(R.string.spool_detail_used_in_prints))
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            usageHistory.forEach { entry ->
+                SpoolUsageHistoryRow(
+                    entry = entry,
+                    printerNamesById = printerNamesById,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SpoolUsageHistoryRow(
+    entry: SpoolUsageEntry,
+    printerNamesById: Map<Int, String>,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = formatSpoolUsagePrintName(entry),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        FilamentUsageText(text = formatSpoolUsageWeight(entry))
+        formatSpoolUsageDate(entry)?.let { date ->
+            Text(
+                text = date,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+            )
+        }
+        formatSpoolUsagePrinterLine(entry, printerNamesById)?.let { printer ->
+            Text(
+                text = printer,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+            )
         }
     }
 }
