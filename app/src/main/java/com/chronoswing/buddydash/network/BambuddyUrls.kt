@@ -91,3 +91,16 @@ fun queueJobThumbnailUrl(
     val url = tokenAuthenticatedImageUrl(serverUrl, apiPath, cameraToken, cacheBust = cacheBust)
     return QueueJobThumbnailUrl(resolution.source, url)
 }
+
+/** Archive thumbnail (GET /api/v1/archives/{id}/thumbnail?token=). */
+fun archiveThumbnailUrl(
+    serverUrl: String,
+    archiveId: Int,
+    cameraToken: String,
+): String? =
+    tokenAuthenticatedImageUrl(
+        serverUrl,
+        BambuddyApi.archiveThumbnailPath(archiveId),
+        cameraToken,
+        cacheBust = System.currentTimeMillis(),
+    )

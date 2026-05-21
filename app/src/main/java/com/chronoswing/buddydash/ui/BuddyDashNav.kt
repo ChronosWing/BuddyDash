@@ -1,8 +1,10 @@
 package com.chronoswing.buddydash.ui
 
+import android.util.Log
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
@@ -16,6 +18,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.chronoswing.buddydash.ArchiveDetailViewModel
+import com.chronoswing.buddydash.ArchivesViewModel
 import com.chronoswing.buddydash.HomeViewModel
 import com.chronoswing.buddydash.PrinterDetailViewModel
 import com.chronoswing.buddydash.SettingsViewModel
@@ -28,19 +32,32 @@ import java.nio.charset.StandardCharsets
 
 object Routes {
     const val HOME = "home"
+    const val ARCHIVES = "archives"
     const val SPOOLS = "spools"
     const val SETTINGS = "settings"
     const val PRINTER_DETAIL = "printer/{printerId}/{printerName}/{printerModel}"
     const val PRINTER_QUEUE = "printer_queue"
+    const val ARCHIVE_DETAIL = "archive/{archiveId}"
 
     fun printerDetail(printerId: Int, printerName: String, printerModel: String? = null): String {
         val encodedName = java.net.URLEncoder.encode(printerName, StandardCharsets.UTF_8.toString())
         val encodedModel = java.net.URLEncoder.encode(printerModel.orEmpty(), StandardCharsets.UTF_8.toString())
         return "printer/$printerId/$encodedName/$encodedModel"
     }
+
+    fun archiveDetail(archiveId: Int): String = "archive/$archiveId"
 }
 
-private val bottomNavRoutes = setOf(Routes.HOME, Routes.SPOOLS, Routes.SETTINGS)
+/** Temporary: verify bottom-tab destinations. Set false before release. */
+private const val DEBUG_LOG_NAV_DESTINATIONS = true
+private const val TAG_NAV = "BuddyDash/Nav"
+
+private val bottomNavRoutes = setOf(
+    Routes.HOME,
+    Routes.SPOOLS,
+    Routes.ARCHIVES,
+    Routes.SETTINGS,
+)
 
 @Composable
 fun BuddyDashNav(
@@ -51,6 +68,16 @@ fun BuddyDashNav(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in bottomNavRoutes
+
+    LaunchedEffect(Unit) {
+        if (DEBUG_LOG_NAV_DESTINATIONS) {
+            Log.d(
+                TAG_NAV,
+                "bottomNavTabs=Printers(${Routes.HOME}), Spools(${Routes.SPOOLS}), " +
+                    "Archives(${Routes.ARCHIVES}), Settings(${Routes.SETTINGS})",
+            )
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -68,6 +95,15 @@ fun BuddyDashNav(
                     },
                     onSpools = {
                         navController.navigate(Routes.SPOOLS) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onArchives = {
+                        navController.navigate(Routes.ARCHIVES) {
                             popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = true
                             }
@@ -109,6 +145,20 @@ fun BuddyDashNav(
                 )
             }
 
+            composable(Routes.ARCHIVES) {
+                val viewModel: ArchivesViewModel = viewModel(
+                    factory = viewModelFactory {
+                        ArchivesViewModel(settingsRepository, apiClient)
+                    },
+                )
+                ArchivesScreen(
+                    viewModel = viewModel,
+                    onArchiveClick = { archive ->
+                        navController.navigate(Routes.archiveDetail(archive.id))
+                    },
+                )
+            }
+
             composable(Routes.SPOOLS) {
                 val viewModel: SpoolsViewModel = viewModel(
                     factory = viewModelFactory {
@@ -125,6 +175,23 @@ fun BuddyDashNav(
                     },
                 )
                 SettingsScreen(viewModel = viewModel)
+            }
+
+            composable(
+                route = Routes.ARCHIVE_DETAIL,
+                arguments = listOf(navArgument("archiveId") { type = NavType.IntType }),
+            ) { backStackEntry ->
+                val archiveId = backStackEntry.arguments?.getInt("archiveId") ?: return@composable
+                val viewModel: ArchiveDetailViewModel = viewModel(
+                    factory = viewModelFactory {
+                        ArchiveDetailViewModel(settingsRepository, apiClient)
+                    },
+                )
+                ArchiveDetailScreen(
+                    archiveId = archiveId,
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                )
             }
 
             composable(

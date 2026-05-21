@@ -1,6 +1,7 @@
 package com.chronoswing.buddydash.ui.components
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Settings
@@ -20,6 +21,7 @@ fun BuddyDashBottomNav(
     currentRoute: String?,
     onPrinters: () -> Unit,
     onSpools: () -> Unit,
+    onArchives: () -> Unit,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -48,6 +50,17 @@ fun BuddyDashBottomNav(
                 )
             },
             label = { Text(stringResource(R.string.nav_spools)) },
+        )
+        NavigationBarItem(
+            selected = currentRoute == Routes.ARCHIVES,
+            onClick = onArchives,
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.History,
+                    contentDescription = stringResource(R.string.nav_archives),
+                )
+            },
+            label = { Text(stringResource(R.string.nav_archives)) },
         )
         NavigationBarItem(
             selected = currentRoute == Routes.SETTINGS,

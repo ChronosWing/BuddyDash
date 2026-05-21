@@ -4,6 +4,7 @@ import com.chronoswing.buddydash.data.model.AmsUnitInfo
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.Printer
+import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.data.model.PrintQueueJob
 import com.chronoswing.buddydash.data.model.PrinterQueueSnapshot
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
@@ -41,6 +42,12 @@ import com.chronoswing.buddydash.util.logFilamentUsageDiscovery
 import com.chronoswing.buddydash.util.queueDurationFieldCandidates
 import com.chronoswing.buddydash.util.queueFilamentUsageFieldCandidates
 import com.chronoswing.buddydash.util.resolveFilamentUsageFromJson
+import com.chronoswing.buddydash.util.ARCHIVES_LIST_DEFAULT_LIMIT
+import com.chronoswing.buddydash.util.DEBUG_LOG_ARCHIVES
+import com.chronoswing.buddydash.util.TAG_ARCHIVES
+import com.chronoswing.buddydash.util.archiveDisplayFieldsSample
+import com.chronoswing.buddydash.util.logArchiveStatsDateItemDebug
+import com.chronoswing.buddydash.util.parsePrintArchive
 import com.chronoswing.buddydash.util.resolveQueueFilamentUsage
 import com.chronoswing.buddydash.util.queueImageIdFieldCandidates
 import com.chronoswing.buddydash.util.queueJsonPositiveInt
@@ -373,6 +380,95 @@ class BambuddyApiClient {
                 }
             }
         }
+
+    suspend fun fetchArchives(
+        serverUrl: String,
+        apiKey: String,
+        limit: Int = ARCHIVES_LIST_DEFAULT_LIMIT,
+        offset: Int = 0,
+    ): Result<List<PrintArchive>> =
+        withContext(Dispatchers.IO) {
+            if (!BambuddyApi.hasArchivesEndpoint) {
+                return@withContext Result.failure(
+                    UnsupportedOperationException("Archives endpoint not found"),
+                )
+            }
+            runCatching {
+                val printers = fetchPrinters(serverUrl, apiKey).getOrElse { emptyList() }
+                val namesById = printers.associate { it.id to it.name }
+                val modelsById = printers.mapNotNull { p -> p.model?.let { p.id to it } }.toMap()
+                val path = BambuddyApi.archivesPath(limit = limit, offset = offset)
+                val archives = runApiCall(serverUrl, apiKey, path) { body ->
+                    parseArchivesList(body, namesById, modelsById)
+                }.getOrThrow()
+                if (DEBUG_LOG_ARCHIVES) {
+                    Log.d(TAG_ARCHIVES, "GET $path count=${archives.size}")
+                    archives.take(3).forEach { archive ->
+                        Log.d(
+                            TAG_ARCHIVES,
+                            "archive id=${archive.id} name=${archive.displayName} " +
+                                "status=${archive.statusRaw} kind=${archive.resultKind} " +
+                                "printer=${archive.printerName} duration=${archive.durationSeconds} " +
+                                "filament=${archive.filamentUsage?.weightGrams}",
+                        )
+                    }
+                }
+                archives.sortedByDescending { it.completedAtIso ?: it.startedAtIso.orEmpty() }
+            }
+        }
+
+    suspend fun fetchArchive(
+        serverUrl: String,
+        apiKey: String,
+        archiveId: Int,
+    ): Result<PrintArchive> =
+        withContext(Dispatchers.IO) {
+            if (!BambuddyApi.hasArchivesEndpoint) {
+                return@withContext Result.failure(
+                    UnsupportedOperationException("Archives endpoint not found"),
+                )
+            }
+            runCatching {
+                val printers = fetchPrinters(serverUrl, apiKey).getOrElse { emptyList() }
+                val namesById = printers.associate { it.id to it.name }
+                val modelsById = printers.mapNotNull { p -> p.model?.let { p.id to it } }.toMap()
+                val path = BambuddyApi.archiveDetailPath(archiveId)
+                runApiCall(serverUrl, apiKey, path) { body ->
+                    val json = JSONObject(body)
+                    if (DEBUG_LOG_ARCHIVES) {
+                        Log.d(TAG_ARCHIVES, "GET $path fields=${archiveDisplayFieldsSample(json)}")
+                    }
+                    parsePrintArchive(json, namesById, modelsById)
+                        ?: throw IllegalStateException("Invalid archive response")
+                }.getOrThrow()
+            }
+        }
+
+    private fun parseArchivesList(
+        body: String,
+        printerNamesById: Map<Int, String>,
+        printerModelsById: Map<Int, String>,
+    ): List<PrintArchive> {
+        val array = JSONArray(body)
+        if (DEBUG_LOG_ARCHIVES) {
+            Log.d(TAG_ARCHIVES, "parseArchivesList rawCount=${array.length()}")
+            if (array.length() > 0) {
+                val sample = array.getJSONObject(0)
+                Log.d(TAG_ARCHIVES, "fieldsSample=${archiveDisplayFieldsSample(sample)}")
+            }
+        }
+        return buildList {
+            for (i in 0 until array.length()) {
+                val json = array.optJSONObject(i) ?: continue
+                parsePrintArchive(json, printerNamesById, printerModelsById)?.let { archive ->
+                    if (DEBUG_LOG_ARCHIVES) {
+                        logArchiveStatsDateItemDebug(archive.displayName, json, archive)
+                    }
+                    add(archive)
+                }
+            }
+        }
+    }
 
     suspend fun setPrintSpeed(
         serverUrl: String,
