@@ -13,6 +13,11 @@
     <string name="refresh">Refresh</string>
     <string name="configure_settings_hint">Open Settings to enter your Bambuddy server URL and API key.</string>
     <string name="no_printers">No printers found on this server.</string>
+    <string name="search_printers">Search printers</string>
+    <string name="search_printers_hint">Search printers…</string>
+    <string name="close_search">Close search</string>
+    <string name="clear_search">Clear search</string>
+    <string name="no_printers_match_search">No printers found</string>
     <string name="online">Online</string>
     <string name="offline">Offline</string>
     <string name="printer_status_label">Status: %1$s</string>
