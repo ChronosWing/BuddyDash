@@ -261,6 +261,20 @@ private fun PrinterDetailScreenContent(
                             )
                         }
                     }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        StatusLastUpdatedIndicator(
+                            lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
+                            isRefreshing = isRefreshing,
+                            enabled = !isClearingPlate && !isControlBusy,
+                            onRefresh = onRefresh,
+                        )
+                    }
                     PullToRefreshBox(
                         isRefreshing = isRefreshing,
                         onRefresh = onPullRefresh,
@@ -289,10 +303,6 @@ private fun PrinterDetailScreenContent(
                                     labels = labels,
                                     isClearingPlate = isClearingPlate,
                                     isControlBusy = isControlBusy,
-                                    isRefreshing = isRefreshing,
-                                    lastStatusUpdatedAtMillis = lastStatusUpdatedAtMillis,
-                                    onRefresh = onRefresh,
-                                    onMarkPlateClear = onMarkPlateClear,
                                     onSetPrintSpeed = onSetPrintSpeed,
                                     onPausePrint = onPausePrint,
                                     onResumePrint = onResumePrint,
@@ -564,10 +574,6 @@ private fun ControlsTab(
     labels: PrinterDetailLabels,
     isClearingPlate: Boolean,
     isControlBusy: Boolean,
-    isRefreshing: Boolean,
-    lastStatusUpdatedAtMillis: Long?,
-    onRefresh: () -> Unit,
-    onMarkPlateClear: () -> Unit,
     onSetPrintSpeed: (Int) -> Unit,
     onPausePrint: () -> Unit,
     onResumePrint: () -> Unit,
@@ -607,32 +613,6 @@ private fun ControlsTab(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SectionHeader(
-                title = stringResource(R.string.controls_section_status),
-                modifier = Modifier.padding(top = 0.dp),
-            )
-            StatusLastUpdatedIndicator(
-                lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
-                isRefreshing = isRefreshing,
-                enabled = actionsEnabled,
-                onRefresh = onRefresh,
-            )
-        }
-        DetailInfoCard {
-            if (labels.showPlateClearAction) {
-                PlateClearButton(
-                    labels = labels,
-                    isClearingPlate = isClearingPlate,
-                    onClick = onMarkPlateClear,
-                )
-            }
-        }
-
         if (labels.canControlPrint) {
             SectionHeader(stringResource(R.string.controls_section_print))
             DetailInfoCard {
