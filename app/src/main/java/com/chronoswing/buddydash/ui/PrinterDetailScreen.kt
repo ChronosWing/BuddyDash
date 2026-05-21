@@ -492,6 +492,8 @@ private fun FilamentTab(labels: PrinterDetailLabels) {
     FilamentDetailGroups(
         slots = slots,
         activeKey = labels.activeFilamentSlot,
+        activityKind = labels.activityKind,
+        printerRawState = labels.printerRawState,
         modifier = Modifier.fillMaxWidth(),
     )
 }

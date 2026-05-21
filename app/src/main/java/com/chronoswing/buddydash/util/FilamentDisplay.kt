@@ -111,3 +111,32 @@ fun resolveActiveFilamentSlot(
 
 fun FilamentSlot.isActiveSlot(activeKey: SlotInventoryKey?): Boolean =
     activeKey != null && inventoryKey == activeKey
+
+enum class FilamentGlowMotion {
+    /** Error, offline, failed — static highlight only. */
+    None,
+    /** Paused — hold steady mid glow. */
+    Frozen,
+    /** Idle / busy — slower, softer breathing. */
+    SoftIdle,
+    /** Printing — standard breathing. */
+    Breathing,
+}
+
+fun resolveFilamentGlowMotion(
+    activityKind: PrinterActivityKind,
+    rawState: String? = null,
+): FilamentGlowMotion {
+    val raw = rawState?.uppercase()
+    if (raw == "FAILED" || activityKind == PrinterActivityKind.Error ||
+        activityKind == PrinterActivityKind.Offline
+    ) {
+        return FilamentGlowMotion.None
+    }
+    return when (activityKind) {
+        PrinterActivityKind.Printing -> FilamentGlowMotion.Breathing
+        PrinterActivityKind.Paused -> FilamentGlowMotion.Frozen
+        PrinterActivityKind.Idle, PrinterActivityKind.Busy -> FilamentGlowMotion.SoftIdle
+        PrinterActivityKind.Error, PrinterActivityKind.Offline -> FilamentGlowMotion.None
+    }
+}
