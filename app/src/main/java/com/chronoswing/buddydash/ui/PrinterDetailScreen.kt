@@ -11,8 +11,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
@@ -29,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,11 +41,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chronoswing.buddydash.ControlSnackbar
 import com.chronoswing.buddydash.PlateClearSnackbar
 import com.chronoswing.buddydash.PrinterDetailViewModel
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.ui.components.ComingSoonActionButton
+import com.chronoswing.buddydash.ui.components.DetailConnectivityCard
+import com.chronoswing.buddydash.ui.components.DetailFansCard
+import com.chronoswing.buddydash.ui.components.DetailMaintenanceCard
+import com.chronoswing.buddydash.ui.components.DetailPrintSpeedCard
+import com.chronoswing.buddydash.ui.components.FilamentAmsEnvironmentSection
+import com.chronoswing.buddydash.ui.components.PrintSpeedControlChips
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.ErrorContent
@@ -86,7 +97,7 @@ fun PrinterDetailScreen(
         },
     )
 
-    val labels = uiState.status?.toDetailLabels()
+    val labels = uiState.status?.toDetailLabels(uiState.maintenanceItems)
 
     PrinterDetailScreenContent(
         title = uiState.printerName.ifBlank { printerName },
@@ -98,13 +109,21 @@ fun PrinterDetailScreen(
         error = uiState.error,
         labels = labels,
         isClearingPlate = uiState.isClearingPlate,
+        isControlBusy = uiState.isControlBusy,
         plateClearSnackbar = uiState.plateClearSnackbar,
+        controlSnackbar = uiState.controlSnackbar,
         onBack = onBack,
         onRetry = viewModel::loadStatus,
         onRefresh = { viewModel.loadStatus(showLoading = false) },
         onPullRefresh = { viewModel.loadStatus(showLoading = false, fromPull = true) },
         onMarkPlateClear = viewModel::markPlateClear,
         onPlateClearSnackbarShown = viewModel::onPlateClearSnackbarShown,
+        onControlSnackbarShown = viewModel::onControlSnackbarShown,
+        onSetPrintSpeed = viewModel::setPrintSpeed,
+        onPausePrint = viewModel::pausePrint,
+        onResumePrint = viewModel::resumePrint,
+        onStopPrint = viewModel::stopPrint,
+        onToggleLight = viewModel::toggleChamberLight,
     )
 }
 
@@ -120,17 +139,27 @@ private fun PrinterDetailScreenContent(
     error: String?,
     labels: PrinterDetailLabels?,
     isClearingPlate: Boolean,
+    isControlBusy: Boolean,
     plateClearSnackbar: PlateClearSnackbar?,
+    controlSnackbar: ControlSnackbar?,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
     onMarkPlateClear: () -> Unit,
     onPlateClearSnackbarShown: () -> Unit,
+    onControlSnackbarShown: () -> Unit,
+    onSetPrintSpeed: (Int) -> Unit,
+    onPausePrint: () -> Unit,
+    onResumePrint: () -> Unit,
+    onStopPrint: () -> Unit,
+    onToggleLight: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val plateClearSuccessMessage = stringResource(R.string.plate_clear_success)
     val plateClearFailedMessage = stringResource(R.string.plate_clear_failed)
+    val controlSuccessMessage = stringResource(R.string.control_success)
+    val controlFailedMessage = stringResource(R.string.control_failed)
     var selectedTab by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(plateClearSnackbar) {
@@ -141,6 +170,16 @@ private fun PrinterDetailScreenContent(
         }
         snackbarHostState.showSnackbar(message)
         onPlateClearSnackbarShown()
+    }
+
+    LaunchedEffect(controlSnackbar) {
+        val message = when (controlSnackbar) {
+            ControlSnackbar.Success -> controlSuccessMessage
+            ControlSnackbar.Failed -> controlFailedMessage
+            null -> return@LaunchedEffect
+        }
+        snackbarHostState.showSnackbar(message)
+        onControlSnackbarShown()
     }
 
     Scaffold(
@@ -203,12 +242,18 @@ private fun PrinterDetailScreenContent(
                                     isClearingPlate = isClearingPlate,
                                     onMarkPlateClear = onMarkPlateClear,
                                 )
-                                1 -> FilamentTab(slots = labels.filamentSlots)
+                                1 -> FilamentTab(labels = labels)
                                 2 -> ControlsTab(
                                     labels = labels,
                                     isClearingPlate = isClearingPlate,
+                                    isControlBusy = isControlBusy,
                                     onRefresh = onRefresh,
                                     onMarkPlateClear = onMarkPlateClear,
+                                    onSetPrintSpeed = onSetPrintSpeed,
+                                    onPausePrint = onPausePrint,
+                                    onResumePrint = onResumePrint,
+                                    onStopPrint = onStopPrint,
+                                    onToggleLight = onToggleLight,
                                 )
                             }
                         }
@@ -247,6 +292,15 @@ private fun StatusTab(
             onMarkPlateClear = onMarkPlateClear,
         )
     }
+    DetailOperationalStats(labels)
+}
+
+@Composable
+private fun DetailOperationalStats(labels: PrinterDetailLabels) {
+    DetailConnectivityCard(labels)
+    DetailFansCard(labels)
+    DetailPrintSpeedCard(labels)
+    DetailMaintenanceCard(labels)
 }
 
 @Composable
@@ -429,7 +483,8 @@ private fun IdleStatusTab(
 }
 
 @Composable
-private fun FilamentTab(slots: List<FilamentSlot>) {
+private fun FilamentTab(labels: PrinterDetailLabels) {
+    val slots = labels.filamentSlots
     if (slots.isEmpty()) {
         Text(
             text = stringResource(R.string.no_filament_data),
@@ -438,6 +493,7 @@ private fun FilamentTab(slots: List<FilamentSlot>) {
         )
         return
     }
+    FilamentAmsEnvironmentSection(labels)
     FilamentChipRow(slots = slots, compact = false, modifier = Modifier.fillMaxWidth())
     slots.forEach { slot ->
         val typeLabel = if (slot.isLoaded) {
@@ -467,17 +523,48 @@ private fun FilamentTab(slots: List<FilamentSlot>) {
 private fun ControlsTab(
     labels: PrinterDetailLabels,
     isClearingPlate: Boolean,
+    isControlBusy: Boolean,
     onRefresh: () -> Unit,
     onMarkPlateClear: () -> Unit,
+    onSetPrintSpeed: (Int) -> Unit,
+    onPausePrint: () -> Unit,
+    onResumePrint: () -> Unit,
+    onStopPrint: () -> Unit,
+    onToggleLight: () -> Unit,
 ) {
     val comingSoon = stringResource(R.string.coming_soon)
+    var showStopConfirm by remember { mutableStateOf(false) }
+    val actionsEnabled = !isClearingPlate && !isControlBusy
+
+    if (showStopConfirm) {
+        AlertDialog(
+            onDismissRequest = { showStopConfirm = false },
+            title = { Text(stringResource(R.string.stop_print_confirm_title)) },
+            text = { Text(stringResource(R.string.stop_print_confirm_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showStopConfirm = false
+                        onStopPrint()
+                    },
+                ) {
+                    Text(stringResource(R.string.stop_print_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStopConfirm = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionHeader(stringResource(R.string.controls_section_status))
         DetailInfoCard {
             Button(
                 onClick = onRefresh,
-                enabled = !isClearingPlate,
+                enabled = actionsEnabled,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.refresh_status))
@@ -491,12 +578,67 @@ private fun ControlsTab(
             }
         }
 
-        SectionHeader(stringResource(R.string.controls_section_quick_actions))
+        if (labels.canControlPrint) {
+            SectionHeader(stringResource(R.string.controls_section_print))
+            DetailInfoCard {
+                PrintSpeedControlChips(
+                    currentLevel = labels.speedLevel,
+                    enabled = actionsEnabled,
+                    onSelect = onSetPrintSpeed,
+                )
+            }
+        }
+
+        val hasQuickActions = labels.canPause || labels.canResume || labels.canStop || labels.canToggleLight
+        if (hasQuickActions) {
+            SectionHeader(stringResource(R.string.controls_section_quick_actions))
+            DetailInfoCard {
+                if (labels.canPause) {
+                    Button(
+                        onClick = onPausePrint,
+                        enabled = actionsEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.pause_print))
+                    }
+                }
+                if (labels.canResume) {
+                    Button(
+                        onClick = onResumePrint,
+                        enabled = actionsEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.resume_print))
+                    }
+                }
+                if (labels.canStop) {
+                    OutlinedButton(
+                        onClick = { showStopConfirm = true },
+                        enabled = actionsEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.stop_print))
+                    }
+                }
+                if (labels.canToggleLight) {
+                    val lightOn = labels.chamberLightOn == true
+                    OutlinedButton(
+                        onClick = onToggleLight,
+                        enabled = actionsEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            stringResource(
+                                if (lightOn) R.string.light_off else R.string.light_on,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
+        SectionHeader(stringResource(R.string.controls_section_more))
         DetailInfoCard {
-            ComingSoonActionButton(
-                label = stringResource(R.string.toggle_light),
-                helperText = comingSoon,
-            )
             ComingSoonActionButton(
                 label = stringResource(R.string.camera_view),
                 helperText = comingSoon,

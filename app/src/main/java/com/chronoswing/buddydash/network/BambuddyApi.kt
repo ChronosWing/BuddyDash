@@ -20,10 +20,17 @@ object BambuddyApi {
     const val CHAMBER_LIGHT_PATH = "/api/v1/printers/{printer_id}/chamber-light"
     const val CAMERA_SNAPSHOT_PATH = "/api/v1/printers/{printer_id}/camera/snapshot"
     const val PRINTER_FILES_PATH = "/api/v1/printers/{printer_id}/files"
+    const val PRINT_PAUSE_PATH = "/api/v1/printers/{printer_id}/print/pause"
+    const val PRINT_RESUME_PATH = "/api/v1/printers/{printer_id}/print/resume"
+    const val PRINT_STOP_PATH = "/api/v1/printers/{printer_id}/print/stop"
+    const val PRINT_SPEED_PATH = "/api/v1/printers/{printer_id}/print-speed"
+    const val MAINTENANCE_PRINTER_PATH = "/api/v1/maintenance/printers/{printer_id}"
 
     val hasClearPlateEndpoint: Boolean = true
-    /** Present in OpenAPI; not wired in BuddyDash v1. */
     val hasChamberLightEndpoint: Boolean = true
+    val hasPrintControlEndpoints: Boolean = true
+    val hasPrintSpeedEndpoint: Boolean = true
+    val hasMaintenanceEndpoint: Boolean = true
     val hasCameraEndpoint: Boolean = true
     val hasFilesEndpoint: Boolean = true
 
@@ -42,4 +49,22 @@ object BambuddyApi {
 
     fun printerCoverPath(printerId: Int): String =
         PRINTER_COVER_PATH.replace("{printer_id}", printerId.toString())
+
+    fun chamberLightPath(printerId: Int, on: Boolean): String =
+        "${CHAMBER_LIGHT_PATH.replace("{printer_id}", printerId.toString())}?on=$on"
+
+    fun printPausePath(printerId: Int): String =
+        PRINT_PAUSE_PATH.replace("{printer_id}", printerId.toString())
+
+    fun printResumePath(printerId: Int): String =
+        PRINT_RESUME_PATH.replace("{printer_id}", printerId.toString())
+
+    fun printStopPath(printerId: Int): String =
+        PRINT_STOP_PATH.replace("{printer_id}", printerId.toString())
+
+    fun printSpeedPath(printerId: Int, mode: Int): String =
+        "${PRINT_SPEED_PATH.replace("{printer_id}", printerId.toString())}?mode=$mode"
+
+    fun maintenancePrinterPath(printerId: Int): String =
+        MAINTENANCE_PRINTER_PATH.replace("{printer_id}", printerId.toString())
 }
