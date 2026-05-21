@@ -20,11 +20,12 @@ import java.nio.charset.StandardCharsets
 object Routes {
     const val HOME = "home"
     const val SETTINGS = "settings"
-    const val PRINTER_DETAIL = "printer/{printerId}/{printerName}"
+    const val PRINTER_DETAIL = "printer/{printerId}/{printerName}/{printerModel}"
 
-    fun printerDetail(printerId: Int, printerName: String): String {
-        val encoded = java.net.URLEncoder.encode(printerName, StandardCharsets.UTF_8.toString())
-        return "printer/$printerId/$encoded"
+    fun printerDetail(printerId: Int, printerName: String, printerModel: String? = null): String {
+        val encodedName = java.net.URLEncoder.encode(printerName, StandardCharsets.UTF_8.toString())
+        val encodedModel = java.net.URLEncoder.encode(printerModel.orEmpty(), StandardCharsets.UTF_8.toString())
+        return "printer/$printerId/$encodedName/$encodedModel"
     }
 }
 
@@ -45,7 +46,9 @@ fun BuddyDashNav(
             HomeScreen(
                 viewModel = viewModel,
                 onPrinterClick = { printer ->
-                    navController.navigate(Routes.printerDetail(printer.id, printer.name))
+                    navController.navigate(
+                        Routes.printerDetail(printer.id, printer.name, printer.model),
+                    )
                 },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
             )
@@ -68,11 +71,18 @@ fun BuddyDashNav(
             arguments = listOf(
                 navArgument("printerId") { type = NavType.IntType },
                 navArgument("printerName") { type = NavType.StringType },
+                navArgument("printerModel") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
             ),
         ) { backStackEntry ->
             val printerId = backStackEntry.arguments?.getInt("printerId") ?: return@composable
             val encodedName = backStackEntry.arguments?.getString("printerName").orEmpty()
             val printerName = URLDecoder.decode(encodedName, StandardCharsets.UTF_8.toString())
+            val encodedModel = backStackEntry.arguments?.getString("printerModel").orEmpty()
+            val printerModel = URLDecoder.decode(encodedModel, StandardCharsets.UTF_8.toString())
+                .takeIf { it.isNotBlank() }
 
             val viewModel: PrinterDetailViewModel = viewModel(
                 factory = viewModelFactory {
@@ -82,6 +92,7 @@ fun BuddyDashNav(
             PrinterDetailScreen(
                 printerId = printerId,
                 printerName = printerName,
+                printerModel = printerModel,
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
             )

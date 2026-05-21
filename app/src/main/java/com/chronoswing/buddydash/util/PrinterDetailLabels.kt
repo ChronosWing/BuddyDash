@@ -56,13 +56,15 @@ data class PrinterDetailLabels(
     val canResume: Boolean,
     val canStop: Boolean,
     val canToggleLight: Boolean,
-    val showBedAdjust: Boolean,
-    val canAdjustBed: Boolean,
+    val motionLayout: PrinterMotionLayout,
+    val showMotionControls: Boolean,
+    val canUseMotionControls: Boolean,
     val maintenanceItems: List<MaintenanceItem>,
 )
 
 fun PrinterStatus.toDetailLabels(
     maintenanceItems: List<MaintenanceItem> = emptyList(),
+    printerModel: String? = null,
 ): PrinterDetailLabels {
     val raw = rawState?.uppercase()
     val isPrinting = raw == "RUNNING"
@@ -94,6 +96,11 @@ fun PrinterStatus.toDetailLabels(
     val chamberTempCompact = formatChamberTempCompact(chamberTemp)
     val printSpeedLabel = formatPrintSpeedLevel(speedLevel)
     val canControlPrint = connected && isActivePrint
+    val motionLayout = if (connected) {
+        resolveMotionLayout(printerModel)
+    } else {
+        PrinterMotionLayout.Hidden
+    }
 
     val activityKind = resolveActivityKind()
     return PrinterDetailLabels(
@@ -143,8 +150,9 @@ fun PrinterStatus.toDetailLabels(
         canResume = connected && isPaused,
         canStop = canControlPrint,
         canToggleLight = connected && chamberLightOn != null,
-        showBedAdjust = BambuddyApi.hasBedJogEndpoint && connected,
-        canAdjustBed = BambuddyApi.hasBedJogEndpoint && canAdjustBedWhenIdle(),
+        motionLayout = motionLayout,
+        showMotionControls = motionLayout != PrinterMotionLayout.Hidden,
+        canUseMotionControls = motionLayout != PrinterMotionLayout.Hidden && canAdjustBedWhenIdle(),
         maintenanceItems = maintenanceItems,
     )
 }

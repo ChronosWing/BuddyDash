@@ -53,9 +53,8 @@ import com.chronoswing.buddydash.ui.components.DetailFansCard
 import com.chronoswing.buddydash.ui.components.DetailMaintenanceCard
 import com.chronoswing.buddydash.ui.components.DetailPrintSpeedCard
 import com.chronoswing.buddydash.ui.components.FilamentAmsEnvironmentSection
-import com.chronoswing.buddydash.ui.components.BedAdjustControl
-import com.chronoswing.buddydash.ui.components.BedAdjustOptionsDialog
 import com.chronoswing.buddydash.ui.components.ChamberLightControlChip
+import com.chronoswing.buddydash.ui.components.MotionControlsSection
 import com.chronoswing.buddydash.ui.components.PrintSpeedControlChips
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
@@ -84,11 +83,12 @@ private val detailTabs = listOf("Status", "Filament", "Controls")
 fun PrinterDetailScreen(
     printerId: Int,
     printerName: String,
+    printerModel: String? = null,
     viewModel: PrinterDetailViewModel,
     onBack: () -> Unit,
 ) {
-    LaunchedEffect(printerId, printerName) {
-        viewModel.init(printerId, printerName)
+    LaunchedEffect(printerId, printerName, printerModel) {
+        viewModel.init(printerId, printerName, printerModel)
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -102,7 +102,10 @@ fun PrinterDetailScreen(
         },
     )
 
-    val labels = uiState.status?.toDetailLabels(uiState.maintenanceItems)
+    val labels = uiState.status?.toDetailLabels(
+        maintenanceItems = uiState.maintenanceItems,
+        printerModel = uiState.printerModel ?: printerModel,
+    )
 
     PrinterDetailScreenContent(
         title = uiState.printerName.ifBlank { printerName },
@@ -530,16 +533,7 @@ private fun ControlsTab(
 ) {
     val comingSoon = stringResource(R.string.coming_soon)
     var showStopConfirm by remember { mutableStateOf(false) }
-    var showBedAdjustDialog by remember { mutableStateOf(false) }
     val actionsEnabled = !isClearingPlate && !isControlBusy
-
-    BedAdjustOptionsDialog(
-        visible = showBedAdjustDialog,
-        stepMm = BED_JOG_STEP_MM,
-        onDismiss = { showBedAdjustDialog = false },
-        onRaiseBed = onJogBedUp,
-        onLowerBed = onJogBedDown,
-    )
 
     if (showStopConfirm) {
         AlertDialog(
@@ -598,7 +592,7 @@ private fun ControlsTab(
         }
 
         val hasQuickActions = labels.canPause || labels.canResume || labels.canStop ||
-            labels.showBedAdjust || labels.canToggleLight
+            labels.canToggleLight
         if (hasQuickActions) {
             SectionHeader(stringResource(R.string.controls_section_quick_actions))
             DetailInfoCard {
@@ -632,13 +626,6 @@ private fun ControlsTab(
                         Text(stringResource(R.string.stop_print))
                     }
                 }
-                if (labels.showBedAdjust) {
-                    BedAdjustControl(
-                        enabled = labels.canAdjustBed,
-                        actionsEnabled = actionsEnabled,
-                        onOpenOptions = { showBedAdjustDialog = true },
-                    )
-                }
                 if (labels.canToggleLight) {
                     ChamberLightControlChip(
                         isOn = labels.chamberLightOn == true,
@@ -646,6 +633,20 @@ private fun ControlsTab(
                         onToggle = onToggleLight,
                     )
                 }
+            }
+        }
+
+        if (labels.showMotionControls) {
+            SectionHeader(stringResource(R.string.section_motion_controls))
+            DetailInfoCard {
+                MotionControlsSection(
+                    layout = labels.motionLayout,
+                    canUseMotion = labels.canUseMotionControls,
+                    actionsEnabled = actionsEnabled,
+                    stepMm = BED_JOG_STEP_MM,
+                    onJogUp = onJogBedUp,
+                    onJogDown = onJogBedDown,
+                )
             }
         }
 

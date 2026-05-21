@@ -1,11 +1,13 @@
 package com.chronoswing.buddydash.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -13,7 +15,6 @@ import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.SingleBed
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DoorFront
 import androidx.compose.material.icons.filled.Lightbulb
@@ -22,7 +23,7 @@ import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Wifi
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.AmsUnitInfo
@@ -42,7 +44,7 @@ import com.chronoswing.buddydash.util.PrintSpeedMode
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.formatAmsHumidityCompact
 import com.chronoswing.buddydash.util.formatAmsTempCompact
-import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
+import com.chronoswing.buddydash.util.PrinterMotionLayout
 import com.chronoswing.buddydash.util.formatFanPercentCompact
 import com.chronoswing.buddydash.util.maintenanceDisplayLines
 
@@ -256,33 +258,54 @@ fun FilamentAmsEnvironmentSection(labels: PrinterDetailLabels) {
 }
 
 @Composable
-fun BedAdjustControl(
-    enabled: Boolean,
+fun MotionControlsSection(
+    layout: PrinterMotionLayout,
+    canUseMotion: Boolean,
     actionsEnabled: Boolean,
-    onOpenOptions: () -> Unit,
+    stepMm: Float,
+    onJogUp: () -> Unit,
+    onJogDown: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        OutlinedButton(
-            onClick = onOpenOptions,
-            enabled = enabled && actionsEnabled,
+    if (layout == PrinterMotionLayout.Hidden) return
+    val stepLabel = stepMm.toInt().toString()
+    val (upLabel, downLabel) = when (layout) {
+        PrinterMotionLayout.BedSlingerZ -> stringResource(R.string.toolhead_up) to
+            stringResource(R.string.toolhead_down)
+        PrinterMotionLayout.ZBedJog -> stringResource(R.string.bed_up) to
+            stringResource(R.string.bed_down)
+        PrinterMotionLayout.Hidden -> return
+    }
+    val controlsEnabled = canUseMotion && actionsEnabled
+
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
             modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SingleBed,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Text(stringResource(R.string.adjust_bed))
-            }
+            MotionJogButton(
+                label = upLabel,
+                icon = Icons.Default.KeyboardArrowUp,
+                enabled = controlsEnabled,
+                onClick = onJogUp,
+                modifier = Modifier.weight(1f),
+            )
+            MotionJogButton(
+                label = downLabel,
+                icon = Icons.Default.KeyboardArrowDown,
+                enabled = controlsEnabled,
+                onClick = onJogDown,
+                modifier = Modifier.weight(1f),
+            )
         }
-        if (!enabled) {
+        Text(
+            text = stringResource(R.string.motion_step_hint, stepLabel),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!canUseMotion) {
             Text(
-                text = stringResource(R.string.adjust_bed_unavailable),
+                text = stringResource(R.string.motion_controls_unavailable),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
             )
@@ -291,59 +314,49 @@ fun BedAdjustControl(
 }
 
 @Composable
-fun BedAdjustOptionsDialog(
-    visible: Boolean,
-    stepMm: Float,
-    onDismiss: () -> Unit,
-    onRaiseBed: () -> Unit,
-    onLowerBed: () -> Unit,
+private fun MotionJogButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    if (!visible) return
-    val stepLabel = stepMm.toInt().toString()
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.adjust_bed_dialog_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = stringResource(R.string.adjust_bed_dialog_message, stepLabel),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                TextButton(
-                    onClick = {
-                        onRaiseBed()
-                        onDismiss()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = null)
-                    Text(
-                        text = stringResource(R.string.raise_bed, stepLabel),
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
-                }
-                TextButton(
-                    onClick = {
-                        onLowerBed()
-                        onDismiss()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
-                    Text(
-                        text = stringResource(R.string.lower_bed, stepLabel),
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-    )
+    val accent = MaterialTheme.colorScheme.primary
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.heightIn(min = 56.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
+        ),
+        border = BorderStroke(
+            width = if (enabled) 1.5.dp else 1.dp,
+            color = if (enabled) {
+                accent.copy(alpha = 0.55f)
+            } else {
+                MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
+            },
+        ),
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(22.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
 }
 
 @Composable
