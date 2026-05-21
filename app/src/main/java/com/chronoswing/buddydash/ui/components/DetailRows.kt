@@ -200,8 +200,8 @@ fun StatusLastUpdatedIndicator(
             muted to muted
         }
         freshness == StatusRefreshFreshness.Live ->
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f) to
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f) to
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.52f)
         freshness == StatusRefreshFreshness.Aging ->
             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f) to
                 dueSoonTint.copy(alpha = 0.7f)
@@ -214,19 +214,20 @@ fun StatusLastUpdatedIndicator(
 
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = textColor,
+            maxLines = 1,
         )
         Icon(
             imageVector = Icons.Default.Refresh,
             contentDescription = stringResource(R.string.cd_refresh_status),
             modifier = Modifier
-                .size(14.dp)
+                .size(12.dp)
                 .clickable(enabled = enabled && !isRefreshing) { onRefresh() },
             tint = iconTint,
         )
