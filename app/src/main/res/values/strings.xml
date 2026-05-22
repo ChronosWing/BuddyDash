@@ -206,6 +206,16 @@
     <string name="section_environment">Temperatures &amp; health</string>
     <string name="filament_unknown">Unknown</string>
     <string name="filament_empty">Empty</string>
+    <string name="filament_action_load">Load</string>
+    <string name="filament_action_unload">Unload</string>
+    <string name="filament_confirm_load_title">Load filament?</string>
+    <string name="filament_confirm_unload_title">Unload filament?</string>
+    <string name="filament_confirm_load_message">%1$s • %2$s</string>
+    <string name="filament_confirm_unload_message">%1$s • %2$s</string>
+    <string name="filament_load_started">Filament load started</string>
+    <string name="filament_unload_started">Filament unload started</string>
+    <string name="filament_load_failed">Could not load filament</string>
+    <string name="filament_unload_failed">Could not unload filament</string>
     <string name="section_connectivity">Printer &amp; connectivity</string>
     <string name="section_fans">Fans</string>
     <string name="section_print_speed">Print speed</string>

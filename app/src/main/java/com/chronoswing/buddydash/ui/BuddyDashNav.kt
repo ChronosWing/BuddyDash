@@ -484,6 +484,9 @@ fun BuddyDashNav(
                             Routes.archives(printerId = printerId, printerName = printerName),
                         )
                     },
+                    onOpenSpoolDetail = { spoolId ->
+                        navController.navigate(Routes.spoolDetail(spoolId))
+                    },
                 )
             }
 

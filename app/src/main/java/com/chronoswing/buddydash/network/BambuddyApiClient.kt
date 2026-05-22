@@ -745,6 +745,43 @@ class BambuddyApiClient {
         postPrinterAction(serverUrl, apiKey, BambuddyApi.homeAxesPath(printerId))
     }
 
+    suspend fun amsLoadFilament(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+        trayId: Int,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasAmsLoadEndpoint) {
+            return@withContext Result.failure(
+                UnsupportedOperationException("AMS load endpoint not found"),
+            )
+        }
+        postPrinterAction(serverUrl, apiKey, BambuddyApi.amsLoadPath(printerId, trayId))
+    }
+
+    suspend fun amsUnloadFilament(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasAmsUnloadEndpoint) {
+            return@withContext Result.failure(
+                UnsupportedOperationException("AMS unload endpoint not found"),
+            )
+        }
+        postPrinterAction(serverUrl, apiKey, BambuddyApi.amsUnloadPath(printerId))
+    }
+
+    suspend fun fetchInventoryForPrinter(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+    ): Result<Map<SlotInventoryKey, SlotInventoryInfo>> =
+        withContext(Dispatchers.IO) {
+            fetchInventoryByPrinter(serverUrl, apiKey, printerId)
+                .map { it[printerId].orEmpty() }
+        }
+
     suspend fun bedJog(
         serverUrl: String,
         apiKey: String,

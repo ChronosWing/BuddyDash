@@ -22,7 +22,11 @@ import com.chronoswing.buddydash.util.ControlFeedback
 import com.chronoswing.buddydash.util.logControlFailure
 import com.chronoswing.buddydash.util.PRINTER_STATUS_SETTLE_MS
 import com.chronoswing.buddydash.util.isTransientState
+import com.chronoswing.buddydash.util.BuddyDashDebug
+import com.chronoswing.buddydash.util.FilamentAction
+import com.chronoswing.buddydash.util.FilamentSlotDisplay
 import com.chronoswing.buddydash.util.RefreshGuard
+import com.chronoswing.buddydash.util.buildFilamentSlotDisplays
 import com.chronoswing.buddydash.util.motionDebugLog
 import com.chronoswing.buddydash.util.toUserNetworkMessage
 import kotlinx.coroutines.Job
@@ -66,7 +70,23 @@ data class PrinterDetailUiState(
     val activePrintFilamentUsage: FilamentUsage? = null,
     val machineInfo: PrinterMachineInfo? = null,
     val bedJogStepMm: Float = BED_JOG_STEP_OPTIONS_MM[1],
+    val filamentSlotDisplays: List<FilamentSlotDisplay> = emptyList(),
+    val isFilamentActionBusy: Boolean = false,
+    val filamentConfirm: FilamentConfirmRequest? = null,
+    val filamentSnackbar: FilamentActionSnackbar? = null,
 )
+
+data class FilamentConfirmRequest(
+    val action: FilamentAction,
+    val slotDisplay: FilamentSlotDisplay,
+)
+
+enum class FilamentActionSnackbar {
+    LoadStarted,
+    UnloadStarted,
+    LoadFailed,
+    UnloadFailed,
+}
 
 enum class StartQueuedPrintSnackbar {
     Started,
@@ -94,6 +114,7 @@ class PrinterDetailViewModel(
     val uiState: StateFlow<PrinterDetailUiState> = _uiState.asStateFlow()
 
     private var fetchJob: Job? = null
+    private var filamentInventoryJob: Job? = null
     private val manualRefreshGuard = RefreshGuard()
 
     init {
@@ -238,6 +259,104 @@ class PrinterDetailViewModel(
                 lastStatusUpdatedAtMillis = System.currentTimeMillis(),
             )
         }
+        refreshFilamentSlotDisplays(status)
+    }
+
+    private fun refreshFilamentSlotDisplays(status: PrinterStatus) {
+        filamentInventoryJob?.cancel()
+        filamentInventoryJob = viewModelScope.launch {
+            val state = _uiState.value
+            if (!state.hasCredentials || printerId < 0) return@launch
+            val inventoryResult = apiClient.fetchInventoryForPrinter(
+                state.serverUrl,
+                state.apiKey,
+                printerId,
+            )
+            val spoolsResult = apiClient.fetchSpoolInventory(state.serverUrl, state.apiKey)
+            val inventoryBySlot = inventoryResult.getOrElse { emptyMap() }
+            val spools = spoolsResult.getOrElse { emptyList() }
+            val spoolsById = spools.associateBy { it.id }
+            val assignedToPrinter = spools.filter { it.assignment?.printerId == printerId }
+            val displays = buildFilamentSlotDisplays(
+                slots = status.filamentSlots,
+                activeKey = status.activeFilamentSlot,
+                printerId = printerId,
+                inventoryBySlot = inventoryBySlot,
+                spoolsById = spoolsById,
+                spoolsAssignedToPrinter = assignedToPrinter,
+            )
+            if (BuddyDashDebug.enabled) {
+                android.util.Log.d(
+                    "BuddyDash/FilamentTab",
+                    "slotDisplays=${displays.size} inventoryKeys=${inventoryBySlot.size} " +
+                        "spools=${spools.size} matched=${displays.count { it.isTappable }}",
+                )
+            }
+            _uiState.update { it.copy(filamentSlotDisplays = displays) }
+        }
+    }
+
+    fun requestFilamentLoad(slotDisplay: FilamentSlotDisplay) {
+        _uiState.update { it.copy(filamentConfirm = FilamentConfirmRequest(FilamentAction.Load, slotDisplay)) }
+    }
+
+    fun requestFilamentUnload(slotDisplay: FilamentSlotDisplay) {
+        _uiState.update { it.copy(filamentConfirm = FilamentConfirmRequest(FilamentAction.Unload, slotDisplay)) }
+    }
+
+    fun dismissFilamentConfirm() {
+        _uiState.update { it.copy(filamentConfirm = null) }
+    }
+
+    fun confirmFilamentAction() {
+        val confirm = _uiState.value.filamentConfirm ?: return
+        _uiState.update { it.copy(filamentConfirm = null, isFilamentActionBusy = true) }
+        viewModelScope.launch {
+            val state = _uiState.value
+            val result = when (confirm.action) {
+                FilamentAction.Load ->
+                    apiClient.amsLoadFilament(
+                        state.serverUrl,
+                        state.apiKey,
+                        printerId,
+                        confirm.slotDisplay.trayGlobalId,
+                    )
+                FilamentAction.Unload ->
+                    apiClient.amsUnloadFilament(state.serverUrl, state.apiKey, printerId)
+            }
+            result.fold(
+                onSuccess = {
+                    _uiState.update {
+                        it.copy(
+                            isFilamentActionBusy = false,
+                            filamentSnackbar = when (confirm.action) {
+                                FilamentAction.Load -> FilamentActionSnackbar.LoadStarted
+                                FilamentAction.Unload -> FilamentActionSnackbar.UnloadStarted
+                            },
+                        )
+                    }
+                    loadStatus(showLoading = false)
+                },
+                onFailure = { error ->
+                    if (BuddyDashDebug.enabled) {
+                        android.util.Log.w("BuddyDash/FilamentTab", "filament action failed", error)
+                    }
+                    _uiState.update {
+                        it.copy(
+                            isFilamentActionBusy = false,
+                            filamentSnackbar = when (confirm.action) {
+                                FilamentAction.Load -> FilamentActionSnackbar.LoadFailed
+                                FilamentAction.Unload -> FilamentActionSnackbar.UnloadFailed
+                            },
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    fun onFilamentSnackbarShown() {
+        _uiState.update { it.copy(filamentSnackbar = null) }
     }
 
     private suspend fun refreshStatusAfterControl() {
@@ -488,6 +607,7 @@ class PrinterDetailViewModel(
 
     override fun onCleared() {
         fetchJob?.cancel()
+        filamentInventoryJob?.cancel()
         super.onCleared()
     }
 }

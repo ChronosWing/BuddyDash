@@ -120,5 +120,6 @@ fun applyInventoryToSlots(
             isTranslucent = swatch.isTranslucent,
             colorAlpha = swatch.alpha,
             remainPercent = inventory?.remainPercent ?: slot.remainPercent,
+            inventorySpoolId = inventory?.spoolId?.takeIf { it >= 0 },
         )
     }

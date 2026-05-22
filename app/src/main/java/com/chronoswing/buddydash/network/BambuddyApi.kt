@@ -40,6 +40,10 @@ object BambuddyApi {
     const val MAINTENANCE_PERFORM_PATH = "/api/v1/maintenance/items/{item_id}/perform"
     const val BED_JOG_PATH = "/api/v1/printers/{printer_id}/bed-jog"
     const val HOME_AXES_PATH = "/api/v1/printers/{printer_id}/home-axes"
+    /** POST — load filament from AMS slot or external (tray_id query). */
+    const val AMS_LOAD_PATH = "/api/v1/printers/{printer_id}/ams/load"
+    /** POST — unload currently loaded filament. */
+    const val AMS_UNLOAD_PATH = "/api/v1/printers/{printer_id}/ams/unload"
     const val PRINTER_DETAIL_PATH = "/api/v1/printers/{printer_id}"
 
     /** GET — list print queue (OpenAPI: list_queue_api_v1_queue__get). */
@@ -79,6 +83,8 @@ object BambuddyApi {
     val hasMaintenancePerformEndpoint: Boolean = true
     val hasBedJogEndpoint: Boolean = true
     val hasHomeAxesEndpoint: Boolean = true
+    val hasAmsLoadEndpoint: Boolean = true
+    val hasAmsUnloadEndpoint: Boolean = true
     val hasPrinterDetailEndpoint: Boolean = true
     val hasCameraEndpoint: Boolean = true
     val hasFilesEndpoint: Boolean = true
@@ -143,6 +149,12 @@ object BambuddyApi {
 
     fun homeAxesPath(printerId: Int): String =
         HOME_AXES_PATH.replace("{printer_id}", printerId.toString())
+
+    fun amsLoadPath(printerId: Int, trayId: Int): String =
+        "${AMS_LOAD_PATH.replace("{printer_id}", printerId.toString())}?tray_id=$trayId"
+
+    fun amsUnloadPath(printerId: Int): String =
+        AMS_UNLOAD_PATH.replace("{printer_id}", printerId.toString())
 
     fun printerDetailPath(printerId: Int): String =
         PRINTER_DETAIL_PATH.replace("{printer_id}", printerId.toString())
