@@ -1,6 +1,9 @@
 package com.chronoswing.buddydash.ui
 
-import androidx.compose.foundation.clickable
+import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
+import com.chronoswing.buddydash.ui.components.EmptyContent
+import com.chronoswing.buddydash.ui.components.asImageVector
+import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -259,18 +262,25 @@ private fun SpoolUsageHistorySection(
     cameraToken: String,
     onArchiveClick: (Int) -> Unit,
 ) {
-    if (items.isEmpty()) return
-
     DetailInfoCard {
         SectionHeader(stringResource(R.string.spool_detail_used_in_prints))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items.forEach { item ->
-                SpoolUsageHistoryRow(
-                    item = item,
-                    serverUrl = serverUrl,
-                    cameraToken = cameraToken,
-                    onArchiveClick = onArchiveClick,
-                )
+        if (items.isEmpty()) {
+            EmptyContent(
+                message = stringResource(R.string.spool_usage_empty),
+                subtitle = stringResource(R.string.empty_hint_spool_usage),
+                icon = BuddyDashEmptyIcon.SpoolUsage.asImageVector(),
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items.forEach { item ->
+                    SpoolUsageHistoryRow(
+                        item = item,
+                        serverUrl = serverUrl,
+                        cameraToken = cameraToken,
+                        onArchiveClick = onArchiveClick,
+                    )
+                }
             }
         }
     }
@@ -286,7 +296,7 @@ private fun SpoolUsageHistoryRow(
     val archiveId = item.archiveId
     val rowModifier = Modifier.fillMaxWidth().let { base ->
         if (item.isTappable && archiveId != null) {
-            base.clickable { onArchiveClick(archiveId) }
+            base.buddyDashClickable { onArchiveClick(archiveId) }
         } else {
             base
         }

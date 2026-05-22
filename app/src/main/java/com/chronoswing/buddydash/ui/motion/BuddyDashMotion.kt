@@ -26,6 +26,8 @@ object BuddyDashMotion {
     const val NAV_SECTION_MS = 200
     const val NAV_TAB_MS = 180
     const val THUMBNAIL_FADE_MS = 220
+    const val VALUE_FADE_MS = 200
+    const val SUCCESS_PULSE_MS = 280
 }
 
 fun Context.prefersReducedMotion(): Boolean = isReducedMotionEnabled()

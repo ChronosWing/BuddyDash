@@ -14,7 +14,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import com.chronoswing.buddydash.ui.motion.AnimatedLinearProgressIndicator
+import com.chronoswing.buddydash.ui.motion.FadeValueText
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
+import com.chronoswing.buddydash.ui.motion.refreshSpinning
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -67,7 +69,7 @@ fun CompactIconStat(
                 fontWeight = FontWeight.Medium,
             )
         }
-        Text(
+        FadeValueText(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
@@ -106,7 +108,7 @@ fun CompactLabelValue(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(
+        FadeValueText(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
@@ -242,7 +244,7 @@ fun StatusLastUpdatedIndicator(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
+        FadeValueText(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = textColor,
@@ -253,6 +255,7 @@ fun StatusLastUpdatedIndicator(
             contentDescription = stringResource(R.string.cd_refresh_status),
             modifier = Modifier
                 .size(12.dp)
+                .refreshSpinning(isRefreshing)
                 .buddyDashClickable(enabled = enabled && !isRefreshing, onClick = onRefresh),
             tint = iconTint,
         )
@@ -271,7 +274,7 @@ fun HighlightValue(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(
+        FadeValueText(
             text = value,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,

@@ -11,6 +11,7 @@ import com.chronoswing.buddydash.ui.motion.buddyDashButtonPress
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import com.chronoswing.buddydash.ui.motion.rememberBuddyDashInteractionSource
 import com.chronoswing.buddydash.ui.motion.rememberPrefersReducedMotion
+import com.chronoswing.buddydash.ui.motion.successPulseOn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -34,7 +35,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -260,10 +263,19 @@ private fun StartNextQueueChip(
     val chipAlpha = if (enabled) 1f else 0.42f
 
     val actionLabel = stringResource(R.string.start_next_print_action)
+    var successPulse by remember { mutableIntStateOf(0) }
+    var wasSubmitting by remember { mutableStateOf(false) }
+    LaunchedEffect(isSubmitting) {
+        if (wasSubmitting && !isSubmitting && enabled) {
+            successPulse++
+        }
+        wasSubmitting = isSubmitting
+    }
 
     Surface(
         modifier = modifier
             .height(28.dp)
+            .successPulseOn(successPulse)
             .semantics { contentDescription = actionLabel }
             .buddyDashClickable(enabled = enabled && !isSubmitting, onClick = onClick),
         shape = shape,

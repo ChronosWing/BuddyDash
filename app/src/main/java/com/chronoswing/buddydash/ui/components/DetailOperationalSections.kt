@@ -37,7 +37,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import com.chronoswing.buddydash.ui.motion.AnimatedLinearProgressIndicator
+import com.chronoswing.buddydash.ui.motion.FadeValueText
 import com.chronoswing.buddydash.ui.motion.buddyDashButtonPress
+import com.chronoswing.buddydash.ui.motion.rememberAttentionPulse
 import com.chronoswing.buddydash.ui.motion.rememberBuddyDashInteractionSource
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -236,11 +238,22 @@ private fun MaintenanceStatusRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val iconPulse = when (line.kind) {
+                MaintenanceLineKind.DueSoon -> rememberAttentionPulse(enabled = true, periodMillis = 2_800)
+                MaintenanceLineKind.Due -> rememberAttentionPulse(enabled = true, periodMillis = 4_000)
+                MaintenanceLineKind.Ok -> 0f
+            }
+            val iconTint = when (line.kind) {
+                MaintenanceLineKind.DueSoon,
+                MaintenanceLineKind.Due,
+                -> accentColor.copy(alpha = 0.82f + iconPulse * 0.14f)
+                MaintenanceLineKind.Ok -> accentColor
+            }
             Icon(
                 imageVector = icon,
                 contentDescription = stringResource(R.string.cd_maintenance_item, line.name),
                 modifier = Modifier.size(16.dp),
-                tint = accentColor,
+                tint = iconTint,
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
@@ -254,7 +267,7 @@ private fun MaintenanceStatusRow(
                     .padding(end = 6.dp),
             )
             line.remainingText?.let { remaining ->
-                Text(
+                FadeValueText(
                     text = remaining,
                     style = MaterialTheme.typography.labelSmall,
                     color = remainingColor,

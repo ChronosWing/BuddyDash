@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.ui.components
 
+import com.chronoswing.buddydash.ui.motion.FadeValueText
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -102,7 +103,7 @@ fun SpoolInventoryRow(
                             height = 4.dp,
                             barWidth = null,
                         )
-                        Text(
+                        FadeValueText(
                             text = stringResource(R.string.spool_remain_percent, percent),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),

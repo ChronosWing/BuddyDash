@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.SingleBed
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.chronoswing.buddydash.ui.motion.FadeValueText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -154,7 +155,7 @@ private fun TempWithIcon(
             modifier = Modifier.size(16.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(
+        FadeValueText(
             text = value,
             style = valueStyle,
             fontWeight = FontWeight.Medium,

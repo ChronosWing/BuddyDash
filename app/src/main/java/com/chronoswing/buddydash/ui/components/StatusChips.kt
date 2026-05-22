@@ -33,6 +33,7 @@ import com.chronoswing.buddydash.ui.theme.CyanAccent
 import com.chronoswing.buddydash.ui.theme.OfflineRed
 import com.chronoswing.buddydash.ui.theme.OnlineGreen
 import com.chronoswing.buddydash.ui.theme.TextSecondary
+import com.chronoswing.buddydash.ui.motion.FadeValueText
 import com.chronoswing.buddydash.ui.motion.rememberAttentionPulse
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import com.chronoswing.buddydash.util.PlateIndicatorKind
@@ -101,19 +102,22 @@ fun MaintenanceHomeIndicatorIcon(
     when (indicator) {
         MaintenanceHomeIndicator.None -> Unit
         MaintenanceHomeIndicator.DueSoon -> {
+            val pulse = rememberAttentionPulse(enabled = true, periodMillis = 2_800)
+            val amber = Color(0xFFFBBF24)
             Icon(
                 imageVector = Icons.Filled.Warning,
                 contentDescription = stringResource(R.string.cd_maintenance_due_soon_home),
                 modifier = modifier.size(16.dp),
-                tint = Color(0xFFFBBF24).copy(alpha = 0.9f),
+                tint = amber.copy(alpha = 0.82f + pulse * 0.14f),
             )
         }
         MaintenanceHomeIndicator.Due -> {
+            val pulse = rememberAttentionPulse(enabled = true, periodMillis = 4_000)
             Icon(
                 imageVector = Icons.Filled.Warning,
                 contentDescription = stringResource(R.string.cd_maintenance_due_home),
                 modifier = modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.92f),
+                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.82f + pulse * 0.12f),
             )
         }
     }
@@ -232,7 +236,7 @@ private fun StatusPill(
                 modifier = Modifier.size(14.dp),
                 tint = iconTint,
             )
-            Text(
+            FadeValueText(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
