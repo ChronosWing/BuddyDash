@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.ui
 
+import com.chronoswing.buddydash.ui.motion.HomeTitleLogoSlot
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -85,6 +86,8 @@ import com.chronoswing.buddydash.util.PrinterCardLabels
 import com.chronoswing.buddydash.util.HomePrinterSearchFilter
 import com.chronoswing.buddydash.util.applyHomePrinterSearch
 import com.chronoswing.buddydash.util.homeSearchEmptyMessageRes
+import com.chronoswing.buddydash.util.PrinterActivityKind
+import com.chronoswing.buddydash.util.resolveActivityKind
 import com.chronoswing.buddydash.util.toCardLabels
 
 @Composable
@@ -223,6 +226,8 @@ private fun HomeScreenContent(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         HomeTitleWordmark(
+                            ambientPulseEnabled = hasAnyPrinterPrinting(printers) &&
+                                !preferOfflineInHeader,
                             modifier = Modifier
                                 .weight(1f)
                                 .semantics {
@@ -514,8 +519,16 @@ private val HomeTitleLogoImageSize = 104.dp
 private val HomeTitleLogoSlotWidth = 84.dp
 private val HomeTitleTextPullLeft = 14.dp
 
+private fun hasAnyPrinterPrinting(printers: List<Printer>): Boolean =
+    printers.any { printer ->
+        printer.liveStatus?.resolveActivityKind() == PrinterActivityKind.Printing
+    }
+
 @Composable
-private fun HomeTitleWordmark(modifier: Modifier = Modifier) {
+private fun HomeTitleWordmark(
+    ambientPulseEnabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val wordmarkTextStyle = MaterialTheme.typography.titleLarge.copy(
         fontSize = 28.sp,
         lineHeight = 34.sp,
@@ -526,9 +539,10 @@ private fun HomeTitleWordmark(modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        Box(
-            modifier = Modifier.width(HomeTitleLogoSlotWidth),
-            contentAlignment = Alignment.CenterEnd,
+        HomeTitleLogoSlot(
+            ambientPulseEnabled = ambientPulseEnabled,
+            slotWidth = HomeTitleLogoSlotWidth,
+            ambientDiameter = HomeTitleLogoImageSize,
         ) {
             Image(
                 painter = painterResource(R.drawable.buddydash_logo_white),
