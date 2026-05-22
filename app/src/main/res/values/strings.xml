@@ -207,9 +207,8 @@
     <string name="filament_remaining">Remaining</string>
     <string name="filament_metadata">Spool</string>
     <string name="refresh_status">Refresh status</string>
-    <string name="status_updated_ago">Updated %1$s</string>
-    <string name="status_updating">Updating…</string>
-    <string name="status_connection_stale">Connection stale</string>
+    <string name="status_header_offline">Offline · showing last known data</string>
+    <string name="status_header_refresh_failed">Could not refresh · showing cached data</string>
     <string name="cd_refresh_status">Refresh printer status</string>
     <string name="cd_maintenance_due_soon_home">Maintenance due soon</string>
     <string name="cd_maintenance_due_home">Maintenance due</string>

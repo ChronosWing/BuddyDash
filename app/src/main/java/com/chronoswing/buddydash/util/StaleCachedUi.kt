@@ -23,34 +23,45 @@ fun showOfflineInHeader(
         isStaleCachedData &&
         (refreshError == null || isHomeRefreshOfflineError(refreshError))
 
+/** Non-offline refresh failure while cached content is visible (header attention only). */
 fun showConnectionStaleInHeader(
     hasCachedContent: Boolean,
     isStaleCachedData: Boolean,
     refreshError: String?,
-    lastUpdatedAtMillis: Long?,
+    lastUpdatedAtMillis: Long? = null,
 ): Boolean {
     if (!hasCachedContent) return false
     if (showOfflineInHeader(hasCachedContent, isStaleCachedData, refreshError)) return false
-    return isConnectionDisplayStale(lastUpdatedAtMillis) ||
-        (refreshError != null && !isHomeRefreshOfflineError(refreshError))
+    return refreshError != null && !isHomeRefreshOfflineError(refreshError)
 }
 
-fun showHeaderUpdating(
+enum class HeaderStatusAttention {
+    /** Healthy / live — no header status UI. */
+    None,
+    /** Active network request — spinner only. */
+    Refreshing,
+    /** Cached data, offline or not yet refreshed. */
+    Offline,
+    /** Refresh failed while showing cached data. */
+    RefreshFailed,
+}
+
+fun resolveHeaderStatusAttention(
     isRefreshActive: Boolean,
     hasCachedContent: Boolean,
     isStaleCachedData: Boolean,
     refreshError: String?,
-    lastUpdatedAtMillis: Long?,
-): Boolean =
-    isRefreshActive &&
-        hasCachedContent &&
-        !showOfflineInHeader(hasCachedContent, isStaleCachedData, refreshError) &&
-        !showConnectionStaleInHeader(
-            hasCachedContent = hasCachedContent,
-            isStaleCachedData = isStaleCachedData,
-            refreshError = refreshError,
-            lastUpdatedAtMillis = lastUpdatedAtMillis,
-        )
+): HeaderStatusAttention {
+    if (isRefreshActive) return HeaderStatusAttention.Refreshing
+    if (!hasCachedContent) return HeaderStatusAttention.None
+    if (showOfflineInHeader(hasCachedContent, isStaleCachedData, refreshError)) {
+        return HeaderStatusAttention.Offline
+    }
+    if (showConnectionStaleInHeader(hasCachedContent, isStaleCachedData, refreshError)) {
+        return HeaderStatusAttention.RefreshFailed
+    }
+    return HeaderStatusAttention.None
+}
 
 /** True when cached content is shown but server actions should be blocked. */
 fun isShowingStaleCachedContent(

@@ -234,7 +234,6 @@ private fun MachinePrinterInfoCard(
                     "developer_mode" -> stringResource(R.string.machine_info_developer_mode)
                     "print_hours" -> stringResource(R.string.machine_info_print_hours)
                     "auto_archive" -> stringResource(R.string.machine_info_auto_archive)
-                    "status_updated" -> stringResource(R.string.machine_info_status_refreshed)
                     else -> key
                 }
                 CompactLabelValue(label = label, value = value)

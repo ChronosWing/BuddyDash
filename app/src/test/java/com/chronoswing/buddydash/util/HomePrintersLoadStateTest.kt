@@ -111,28 +111,40 @@ class HomePrintersLoadStateTest {
     }
 
     @Test
-    fun showHeaderUpdating_falseWhileOfflineStaleRefreshInFlight() {
-        assertFalse(
-            showHomeHeaderUpdating(
+    fun resolveHeaderStatusAttention_refreshingWhileHealthy() {
+        assertEquals(
+            HeaderStatusAttention.Refreshing,
+            resolveHomeHeaderStatusAttention(
                 isRefreshActive = true,
                 printers = listOf(samplePrinter()),
-                isStaleCachedData = true,
+                isStaleCachedData = false,
                 refreshError = null,
-                lastUpdatedAtMillis = System.currentTimeMillis(),
             ),
         )
     }
 
     @Test
-    fun showHeaderUpdating_trueForFreshDataRefresh() {
-        val now = System.currentTimeMillis()
-        assertTrue(
-            showHomeHeaderUpdating(
+    fun resolveHeaderStatusAttention_refreshingDuringOfflineStale() {
+        assertEquals(
+            HeaderStatusAttention.Refreshing,
+            resolveHomeHeaderStatusAttention(
                 isRefreshActive = true,
+                printers = listOf(samplePrinter()),
+                isStaleCachedData = true,
+                refreshError = null,
+            ),
+        )
+    }
+
+    @Test
+    fun resolveHeaderStatusAttention_noneWhenHealthy() {
+        assertEquals(
+            HeaderStatusAttention.None,
+            resolveHomeHeaderStatusAttention(
+                isRefreshActive = false,
                 printers = listOf(samplePrinter()),
                 isStaleCachedData = false,
                 refreshError = null,
-                lastUpdatedAtMillis = now,
             ),
         )
     }
@@ -168,6 +180,18 @@ class HomePrintersLoadStateTest {
                 printers = emptyList(),
                 refreshError = "Could not refresh printers",
                 lastUpdatedAtMillis = null,
+            ),
+        )
+    }
+
+    @Test
+    fun showConnectionStaleInHeader_falseWhenOnlyConnectionAgeStale() {
+        assertFalse(
+            showHomeConnectionStaleInHeader(
+                printers = listOf(samplePrinter()),
+                isStaleCachedData = false,
+                refreshError = null,
+                lastUpdatedAtMillis = System.currentTimeMillis() - 120_000L,
             ),
         )
     }

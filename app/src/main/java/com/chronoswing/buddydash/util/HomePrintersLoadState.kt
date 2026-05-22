@@ -90,16 +90,14 @@ fun showHomeConnectionStaleInHeader(
     lastUpdatedAtMillis = lastUpdatedAtMillis,
 )
 
-fun showHomeHeaderUpdating(
+fun resolveHomeHeaderStatusAttention(
     isRefreshActive: Boolean,
     printers: List<Printer>,
     isStaleCachedData: Boolean,
     refreshError: String?,
-    lastUpdatedAtMillis: Long?,
-): Boolean = showHeaderUpdating(
+): HeaderStatusAttention = resolveHeaderStatusAttention(
     isRefreshActive = isRefreshActive,
     hasCachedContent = printers.isNotEmpty(),
     isStaleCachedData = isStaleCachedData,
     refreshError = refreshError,
-    lastUpdatedAtMillis = lastUpdatedAtMillis,
 )

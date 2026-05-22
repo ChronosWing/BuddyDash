@@ -93,17 +93,4 @@ fun buildMachineInfoRows(
     labels.totalPrintTimeCompact?.let { add("print_hours" to it) }
     machineInfo?.autoArchiveEnabled?.let { add("auto_archive" to formatYesNo(it)) }
 
-    statusUpdatedAtMillis?.let { millis ->
-        formatRelativeStatusUpdated(millis)?.let { add("status_updated" to it) }
-    }
-}
-
-private fun formatRelativeStatusUpdated(epochMillis: Long): String? {
-    val deltaSeconds = ((System.currentTimeMillis() - epochMillis) / 1000).coerceAtLeast(0)
-    return when {
-        deltaSeconds < 60 -> "${deltaSeconds}s ago"
-        deltaSeconds < 3600 -> "${deltaSeconds / 60}m ago"
-        deltaSeconds < 86400 -> "${deltaSeconds / 3600}h ago"
-        else -> "${deltaSeconds / 86400}d ago"
-    }
 }
