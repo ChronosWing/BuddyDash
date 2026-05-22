@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,12 +28,12 @@ import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.PrinterMachineInfo
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
+import com.chronoswing.buddydash.ui.components.MachineStepFilterChip
 import com.chronoswing.buddydash.ui.components.MachineUtilityButton
 import com.chronoswing.buddydash.ui.components.MotionControlsSection
 import com.chronoswing.buddydash.ui.components.PrinterCameraFullscreenDialog
 import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.util.BED_JOG_STEP_OPTIONS_MM
-import com.chronoswing.buddydash.util.MachineTabCapabilities
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildMachineInfoRows
 import com.chronoswing.buddydash.util.machineTabCapabilities
@@ -55,6 +54,7 @@ fun MachineTab(
     onJogBedUp: () -> Unit,
     onJogBedDown: () -> Unit,
     onHomePrinter: () -> Unit,
+    onToggleLight: (() -> Unit)? = null,
 ) {
     val caps = labels.machineTabCapabilities(cameraTokenConfigured = cameraToken.isNotBlank())
     var showCameraFullscreen by remember { mutableStateOf(false) }
@@ -66,6 +66,9 @@ fun MachineTab(
         cameraToken = cameraToken,
         printerId = printerId,
         onDismiss = { showCameraFullscreen = false },
+        chamberLightOn = labels.chamberLightOn,
+        canToggleLight = labels.canToggleLight && caps.utilitiesEnabled,
+        onToggleLight = onToggleLight,
     )
 
     if (showHomeConfirm) {
@@ -165,16 +168,11 @@ private fun BedJogStepSelector(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         BED_JOG_STEP_OPTIONS_MM.forEach { step ->
-            FilterChip(
+            MachineStepFilterChip(
+                label = stringResource(R.string.machine_step_mm, step.toInt()),
                 selected = selectedStepMm == step,
-                onClick = { onSelect(step) },
                 enabled = enabled,
-                label = {
-                    Text(
-                        text = stringResource(R.string.machine_step_mm, step.toInt()),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                },
+                onClick = { onSelect(step) },
             )
         }
     }

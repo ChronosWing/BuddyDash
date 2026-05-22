@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.lifecycle.Lifecycle
@@ -149,7 +150,11 @@ fun PrinterLiveCameraSnapshot(
     modifier: Modifier = Modifier,
     fillMaxSize: Boolean = false,
     height: Dp = 160.dp,
+    contentScale: ContentScale = ContentScale.Crop,
+    applyHeroScrim: Boolean = true,
+    backgroundColor: Color = Color.Transparent,
     onLoadFailed: () -> Unit = {},
+    onLoadingChanged: (Boolean) -> Unit = {},
 ) {
     PrinterCameraSnapshotImage(
         serverUrl = serverUrl,
@@ -159,7 +164,11 @@ fun PrinterLiveCameraSnapshot(
         height = height,
         fillMaxSize = fillMaxSize,
         frameModifier = modifier,
+        contentScale = contentScale,
+        applyHeroScrim = applyHeroScrim,
+        backgroundColor = backgroundColor,
         onLoadFailed = onLoadFailed,
+        onLoadingChanged = onLoadingChanged,
     )
 }
 
@@ -172,7 +181,11 @@ private fun PrinterCameraSnapshotImage(
     height: Dp,
     fillMaxSize: Boolean = false,
     frameModifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    applyHeroScrim: Boolean = true,
+    backgroundColor: Color = Color.Transparent,
     onLoadFailed: () -> Unit,
+    onLoadingChanged: (Boolean) -> Unit = {},
 ) {
     val imageUrl = remember(serverUrl, printerId, cameraToken, refreshTick) {
         printerCameraSnapshotUrl(serverUrl, printerId, cameraToken, cacheBust = refreshTick)
@@ -214,41 +227,62 @@ private fun PrinterCameraSnapshotImage(
     }
     val shape = RoundedCornerShape(10.dp)
     val resolvedFrame = if (fillMaxSize) {
-        frameModifier.fillMaxSize().clip(shape)
+        frameModifier
+            .fillMaxSize()
+            .background(backgroundColor)
     } else {
         frameModifier
             .fillMaxWidth()
             .height(height)
             .clip(shape)
+            .background(backgroundColor)
     }
 
-    Box(modifier = resolvedFrame) {
+    Box(
+        modifier = resolvedFrame,
+        contentAlignment = Alignment.Center,
+    ) {
         SubcomposeAsyncImage(
             model = request,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             loading = {
+                LaunchedEffect(Unit) { onLoadingChanged(true) }
                 lastPainter?.let { painter ->
-                    CameraSnapshotFrame(painter = painter)
+                    CameraSnapshotFrame(
+                        painter = painter,
+                        contentScale = contentScale,
+                        applyHeroScrim = applyHeroScrim,
+                    )
                 }
             },
             error = {
+                LaunchedEffect(Unit) { onLoadingChanged(false) }
                 if (lastPainter == null) {
                     LaunchedEffect(imageUrl) { onLoadFailed() }
                 } else {
                     lastPainter?.let { painter ->
-                        CameraSnapshotFrame(painter = painter)
+                        CameraSnapshotFrame(
+                            painter = painter,
+                            contentScale = contentScale,
+                            applyHeroScrim = applyHeroScrim,
+                        )
                     }
                 }
             },
             success = { state ->
+                LaunchedEffect(Unit) { onLoadingChanged(false) }
                 Crossfade(
                     targetState = state.painter,
                     animationSpec = tween(SNAPSHOT_CROSSFADE_MS),
                     label = "cameraSnapshot",
                 ) { painter ->
                     lastPainter = painter
-                    CameraSnapshotFrame(painter = painter)
+                    CameraSnapshotFrame(
+                        painter = painter,
+                        contentScale = contentScale,
+                        applyHeroScrim = applyHeroScrim,
+                    )
                 }
             },
         )
@@ -256,19 +290,28 @@ private fun PrinterCameraSnapshotImage(
 }
 
 @Composable
-private fun CameraSnapshotFrame(painter: Painter) {
-    Box(modifier = Modifier.fillMaxSize()) {
+private fun CameraSnapshotFrame(
+    painter: Painter,
+    contentScale: ContentScale,
+    applyHeroScrim: Boolean,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
         Image(
             painter = painter,
             contentDescription = stringResource(R.string.camera_snapshot),
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
+            contentScale = contentScale,
         )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(HeroScrimGradient),
-        )
+        if (applyHeroScrim) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(HeroScrimGradient),
+            )
+        }
     }
 }
 
