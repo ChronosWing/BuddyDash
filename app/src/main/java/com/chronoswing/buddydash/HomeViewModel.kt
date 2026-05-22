@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.HomePrintersCacheRepository
 import com.chronoswing.buddydash.data.SettingsRepository
+import com.chronoswing.buddydash.data.SpoolsCacheRepository
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.BuddyDashDebug
@@ -49,13 +50,18 @@ data class HomeUiState(
     /** True after settings DataStore has emitted at least once. */
     val settingsReady: Boolean = false,
     val lastUpdatedAtMillis: Long? = null,
+    /** Null until spool inventory is known from cache or network. */
+    val loadedSpoolCount: Int? = null,
 )
 
 class HomeViewModel(
     private val settingsRepository: SettingsRepository,
     private val apiClient: BambuddyApiClient,
     private val homePrintersCacheRepository: HomePrintersCacheRepository,
+    private val spoolsCacheRepository: SpoolsCacheRepository,
 ) : ViewModel() {
+
+    private var spoolCountJob: Job? = null
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -93,6 +99,7 @@ class HomeViewModel(
                         !hadCredentials || lastNetworkLoadServerKey != serverKey
                     viewModelScope.launch {
                         hydrateFromDiskCache(url)
+                        hydrateSpoolCountFromDiskCache(url)
                         if (shouldNetworkLoad && serverKey != null) {
                             lastNetworkLoadServerKey = serverKey
                             loadPrinters(showLoading = _uiState.value.printers.isEmpty())
@@ -103,6 +110,7 @@ class HomeViewModel(
                     viewModelScope.launch {
                         if (url.isNotBlank()) {
                             hydrateFromDiskCache(url)
+                            hydrateSpoolCountFromDiskCache(url)
                         }
                         _uiState.update {
                             it.copy(
@@ -141,6 +149,7 @@ class HomeViewModel(
                         printers = emptyList(),
                         lastUpdatedAtMillis = null,
                         hasCompletedLoad = false,
+                        loadedSpoolCount = null,
                         error = null,
                         refreshError = null,
                         isStaleCachedData = false,
@@ -148,6 +157,42 @@ class HomeViewModel(
                 }
                 else -> state
             }
+        }
+    }
+
+    private suspend fun hydrateSpoolCountFromDiskCache(serverUrl: String) {
+        val count = spoolsCacheRepository.load(serverUrl)?.spools?.size ?: return
+        _uiState.update { it.copy(loadedSpoolCount = count) }
+    }
+
+    private fun refreshLoadedSpoolCount() {
+        val state = _uiState.value
+        if (!state.hasCredentials) return
+        spoolCountJob?.cancel()
+        spoolCountJob = viewModelScope.launch {
+            val credentials = _uiState.value
+            val result = apiClient.fetchSpoolInventory(
+                credentials.serverUrl,
+                credentials.apiKey,
+            )
+            result.fold(
+                onSuccess = { spools ->
+                    val existing = spoolsCacheRepository.load(credentials.serverUrl)
+                    val updatedAt = System.currentTimeMillis()
+                    spoolsCacheRepository.save(
+                        credentials.serverUrl,
+                        spools,
+                        existing?.printerFilamentActivityById.orEmpty(),
+                        updatedAt,
+                    )
+                    _uiState.update { it.copy(loadedSpoolCount = spools.size) }
+                },
+                onFailure = { error ->
+                    if (BuddyDashDebug.enabled) {
+                        Log.w(TAG_HOME_VM, "refreshLoadedSpoolCount failed", error)
+                    }
+                },
+            )
         }
     }
 
@@ -316,10 +361,12 @@ class HomeViewModel(
                                     lastUpdatedAtMillis = System.currentTimeMillis(),
                                 )
                             }
+                            refreshLoadedSpoolCount()
                             flushPendingRefresh()
                             return@launch
                         }
 
+                        refreshLoadedSpoolCount()
                         if (hadPrinters) {
                             _uiState.update {
                                 it.copy(
@@ -412,12 +459,14 @@ class HomeViewModel(
                         )
                     }
                     HomeLoadTiming.log("secondary data applied to printer cards")
+                    refreshLoadedSpoolCount()
                     flushPendingRefresh()
                 },
                 onFailure = { error ->
                     if (BuddyDashDebug.enabled) {
                         Log.w(TAG_HOME_VM, "enrichPrinters failed source=$refreshSource", error)
                     }
+                    refreshLoadedSpoolCount()
                     _uiState.update { current ->
                         val message = error.toUserNetworkMessage("Could not refresh printers")
                         if (current.printers.isNotEmpty()) {
@@ -456,6 +505,7 @@ class HomeViewModel(
     override fun onCleared() {
         listFetchJob?.cancel()
         enrichJob?.cancel()
+        spoolCountJob?.cancel()
         super.onCleared()
     }
 }
