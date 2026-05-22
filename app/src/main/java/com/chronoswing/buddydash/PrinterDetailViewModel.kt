@@ -5,12 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.MaintenanceItem
+import com.chronoswing.buddydash.data.model.PrinterMachineInfo
+import com.chronoswing.buddydash.data.model.PrinterMaintenanceOverview
 import com.chronoswing.buddydash.data.model.FilamentUsage
 import com.chronoswing.buddydash.data.model.PrintQueueJob
 import com.chronoswing.buddydash.data.model.PrinterQueueSnapshot
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.BambuddyApiClient
-import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
+import com.chronoswing.buddydash.util.BED_JOG_STEP_OPTIONS_MM
 import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
 import com.chronoswing.buddydash.util.DEBUG_LOG_ARCHIVE_REPRINT
 import com.chronoswing.buddydash.util.TAG_ARCHIVE_REPRINT
@@ -54,6 +56,8 @@ data class PrinterDetailUiState(
     val startQueuedPrintSnackbar: StartQueuedPrintSnackbar? = null,
     /** Filament for active print: status JSON, else queue job with status=printing. */
     val activePrintFilamentUsage: FilamentUsage? = null,
+    val machineInfo: PrinterMachineInfo? = null,
+    val bedJogStepMm: Float = BED_JOG_STEP_OPTIONS_MM[1],
 )
 
 enum class StartQueuedPrintSnackbar {
@@ -158,12 +162,21 @@ class PrinterDetailViewModel(
                         .getOrNull()
                         ?: PrinterQueueSnapshot()
                 }
-                Triple(statusDeferred.await(), maintenanceDeferred.await(), queueDeferred.await())
+                val machineInfoDeferred = async {
+                    apiClient.fetchPrinterMachineInfo(state.serverUrl, state.apiKey, printerId)
+                        .getOrNull()
+                }
+                StatusFetchBundle(
+                    status = statusDeferred.await(),
+                    maintenance = maintenanceDeferred.await(),
+                    queue = queueDeferred.await(),
+                    machineInfo = machineInfoDeferred.await(),
+                )
             }
 
-            statusResult.first.fold(
+            statusResult.status.fold(
                 onSuccess = { status ->
-                    val queueSnapshot = statusResult.third
+                    val queueSnapshot = statusResult.queue
                     val activeFilament = status.filamentUsage
                         ?: queueSnapshot.printing?.filamentUsage
                     val upcoming = queueSnapshot.upcoming
@@ -172,8 +185,9 @@ class PrinterDetailViewModel(
                             isLoading = false,
                             isRefreshing = false,
                             status = status,
-                            maintenanceItems = statusResult.second?.items.orEmpty(),
-                            totalPrintHours = statusResult.second?.totalPrintHours,
+                            maintenanceItems = statusResult.maintenance?.items.orEmpty(),
+                            totalPrintHours = statusResult.maintenance?.totalPrintHours,
+                            machineInfo = statusResult.machineInfo,
                             queueUpcoming = upcoming,
                             startNextQueuedPrintReadiness = evaluateStartNextQueuedPrintReadiness(
                                 status = status,
@@ -260,11 +274,21 @@ class PrinterDetailViewModel(
         }
     }
 
+    fun setBedJogStepMm(stepMm: Float) {
+        if (stepMm in BED_JOG_STEP_OPTIONS_MM) {
+            _uiState.update { it.copy(bedJogStepMm = stepMm) }
+        }
+    }
+
     /** Bed up (toward nozzle) — negative Z per Bambuddy API. */
-    fun jogBedUp() = jogBed(-BED_JOG_STEP_MM, action = "up")
+    fun jogBedUp() = jogBed(-_uiState.value.bedJogStepMm, action = "up")
 
     /** Bed down (away from nozzle) — positive Z per Bambuddy API. */
-    fun jogBedDown() = jogBed(BED_JOG_STEP_MM, action = "down")
+    fun jogBedDown() = jogBed(_uiState.value.bedJogStepMm, action = "down")
+
+    fun homePrinter() = runControl {
+        apiClient.homeAxes(it.serverUrl, it.apiKey, printerId)
+    }
 
     private fun jogBed(distanceMm: Float, action: String) = runControl {
         motionDebugLog(action, printerId, distanceMm)
@@ -391,3 +415,10 @@ class PrinterDetailViewModel(
         _uiState.update { it.copy(startQueuedPrintSnackbar = null) }
     }
 }
+
+private data class StatusFetchBundle(
+    val status: Result<PrinterStatus>,
+    val maintenance: PrinterMaintenanceOverview?,
+    val queue: PrinterQueueSnapshot,
+    val machineInfo: PrinterMachineInfo?,
+)

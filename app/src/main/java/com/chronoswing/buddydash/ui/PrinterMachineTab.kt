@@ -1,0 +1,228 @@
+package com.chronoswing.buddydash.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.chronoswing.buddydash.R
+import com.chronoswing.buddydash.data.model.PrinterMachineInfo
+import com.chronoswing.buddydash.ui.components.CompactLabelValue
+import com.chronoswing.buddydash.ui.components.DetailInfoCard
+import com.chronoswing.buddydash.ui.components.MachineUtilityButton
+import com.chronoswing.buddydash.ui.components.MotionControlsSection
+import com.chronoswing.buddydash.ui.components.PrinterCameraFullscreenDialog
+import com.chronoswing.buddydash.ui.components.SectionHeader
+import com.chronoswing.buddydash.util.BED_JOG_STEP_OPTIONS_MM
+import com.chronoswing.buddydash.util.MachineTabCapabilities
+import com.chronoswing.buddydash.util.PrinterDetailLabels
+import com.chronoswing.buddydash.util.buildMachineInfoRows
+import com.chronoswing.buddydash.util.machineTabCapabilities
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun MachineTab(
+    labels: PrinterDetailLabels,
+    printerModel: String?,
+    machineInfo: PrinterMachineInfo?,
+    cameraToken: String,
+    serverUrl: String,
+    printerId: Int,
+    bedJogStepMm: Float,
+    isControlBusy: Boolean,
+    statusUpdatedAtMillis: Long?,
+    onBedJogStepChange: (Float) -> Unit,
+    onJogBedUp: () -> Unit,
+    onJogBedDown: () -> Unit,
+    onHomePrinter: () -> Unit,
+) {
+    val caps = labels.machineTabCapabilities(cameraTokenConfigured = cameraToken.isNotBlank())
+    var showCameraFullscreen by remember { mutableStateOf(false) }
+    var showHomeConfirm by remember { mutableStateOf(false) }
+
+    PrinterCameraFullscreenDialog(
+        visible = showCameraFullscreen,
+        serverUrl = serverUrl,
+        cameraToken = cameraToken,
+        printerId = printerId,
+        onDismiss = { showCameraFullscreen = false },
+    )
+
+    if (showHomeConfirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showHomeConfirm = false },
+            title = { Text(stringResource(R.string.machine_home_confirm_title)) },
+            text = { Text(stringResource(R.string.machine_home_confirm_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showHomeConfirm = false
+                        onHomePrinter()
+                    },
+                ) {
+                    Text(stringResource(R.string.machine_home))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showHomeConfirm = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (caps.showMotionSection) {
+            DetailInfoCard {
+                SectionHeader(stringResource(R.string.machine_section_motion))
+                BedJogStepSelector(
+                    selectedStepMm = bedJogStepMm,
+                    enabled = !isControlBusy,
+                    onSelect = onBedJogStepChange,
+                )
+                MotionControlsSection(
+                    layout = labels.motionLayout,
+                    canUseMotion = caps.motionEnabled,
+                    actionsEnabled = !isControlBusy && caps.motionEnabled,
+                    stepMm = bedJogStepMm,
+                    onJogUp = onJogBedUp,
+                    onJogDown = onJogBedDown,
+                    compactButtons = true,
+                )
+                caps.motionDisabledReason?.let { reason ->
+                    MachineDisabledHint(reasonCode = reason)
+                }
+            }
+        }
+
+        if (caps.showUtilitiesSection) {
+            DetailInfoCard {
+                SectionHeader(stringResource(R.string.machine_section_utilities))
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (caps.showCamera) {
+                        MachineUtilityButton(
+                            label = stringResource(R.string.camera_view),
+                            icon = Icons.Default.Videocam,
+                            enabled = caps.cameraEnabled && !isControlBusy,
+                            onClick = { showCameraFullscreen = true },
+                        )
+                    }
+                    if (caps.showHome) {
+                        MachineUtilityButton(
+                            label = stringResource(R.string.machine_home),
+                            icon = Icons.Default.Home,
+                            enabled = caps.homeEnabled && !isControlBusy,
+                            onClick = { showHomeConfirm = true },
+                        )
+                    }
+                }
+                if (!caps.utilitiesEnabled) {
+                    caps.utilitiesDisabledReason?.let { reason ->
+                        MachineDisabledHint(reasonCode = reason)
+                    }
+                }
+            }
+        }
+
+        MachinePrinterInfoCard(
+            labels = labels,
+            machineInfo = machineInfo,
+            printerModel = printerModel,
+            statusUpdatedAtMillis = statusUpdatedAtMillis,
+        )
+    }
+}
+
+@Composable
+private fun BedJogStepSelector(
+    selectedStepMm: Float,
+    enabled: Boolean,
+    onSelect: (Float) -> Unit,
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        BED_JOG_STEP_OPTIONS_MM.forEach { step ->
+            FilterChip(
+                selected = selectedStepMm == step,
+                onClick = { onSelect(step) },
+                enabled = enabled,
+                label = {
+                    Text(
+                        text = stringResource(R.string.machine_step_mm, step.toInt()),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun MachineDisabledHint(reasonCode: String) {
+    val text = when (reasonCode) {
+        "offline" -> stringResource(R.string.machine_disabled_offline)
+        "busy" -> stringResource(R.string.machine_disabled_busy)
+        "not_supported" -> stringResource(R.string.machine_disabled_unsupported)
+        else -> return
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+        modifier = Modifier.padding(top = 2.dp),
+    )
+}
+
+@Composable
+private fun MachinePrinterInfoCard(
+    labels: PrinterDetailLabels,
+    machineInfo: PrinterMachineInfo?,
+    printerModel: String?,
+    statusUpdatedAtMillis: Long?,
+) {
+    val rows = buildMachineInfoRows(labels, machineInfo, printerModel, statusUpdatedAtMillis)
+    if (rows.isEmpty()) return
+    DetailInfoCard {
+        SectionHeader(stringResource(R.string.machine_section_printer_info))
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            rows.forEach { (key, value) ->
+                val label = when (key) {
+                    "connection" -> stringResource(R.string.connection)
+                    "ip" -> stringResource(R.string.machine_info_ip)
+                    "network" -> stringResource(R.string.machine_info_network)
+                    "firmware" -> stringResource(R.string.firmware)
+                    "model" -> stringResource(R.string.machine_info_model)
+                    "serial" -> stringResource(R.string.machine_info_serial)
+                    "location" -> stringResource(R.string.machine_info_location)
+                    "updated" -> stringResource(R.string.machine_info_last_updated)
+                    "status_updated" -> stringResource(R.string.machine_info_status_refreshed)
+                    else -> key
+                }
+                CompactLabelValue(label = label, value = value)
+            }
+        }
+    }
+}

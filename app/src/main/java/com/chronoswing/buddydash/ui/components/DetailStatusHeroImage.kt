@@ -110,6 +110,8 @@ fun DetailStatusHeroImage(
                     printerId = printerId,
                     refreshTick = refreshTick,
                     height = height,
+                    fillMaxSize = false,
+                    frameModifier = Modifier,
                     onLoadFailed = { cameraFailed = true },
                 )
             }
@@ -139,12 +141,37 @@ fun DetailStatusHeroImage(
 }
 
 @Composable
+fun PrinterLiveCameraSnapshot(
+    serverUrl: String,
+    cameraToken: String,
+    printerId: Int,
+    refreshTick: Long,
+    modifier: Modifier = Modifier,
+    fillMaxSize: Boolean = false,
+    height: Dp = 160.dp,
+    onLoadFailed: () -> Unit = {},
+) {
+    PrinterCameraSnapshotImage(
+        serverUrl = serverUrl,
+        cameraToken = cameraToken,
+        printerId = printerId,
+        refreshTick = refreshTick,
+        height = height,
+        fillMaxSize = fillMaxSize,
+        frameModifier = modifier,
+        onLoadFailed = onLoadFailed,
+    )
+}
+
+@Composable
 private fun PrinterCameraSnapshotImage(
     serverUrl: String,
     cameraToken: String,
     printerId: Int,
     refreshTick: Long,
     height: Dp,
+    fillMaxSize: Boolean = false,
+    frameModifier: Modifier = Modifier,
     onLoadFailed: () -> Unit,
 ) {
     val imageUrl = remember(serverUrl, printerId, cameraToken, refreshTick) {
@@ -186,12 +213,16 @@ private fun PrinterCameraSnapshotImage(
             .build()
     }
     val shape = RoundedCornerShape(10.dp)
-    val frameModifier = Modifier
-        .fillMaxWidth()
-        .height(height)
-        .clip(shape)
+    val resolvedFrame = if (fillMaxSize) {
+        frameModifier.fillMaxSize().clip(shape)
+    } else {
+        frameModifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(shape)
+    }
 
-    Box(modifier = frameModifier) {
+    Box(modifier = resolvedFrame) {
         SubcomposeAsyncImage(
             model = request,
             contentDescription = null,

@@ -47,14 +47,11 @@ import com.chronoswing.buddydash.StartQueuedPrintSnackbar
 import com.chronoswing.buddydash.network.BambuddyApi
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.PrintQueueJob
-import com.chronoswing.buddydash.ui.components.ComingSoonActionButton
 import com.chronoswing.buddydash.ui.components.DetailConnectivityCard
 import com.chronoswing.buddydash.ui.components.DetailFansCard
 import com.chronoswing.buddydash.ui.components.DetailMaintenanceCard
 import com.chronoswing.buddydash.ui.components.DetailPrintSpeedCard
 import com.chronoswing.buddydash.ui.components.FilamentAmsEnvironmentSection
-import com.chronoswing.buddydash.ui.components.MotionControlsSection
-import com.chronoswing.buddydash.ui.components.PrintSpeedControlChips
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.ErrorContent
@@ -78,11 +75,10 @@ import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildPrintHeadline
-import com.chronoswing.buddydash.util.BED_JOG_STEP_MM
 import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
 import com.chronoswing.buddydash.util.toDetailLabels
 
-private val detailTabs = listOf("Status", "Filament", "Controls")
+private val detailTabs = listOf("Status", "Filament", "Machine")
 
 @Composable
 fun PrinterDetailScreen(
@@ -147,8 +143,13 @@ fun PrinterDetailScreen(
         onResumePrint = viewModel::resumePrint,
         onStopPrint = viewModel::stopPrint,
         onToggleLight = viewModel::toggleChamberLight,
+        bedJogStepMm = uiState.bedJogStepMm,
+        machineInfo = uiState.machineInfo,
+        printerModel = uiState.printerModel ?: printerModel,
+        onBedJogStepChange = viewModel::setBedJogStepMm,
         onJogBedUp = viewModel::jogBedUp,
         onJogBedDown = viewModel::jogBedDown,
+        onHomePrinter = viewModel::homePrinter,
         onPerformMaintenanceReset = viewModel::performMaintenanceReset,
         onMaintenanceResetSnackbarShown = viewModel::onMaintenanceResetSnackbarShown,
         onViewFullQueue = onViewFullQueue,
@@ -194,8 +195,13 @@ private fun PrinterDetailScreenContent(
     onResumePrint: () -> Unit,
     onStopPrint: () -> Unit,
     onToggleLight: () -> Unit,
+    bedJogStepMm: Float,
+    machineInfo: com.chronoswing.buddydash.data.model.PrinterMachineInfo?,
+    printerModel: String?,
+    onBedJogStepChange: (Float) -> Unit,
     onJogBedUp: () -> Unit,
     onJogBedDown: () -> Unit,
+    onHomePrinter: () -> Unit,
     onPerformMaintenanceReset: (Int) -> Unit,
     onMaintenanceResetSnackbarShown: () -> Unit,
 ) {
@@ -351,13 +357,20 @@ private fun PrinterDetailScreenContent(
                                     onStopPrint = onStopPrint,
                                 )
                                 1 -> FilamentTab(labels = labels)
-                                2 -> ControlsTab(
+                                2 -> MachineTab(
                                     labels = labels,
-                                    isClearingPlate = isClearingPlate,
+                                    printerModel = printerModel,
+                                    machineInfo = machineInfo,
+                                    cameraToken = cameraToken,
+                                    serverUrl = serverUrl,
+                                    printerId = printerId,
+                                    bedJogStepMm = bedJogStepMm,
                                     isControlBusy = isControlBusy,
-                                    onSetPrintSpeed = onSetPrintSpeed,
+                                    statusUpdatedAtMillis = lastStatusUpdatedAtMillis,
+                                    onBedJogStepChange = onBedJogStepChange,
                                     onJogBedUp = onJogBedUp,
                                     onJogBedDown = onJogBedDown,
+                                    onHomePrinter = onHomePrinter,
                                 )
                             }
                         }
@@ -667,58 +680,6 @@ private fun FilamentTab(labels: PrinterDetailLabels) {
         cardMicroMotion = labels.cardMicroMotion,
         modifier = Modifier.fillMaxWidth(),
     )
-}
-
-@Composable
-private fun ControlsTab(
-    labels: PrinterDetailLabels,
-    isClearingPlate: Boolean,
-    isControlBusy: Boolean,
-    onSetPrintSpeed: (Int) -> Unit,
-    onJogBedUp: () -> Unit,
-    onJogBedDown: () -> Unit,
-) {
-    val comingSoon = stringResource(R.string.coming_soon)
-    val actionsEnabled = !isClearingPlate && !isControlBusy
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (labels.canControlPrint) {
-            SectionHeader(stringResource(R.string.controls_section_print))
-            DetailInfoCard {
-                PrintSpeedControlChips(
-                    currentLevel = labels.speedLevel,
-                    enabled = actionsEnabled,
-                    onSelect = onSetPrintSpeed,
-                )
-            }
-        }
-
-        if (labels.showMotionControls) {
-            SectionHeader(stringResource(R.string.section_motion_controls))
-            DetailInfoCard {
-                MotionControlsSection(
-                    layout = labels.motionLayout,
-                    canUseMotion = labels.canUseMotionControls,
-                    actionsEnabled = actionsEnabled,
-                    stepMm = BED_JOG_STEP_MM,
-                    onJogUp = onJogBedUp,
-                    onJogDown = onJogBedDown,
-                )
-            }
-        }
-
-        SectionHeader(stringResource(R.string.controls_section_more))
-        DetailInfoCard {
-            ComingSoonActionButton(
-                label = stringResource(R.string.camera_view),
-                helperText = comingSoon,
-            )
-            ComingSoonActionButton(
-                label = stringResource(R.string.printer_files),
-                helperText = comingSoon,
-            )
-        }
-    }
 }
 
 @Composable
