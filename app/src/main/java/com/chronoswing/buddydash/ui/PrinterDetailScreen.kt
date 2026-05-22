@@ -88,6 +88,7 @@ fun PrinterDetailScreen(
     viewModel: PrinterDetailViewModel,
     onBack: () -> Unit,
     onViewFullQueue: () -> Unit,
+    onOpenPrinterArchives: () -> Unit = {},
 ) {
     LaunchedEffect(printerId, printerName, printerModel) {
         viewModel.init(printerId, printerName, printerModel)
@@ -155,6 +156,7 @@ fun PrinterDetailScreen(
         onViewFullQueue = onViewFullQueue,
         onStartNextQueuedPrint = viewModel::startNextQueuedPrint,
         onStartQueuedPrintSnackbarShown = viewModel::onStartQueuedPrintSnackbarShown,
+        onOpenPrinterArchives = onOpenPrinterArchives,
     )
 }
 
@@ -182,6 +184,7 @@ private fun PrinterDetailScreenContent(
     startQueuedPrintSnackbar: StartQueuedPrintSnackbar?,
     onBack: () -> Unit,
     onViewFullQueue: () -> Unit,
+    onOpenPrinterArchives: () -> Unit,
     onStartNextQueuedPrint: () -> Unit,
     onStartQueuedPrintSnackbarShown: () -> Unit,
     onRetry: () -> Unit,
@@ -372,6 +375,7 @@ private fun PrinterDetailScreenContent(
                                     onJogBedDown = onJogBedDown,
                                     onHomePrinter = onHomePrinter,
                                     onToggleLight = onToggleLight,
+                                    onOpenPrinterArchives = onOpenPrinterArchives,
                                 )
                             }
                         }

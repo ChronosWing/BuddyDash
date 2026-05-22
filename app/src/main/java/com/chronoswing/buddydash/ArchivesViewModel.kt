@@ -5,11 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.network.BambuddyApiClient
+import com.chronoswing.buddydash.util.ArchivePrinterFilter
 import com.chronoswing.buddydash.util.ArchiveResultFilter
 import com.chronoswing.buddydash.util.ArchiveStatsSnapshot
 import com.chronoswing.buddydash.util.ArchiveStatsTimeRange
 import com.chronoswing.buddydash.util.ArchivesSection
-import com.chronoswing.buddydash.util.applyArchiveSearch
+import com.chronoswing.buddydash.util.applyArchiveListFilters
 import com.chronoswing.buddydash.util.computeArchiveStats
 import com.chronoswing.buddydash.util.filterArchivesForStatsRange
 import com.chronoswing.buddydash.util.logArchiveStatsDateFilterSummary
@@ -34,12 +35,27 @@ data class ArchivesUiState(
     val filter: ArchiveResultFilter = ArchiveResultFilter.All,
     val section: ArchivesSection = ArchivesSection.History,
     val statsTimeRange: ArchiveStatsTimeRange = ArchiveStatsTimeRange.Last30Days,
+    val printerFilter: ArchivePrinterFilter? = null,
 ) {
     val filteredArchives: List<PrintArchive> =
-        applyArchiveSearch(archives, searchQuery, filter)
+        applyArchiveListFilters(
+            archives = archives,
+            query = searchQuery,
+            filter = filter,
+            printerId = printerFilter?.printerId,
+        )
 
     val statsSnapshot: ArchiveStatsSnapshot =
-        computeArchiveStats(filterArchivesForStatsRange(archives, statsTimeRange))
+        computeArchiveStats(
+            filterArchivesForStatsRange(
+                if (printerFilter != null) {
+                    archives.filter { it.printerId == printerFilter.printerId }
+                } else {
+                    archives
+                },
+                statsTimeRange,
+            ),
+        )
 }
 
 class ArchivesViewModel(
@@ -82,6 +98,25 @@ class ArchivesViewModel(
         _uiState.update { it.copy(searchQuery = query) }
     }
 
+    fun applyPrinterFilter(printerId: Int, printerName: String) {
+        val filter = ArchivePrinterFilter(printerId, printerName)
+        val current = _uiState.value
+        if (current.printerFilter == filter && current.section == ArchivesSection.History) return
+        _uiState.update {
+            it.copy(
+                printerFilter = filter,
+                section = ArchivesSection.History,
+            )
+        }
+        loadArchives(showLoading = current.archives.isEmpty())
+    }
+
+    fun clearPrinterFilter() {
+        if (_uiState.value.printerFilter == null) return
+        _uiState.update { it.copy(printerFilter = null) }
+        loadArchives(showLoading = _uiState.value.archives.isEmpty())
+    }
+
     fun onFilterChange(filter: ArchiveResultFilter) {
         _uiState.update { it.copy(filter = filter) }
     }
@@ -108,7 +143,11 @@ class ArchivesViewModel(
             } else if (showLoading) {
                 _uiState.update { it.copy(isLoading = true, error = null) }
             }
-            val result = apiClient.fetchArchives(state.serverUrl, state.apiKey)
+            val result = apiClient.fetchArchives(
+                state.serverUrl,
+                state.apiKey,
+                printerId = state.printerFilter?.printerId,
+            )
             result.fold(
                 onSuccess = { archives ->
                     logArchiveStatsDateFilterSummary(archives)
