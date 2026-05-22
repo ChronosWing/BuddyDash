@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,8 +32,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.SpoolDetailViewModel
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
-import com.chronoswing.buddydash.data.model.SpoolUsageEntry
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
+import com.chronoswing.buddydash.ui.components.PrintFileNameText
+import com.chronoswing.buddydash.ui.components.SpoolUsageThumbnail
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentColorSwatch
@@ -46,16 +49,14 @@ import com.chronoswing.buddydash.util.formatSpoolLocationLine
 import com.chronoswing.buddydash.util.formatSpoolMaterialSubtitle
 import com.chronoswing.buddydash.util.formatSpoolRemainingGrams
 import com.chronoswing.buddydash.util.formatSpoolTagIndicator
-import com.chronoswing.buddydash.util.formatSpoolUsageDate
-import com.chronoswing.buddydash.util.formatSpoolUsagePrintName
-import com.chronoswing.buddydash.util.formatSpoolUsagePrinterLine
-import com.chronoswing.buddydash.util.formatSpoolUsageWeight
+import com.chronoswing.buddydash.util.SpoolUsageDisplayItem
 
 @Composable
 fun SpoolDetailScreen(
     spoolId: Int,
     viewModel: SpoolDetailViewModel,
     onBack: () -> Unit,
+    onArchiveClick: (Int) -> Unit = {},
 ) {
     LaunchedEffect(spoolId) {
         viewModel.init(spoolId)
@@ -65,12 +66,14 @@ fun SpoolDetailScreen(
 
     SpoolDetailScreenContent(
         spool = uiState.spool,
-        usageHistory = uiState.usageHistory,
-        printerNamesById = uiState.printerNamesById,
+        usageDisplayItems = uiState.usageDisplayItems,
+        serverUrl = uiState.serverUrl,
+        cameraToken = uiState.cameraToken,
         isLoading = uiState.isLoading,
         error = uiState.error,
         onBack = onBack,
         onRetry = { viewModel.load(force = true) },
+        onArchiveClick = onArchiveClick,
     )
 }
 
@@ -78,12 +81,14 @@ fun SpoolDetailScreen(
 @Composable
 private fun SpoolDetailScreenContent(
     spool: SpoolInventoryItem?,
-    usageHistory: List<SpoolUsageEntry>,
-    printerNamesById: Map<Int, String>,
+    usageDisplayItems: List<SpoolUsageDisplayItem>,
+    serverUrl: String,
+    cameraToken: String,
     isLoading: Boolean,
     error: String?,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onArchiveClick: (Int) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -126,8 +131,10 @@ private fun SpoolDetailScreenContent(
                     SpoolDetailHero(spool = spool)
                     SpoolDetailFields(spool = spool)
                     SpoolUsageHistorySection(
-                        usageHistory = usageHistory,
-                        printerNamesById = printerNamesById,
+                        items = usageDisplayItems,
+                        serverUrl = serverUrl,
+                        cameraToken = cameraToken,
+                        onArchiveClick = onArchiveClick,
                     )
                 }
             }
@@ -247,18 +254,22 @@ private fun SpoolDetailFields(spool: SpoolInventoryItem) {
 
 @Composable
 private fun SpoolUsageHistorySection(
-    usageHistory: List<SpoolUsageEntry>,
-    printerNamesById: Map<Int, String>,
+    items: List<SpoolUsageDisplayItem>,
+    serverUrl: String,
+    cameraToken: String,
+    onArchiveClick: (Int) -> Unit,
 ) {
-    if (usageHistory.isEmpty()) return
+    if (items.isEmpty()) return
 
     DetailInfoCard {
         SectionHeader(stringResource(R.string.spool_detail_used_in_prints))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            usageHistory.forEach { entry ->
+            items.forEach { item ->
                 SpoolUsageHistoryRow(
-                    entry = entry,
-                    printerNamesById = printerNamesById,
+                    item = item,
+                    serverUrl = serverUrl,
+                    cameraToken = cameraToken,
+                    onArchiveClick = onArchiveClick,
                 )
             }
         }
@@ -267,33 +278,57 @@ private fun SpoolUsageHistorySection(
 
 @Composable
 private fun SpoolUsageHistoryRow(
-    entry: SpoolUsageEntry,
-    printerNamesById: Map<Int, String>,
+    item: SpoolUsageDisplayItem,
+    serverUrl: String,
+    cameraToken: String,
+    onArchiveClick: (Int) -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Text(
-            text = formatSpoolUsagePrintName(entry),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        FilamentUsageText(text = formatSpoolUsageWeight(entry))
-        formatSpoolUsageDate(entry)?.let { date ->
-            Text(
-                text = date,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-            )
+    val archiveId = item.archiveId
+    val rowModifier = Modifier.fillMaxWidth().let { base ->
+        if (item.isTappable && archiveId != null) {
+            base.clickable { onArchiveClick(archiveId) }
+        } else {
+            base
         }
-        formatSpoolUsagePrinterLine(entry, printerNamesById)?.let { printer ->
-            Text(
-                text = printer,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+    }
+    Row(
+        modifier = rowModifier,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SpoolUsageThumbnail(
+            archiveId = item.archiveId,
+            usageImageUrl = item.usageImageUrl,
+            serverUrl = serverUrl,
+            cameraToken = cameraToken,
+            size = 44.dp,
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            PrintFileNameText(
+                fileName = item.displayName,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+            FilamentUsageText(text = item.weightLine)
+            item.printerLine?.let { printer ->
+                Text(
+                    text = printer,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (item.isTappable) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                modifier = Modifier.padding(start = 2.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
             )
         }
     }
