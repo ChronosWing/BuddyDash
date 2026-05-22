@@ -1,6 +1,7 @@
 package com.chronoswing.buddydash.data.model
 
 import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
+import com.chronoswing.buddydash.util.isFault
 import com.chronoswing.buddydash.util.SlotInventoryKey
 
 data class Printer(
@@ -22,7 +23,9 @@ data class PrinterStatus(
     val nozzleTemp: Double?,
     val bedTemp: Double?,
     val chamberTemp: Double? = null,
-    val hmsErrorCount: Int = 0,
+    val hmsErrors: List<PrinterHmsError> = emptyList(),
+    /** Explicit fault text from top-level status fields (not warnings/notifications). */
+    val statusFaultMessages: List<String> = emptyList(),
     /** Present only when the API includes `awaiting_plate_clear`; do not infer. */
     val awaitingPlateClear: Boolean? = null,
     val filamentSlots: List<FilamentSlot> = emptyList(),
@@ -43,4 +46,7 @@ data class PrinterStatus(
     val nozzleDiameterDisplay: String? = null,
     /** Filament usage when present on status JSON (OpenAPI has no field; may appear at runtime). */
     val filamentUsage: FilamentUsage? = null,
-)
+) {
+    /** Count of HMS entries that are faults (excludes warnings/notifications). */
+    val hmsErrorCount: Int get() = hmsErrors.count { it.isFault() }
+}

@@ -1,6 +1,7 @@
 package com.chronoswing.buddydash.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -47,6 +48,7 @@ fun PrinterQuickStatusRow(
     cardMicroMotion: CardMicroMotion = CardMicroMotion.None,
     maintenanceIndicator: MaintenanceHomeIndicator = MaintenanceHomeIndicator.None,
     pendingQueueCount: Int = 0,
+    onErrorChipClick: (() -> Unit)? = null,
 ) {
     val chipBreath = rememberPrintingChipBreath(cardMicroMotion == CardMicroMotion.Printing)
     Row(
@@ -58,6 +60,11 @@ fun PrinterQuickStatusRow(
             kind = activityKind,
             progressCompact = progressCompact,
             breathPhase = chipBreath,
+            onClick = if (activityKind == PrinterActivityKind.Error && onErrorChipClick != null) {
+                onErrorChipClick
+            } else {
+                null
+            },
         )
         plateKind?.let { PlateStatusChip(kind = it) }
         MaintenanceHomeIndicatorIcon(indicator = maintenanceIndicator)
@@ -121,6 +128,7 @@ fun ActivityStatusChip(
     progressCompact: String?,
     modifier: Modifier = Modifier,
     breathPhase: Float = 0f,
+    onClick: (() -> Unit)? = null,
 ) {
     val style = activityChipStyle(kind = kind)
     val label = activityChipLabel(kind, progressCompact)
@@ -137,6 +145,7 @@ fun ActivityStatusChip(
         contentColor = style.content,
         borderColor = style.accent.copy(alpha = borderAlpha),
         modifier = modifier,
+        onClick = onClick,
     )
 }
 
@@ -188,9 +197,12 @@ private fun StatusPill(
     contentColor: Color,
     borderColor: Color,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.then(
+            if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
+        ),
         shape = RoundedCornerShape(8.dp),
         color = containerColor,
         border = BorderStroke(1.dp, borderColor),

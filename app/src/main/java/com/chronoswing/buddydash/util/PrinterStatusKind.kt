@@ -19,20 +19,12 @@ enum class PlateIndicatorKind {
 
 fun PrinterStatus.resolveActivityKind(): PrinterActivityKind {
     if (!connected) return PrinterActivityKind.Offline
+    if (hasActiveFault()) return PrinterActivityKind.Error
     val raw = rawState?.uppercase()
-    if (raw == "RUNNING") {
-        return if (hmsErrorCount > 0) PrinterActivityKind.Error else PrinterActivityKind.Printing
-    }
-    if (raw == "PAUSE") {
-        return if (hmsErrorCount > 0) PrinterActivityKind.Error else PrinterActivityKind.Paused
-    }
-    if (raw in IDLE_LIKE_STATES || raw.isNullOrBlank()) {
-        return if (hmsErrorCount > 0) PrinterActivityKind.Error else PrinterActivityKind.Idle
-    }
-    if (raw in BUSY_LIKE_STATES) {
-        return if (hmsErrorCount > 0) PrinterActivityKind.Error else PrinterActivityKind.Busy
-    }
-    if (hmsErrorCount > 0) return PrinterActivityKind.Error
+    if (raw == "RUNNING") return PrinterActivityKind.Printing
+    if (raw == "PAUSE") return PrinterActivityKind.Paused
+    if (raw in IDLE_LIKE_STATES || raw.isNullOrBlank()) return PrinterActivityKind.Idle
+    if (raw in BUSY_LIKE_STATES || raw in HOMING_LIKE_STATES) return PrinterActivityKind.Busy
     return PrinterActivityKind.Busy
 }
 
@@ -68,4 +60,8 @@ fun PrinterStatus.showHomeCardTemps(): Boolean {
 private val IDLE_LIKE_STATES = setOf("IDLE", "FINISH", "FAILED")
 private val BUSY_LIKE_STATES = setOf(
     "PREPARE", "PREPARING", "SLICING", "CALIBRATING", "BUSY", "INITIALIZING",
+)
+
+private val HOMING_LIKE_STATES = setOf(
+    "HOMING", "HOME", "AUTO_HOME", "AUTOHOMING", "G28", "G28ING",
 )

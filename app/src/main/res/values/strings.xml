@@ -245,6 +245,12 @@
     <string name="close">Close</string>
     <string name="control_success">Command sent</string>
     <string name="control_failed">Command failed</string>
+    <string name="machine_home_failed">Home axes failed</string>
+    <string name="machine_bed_jog_failed">Could not move bed</string>
+    <string name="machine_chamber_light_failed">Could not toggle chamber light</string>
+    <string name="printer_error_details_title">Error</string>
+    <string name="printer_error_no_details">Printer reports an error, but no details were provided.</string>
+    <string name="printer_error_show_more">Show %1$d more</string>
     <string name="maintenance_due_suffix">due</string>
     <string name="maintenance_soon_suffix">soon</string>
     <string name="maintenance_reset">Reset</string>

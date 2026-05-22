@@ -9,6 +9,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.gestures.animateScrollBy
+import kotlin.math.roundToInt
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -38,7 +44,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.chronoswing.buddydash.ControlSnackbar
+import com.chronoswing.buddydash.util.ControlAction
+import com.chronoswing.buddydash.util.ControlFeedback
 import com.chronoswing.buddydash.MaintenanceResetSnackbar
 import com.chronoswing.buddydash.PlateClearSnackbar
 import com.chronoswing.buddydash.PrinterDetailViewModel
@@ -61,6 +68,7 @@ import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
 import com.chronoswing.buddydash.ui.components.DetailPrintQueueSection
 import com.chronoswing.buddydash.ui.components.PrinterStatusQuickActions
 import com.chronoswing.buddydash.ui.components.SectionHeaderRow
+import com.chronoswing.buddydash.ui.components.PrinterErrorDetailsCard
 import com.chronoswing.buddydash.ui.components.DetailStatusHeroImage
 import com.chronoswing.buddydash.ui.components.HighlightValue
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
@@ -105,11 +113,13 @@ fun PrinterDetailScreen(
         },
     )
 
+    val printerErrorNoDetails = stringResource(R.string.printer_error_no_details)
     val labels = uiState.status?.toDetailLabels(
         maintenanceItems = uiState.maintenanceItems,
         totalPrintHours = uiState.totalPrintHours,
         printerModel = uiState.printerModel ?: printerModel,
         activePrintFilamentUsage = uiState.activePrintFilamentUsage,
+        printerErrorNoDetailsFallback = printerErrorNoDetails,
     )
 
     PrinterDetailScreenContent(
@@ -124,7 +134,7 @@ fun PrinterDetailScreen(
         isClearingPlate = uiState.isClearingPlate,
         isControlBusy = uiState.isControlBusy,
         plateClearSnackbar = uiState.plateClearSnackbar,
-        controlSnackbar = uiState.controlSnackbar,
+        controlFeedback = uiState.controlFeedback,
         isMaintenanceResetBusy = uiState.isMaintenanceResetBusy,
         maintenanceResetSnackbar = uiState.maintenanceResetSnackbar,
         lastStatusUpdatedAtMillis = uiState.lastStatusUpdatedAtMillis,
@@ -138,7 +148,7 @@ fun PrinterDetailScreen(
         onPullRefresh = { viewModel.loadStatus(showLoading = false, fromPull = true) },
         onMarkPlateClear = viewModel::markPlateClear,
         onPlateClearSnackbarShown = viewModel::onPlateClearSnackbarShown,
-        onControlSnackbarShown = viewModel::onControlSnackbarShown,
+        onControlFeedbackShown = viewModel::onControlFeedbackShown,
         onSetPrintSpeed = viewModel::setPrintSpeed,
         onPausePrint = viewModel::pausePrint,
         onResumePrint = viewModel::resumePrint,
@@ -174,7 +184,7 @@ private fun PrinterDetailScreenContent(
     isClearingPlate: Boolean,
     isControlBusy: Boolean,
     plateClearSnackbar: PlateClearSnackbar?,
-    controlSnackbar: ControlSnackbar?,
+    controlFeedback: ControlFeedback?,
     isMaintenanceResetBusy: Boolean,
     maintenanceResetSnackbar: MaintenanceResetSnackbar?,
     lastStatusUpdatedAtMillis: Long?,
@@ -192,7 +202,7 @@ private fun PrinterDetailScreenContent(
     onPullRefresh: () -> Unit,
     onMarkPlateClear: () -> Unit,
     onPlateClearSnackbarShown: () -> Unit,
-    onControlSnackbarShown: () -> Unit,
+    onControlFeedbackShown: () -> Unit,
     onSetPrintSpeed: (Int) -> Unit,
     onPausePrint: () -> Unit,
     onResumePrint: () -> Unit,
@@ -213,6 +223,9 @@ private fun PrinterDetailScreenContent(
     val plateClearFailedMessage = stringResource(R.string.plate_clear_failed)
     val controlSuccessMessage = stringResource(R.string.control_success)
     val controlFailedMessage = stringResource(R.string.control_failed)
+    val homeFailedMessage = stringResource(R.string.machine_home_failed)
+    val bedJogFailedMessage = stringResource(R.string.machine_bed_jog_failed)
+    val chamberLightFailedMessage = stringResource(R.string.machine_chamber_light_failed)
     val printStoppedSuccessMessage = stringResource(R.string.print_stopped_success)
     val printStoppedFailedMessage = stringResource(R.string.print_stopped_failed)
     val maintenanceResetSuccessMessage = stringResource(R.string.maintenance_reset_success)
@@ -220,6 +233,18 @@ private fun PrinterDetailScreenContent(
     val printStartedMessage = stringResource(R.string.archive_reprint_started)
     val startNextPrintFailedMessage = stringResource(R.string.start_next_print_failed)
     var selectedTab by remember { mutableIntStateOf(0) }
+    val scrollState = rememberScrollState()
+    var errorDetailsExpanded by rememberSaveable { mutableStateOf(false) }
+    val errorCardScrollOffset = remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+
+    LaunchedEffect(errorDetailsExpanded) {
+        if (errorDetailsExpanded) {
+            val target = errorCardScrollOffset.intValue.toFloat()
+            val delta = target - scrollState.value
+            if (delta > 0f) scrollState.animateScrollBy(delta)
+        }
+    }
 
     LaunchedEffect(plateClearSnackbar) {
         val message = when (plateClearSnackbar) {
@@ -231,16 +256,21 @@ private fun PrinterDetailScreenContent(
         onPlateClearSnackbarShown()
     }
 
-    LaunchedEffect(controlSnackbar) {
-        val message = when (controlSnackbar) {
-            ControlSnackbar.Success -> controlSuccessMessage
-            ControlSnackbar.Failed -> controlFailedMessage
-            ControlSnackbar.StopSuccess -> printStoppedSuccessMessage
-            ControlSnackbar.StopFailed -> printStoppedFailedMessage
-            null -> return@LaunchedEffect
-        }
-        snackbarHostState.showSnackbar(message)
-        onControlSnackbarShown()
+    LaunchedEffect(controlFeedback) {
+        val feedback = controlFeedback ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(
+            controlFeedbackMessage(
+                feedback = feedback,
+                genericSuccessMessage = controlSuccessMessage,
+                genericFailedMessage = controlFailedMessage,
+                homeFailedMessage = homeFailedMessage,
+                bedJogFailedMessage = bedJogFailedMessage,
+                chamberLightFailedMessage = chamberLightFailedMessage,
+                printStoppedSuccessMessage = printStoppedSuccessMessage,
+                printStoppedFailedMessage = printStoppedFailedMessage,
+            ),
+        )
+        onControlFeedbackShown()
     }
 
     LaunchedEffect(maintenanceResetSnackbar) {
@@ -330,13 +360,24 @@ private fun PrinterDetailScreenContent(
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
+                                .verticalScroll(scrollState)
                                 .padding(12.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             when (selectedTab) {
                                 0 -> StatusTab(
                                     labels = labels,
+                                    errorDetailsExpanded = errorDetailsExpanded,
+                                    onExpandErrorDetails = { errorDetailsExpanded = true },
+                                    onErrorChipClick = {
+                                        if (labels.printerErrorDisplay.hasKnownDetails ||
+                                            labels.printerErrorDisplay.showCard
+                                        ) {
+                                            errorDetailsExpanded = true
+                                        }
+                                    },
+                                    errorCardScrollOffset = errorCardScrollOffset,
+                                    density = density,
                                     printerName = title,
                                     printerId = printerId,
                                     serverUrl = serverUrl,
@@ -399,6 +440,11 @@ private fun StatusTab(
     isStartingQueuedPrint: Boolean,
     isClearingPlate: Boolean,
     isMaintenanceResetBusy: Boolean,
+    errorDetailsExpanded: Boolean,
+    onExpandErrorDetails: () -> Unit,
+    onErrorChipClick: () -> Unit,
+    errorCardScrollOffset: androidx.compose.runtime.MutableIntState,
+    density: androidx.compose.ui.unit.Density,
     onMarkPlateClear: () -> Unit,
     onPerformMaintenanceReset: (Int) -> Unit,
     onViewFullQueue: () -> Unit,
@@ -434,6 +480,11 @@ private fun StatusTab(
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
             headerTrailing = quickActions,
+            errorDetailsExpanded = errorDetailsExpanded,
+            onExpandErrorDetails = onExpandErrorDetails,
+            onErrorChipClick = onErrorChipClick,
+            errorCardScrollOffset = errorCardScrollOffset,
+            density = density,
         )
     } else {
         IdleStatusTab(
@@ -444,6 +495,11 @@ private fun StatusTab(
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
             headerTrailing = quickActions,
+            errorDetailsExpanded = errorDetailsExpanded,
+            onExpandErrorDetails = onExpandErrorDetails,
+            onErrorChipClick = onErrorChipClick,
+            errorCardScrollOffset = errorCardScrollOffset,
+            density = density,
         )
     }
     if (queueUpcoming.isNotEmpty()) {
@@ -486,6 +542,11 @@ private fun ActivePrintStatusTab(
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
     headerTrailing: @Composable () -> Unit,
+    errorDetailsExpanded: Boolean,
+    onExpandErrorDetails: () -> Unit,
+    onErrorChipClick: () -> Unit,
+    errorCardScrollOffset: androidx.compose.runtime.MutableIntState,
+    density: androidx.compose.ui.unit.Density,
 ) {
     var cameraHeroActive by remember { mutableStateOf(false) }
     DetailStatusHeroImage(
@@ -505,6 +566,19 @@ private fun ActivePrintStatusTab(
             progressCompact = labels.progressCompact,
             plateKind = labels.plateKind,
             cardMicroMotion = labels.cardMicroMotion,
+            onErrorChipClick = onErrorChipClick.takeIf {
+                labels.printerErrorDisplay.showCard
+            },
+        )
+        PrinterErrorDetailsCard(
+            display = labels.printerErrorDisplay,
+            expanded = errorDetailsExpanded,
+            onExpand = onExpandErrorDetails,
+            modifier = Modifier.onGloballyPositioned { coordinates ->
+                errorCardScrollOffset.intValue = with(density) {
+                    coordinates.positionInParent().y.toDp().roundToPx()
+                }
+            },
         )
         HighlightValue(
             label = labels.progressTitle,
@@ -570,6 +644,11 @@ private fun IdleStatusTab(
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
     headerTrailing: @Composable () -> Unit,
+    errorDetailsExpanded: Boolean,
+    onExpandErrorDetails: () -> Unit,
+    onErrorChipClick: () -> Unit,
+    errorCardScrollOffset: androidx.compose.runtime.MutableIntState,
+    density: androidx.compose.ui.unit.Density,
 ) {
     var cameraHeroActive by remember { mutableStateOf(false) }
     DetailStatusHeroImage(
@@ -587,6 +666,19 @@ private fun IdleStatusTab(
             activityKind = labels.activityKind,
             progressCompact = labels.progressCompact,
             plateKind = labels.plateKind,
+            onErrorChipClick = onErrorChipClick.takeIf {
+                labels.printerErrorDisplay.showCard
+            },
+        )
+        PrinterErrorDetailsCard(
+            display = labels.printerErrorDisplay,
+            expanded = errorDetailsExpanded,
+            onExpand = onExpandErrorDetails,
+            modifier = Modifier.onGloballyPositioned { coordinates ->
+                errorCardScrollOffset.intValue = with(density) {
+                    coordinates.positionInParent().y.toDp().roundToPx()
+                }
+            },
         )
         HighlightValue(
             label = stringResource(R.string.current_activity),
@@ -664,6 +756,31 @@ private fun IdleStatusTab(
                 MaterialTheme.colorScheme.primary
             },
         )
+    }
+}
+
+private fun controlFeedbackMessage(
+    feedback: ControlFeedback,
+    genericSuccessMessage: String,
+    genericFailedMessage: String,
+    homeFailedMessage: String,
+    bedJogFailedMessage: String,
+    chamberLightFailedMessage: String,
+    printStoppedSuccessMessage: String,
+    printStoppedFailedMessage: String,
+): String {
+    if (feedback.success) {
+        return when (feedback.action) {
+            ControlAction.Stop -> printStoppedSuccessMessage
+            else -> genericSuccessMessage
+        }
+    }
+    return when (feedback.action) {
+        ControlAction.HomeAxes -> homeFailedMessage
+        ControlAction.BedJog -> bedJogFailedMessage
+        ControlAction.ChamberLight -> chamberLightFailedMessage
+        ControlAction.Stop -> printStoppedFailedMessage
+        else -> genericFailedMessage
     }
 }
 
