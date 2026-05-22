@@ -64,6 +64,8 @@ import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.ui.components.FilamentHomeGroupsRow
 import com.chronoswing.buddydash.ui.components.HomePrinterSearchField
 import com.chronoswing.buddydash.ui.components.HomePrinterSearchFilterChips
+import com.chronoswing.buddydash.ui.components.HomeDashboardActivityStrip
+import com.chronoswing.buddydash.ui.components.HomeDashboardActivityStripSkeleton
 import com.chronoswing.buddydash.ui.components.HomeCardMicroMotionFrame
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
 import com.chronoswing.buddydash.ui.components.MicroMotionThumbnailFrame
@@ -86,6 +88,7 @@ import com.chronoswing.buddydash.util.PrinterCardLabels
 import com.chronoswing.buddydash.util.HomePrinterSearchFilter
 import com.chronoswing.buddydash.util.applyHomePrinterSearch
 import com.chronoswing.buddydash.util.homeSearchEmptyMessageRes
+import com.chronoswing.buddydash.util.homePrinterDashboardCounts
 import com.chronoswing.buddydash.util.PrinterActivityKind
 import com.chronoswing.buddydash.util.resolveActivityKind
 import com.chronoswing.buddydash.util.toCardLabels
@@ -121,6 +124,7 @@ fun HomeScreen(
         onRefresh = { viewModel.refreshManual() },
         onPullRefresh = { viewModel.refreshManual() },
         lastUpdatedAtMillis = uiState.lastUpdatedAtMillis,
+        loadedSpoolCount = uiState.loadedSpoolCount,
         onPrinterClick = onPrinterClick,
     )
 }
@@ -143,9 +147,16 @@ private fun HomeScreenContent(
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
     lastUpdatedAtMillis: Long?,
+    loadedSpoolCount: Int?,
     onPrinterClick: (Printer) -> Unit,
 ) {
     val cachedCount = printers.size
+    val printerCounts = printers.homePrinterDashboardCounts()
+    val showDashboardStrip = settingsReady && hasCredentials
+    val dashboardStripLoading = showDashboardStrip &&
+        !hasCompletedLoad &&
+        cachedCount == 0 &&
+        loadedSpoolCount == null
     val showInitialSkeleton = ListLoadUi.showInitialSkeleton(
         settingsReady = settingsReady,
         hasCredentials = hasCredentials,
@@ -281,7 +292,16 @@ private fun HomeScreenContent(
                 )
             }
             showInitialSkeleton -> {
-                PrinterListSkeleton(Modifier.padding(innerPadding))
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                ) {
+                    if (showDashboardStrip) {
+                        HomeDashboardActivityStripSkeleton()
+                    }
+                    PrinterListSkeleton(Modifier.weight(1f))
+                }
             }
             loadState == HomePrintersLoadState.ErrorNoCachedData -> {
                 PullToRefreshBox(
@@ -299,12 +319,26 @@ private fun HomeScreenContent(
                 }
             }
             loadState == HomePrintersLoadState.EmptyLoadedSuccessfully -> {
-                EmptyContent(
-                    message = stringResource(R.string.no_printers),
-                    subtitle = stringResource(R.string.empty_hint_printers),
-                    icon = BuddyDashEmptyIcon.Printers.asImageVector(),
-                    modifier = Modifier.padding(innerPadding),
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                ) {
+                    if (showDashboardStrip) {
+                        HomeDashboardActivityStrip(
+                            onlineCount = printerCounts.online,
+                            printingCount = printerCounts.printing,
+                            loadedSpoolCount = loadedSpoolCount,
+                            isLoading = dashboardStripLoading,
+                        )
+                    }
+                    EmptyContent(
+                        message = stringResource(R.string.no_printers),
+                        subtitle = stringResource(R.string.empty_hint_printers),
+                        icon = BuddyDashEmptyIcon.Printers.asImageVector(),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
             else -> {
                 val filteredPrinters = if (searchExpanded) {
@@ -317,6 +351,14 @@ private fun HomeScreenContent(
                         .fillMaxSize()
                         .padding(innerPadding),
                 ) {
+                    if (showDashboardStrip) {
+                        HomeDashboardActivityStrip(
+                            onlineCount = printerCounts.online,
+                            printingCount = printerCounts.printing,
+                            loadedSpoolCount = loadedSpoolCount,
+                            isLoading = dashboardStripLoading,
+                        )
+                    }
                     HomePrinterSearchField(
                         expanded = searchExpanded,
                         query = searchQuery,

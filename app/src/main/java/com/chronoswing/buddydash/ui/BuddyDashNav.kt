@@ -330,6 +330,7 @@ fun BuddyDashNav(
                             settingsRepository,
                             apiClient,
                             homePrintersCacheRepository,
+                            spoolsCacheRepository,
                         )
                     },
                 )
