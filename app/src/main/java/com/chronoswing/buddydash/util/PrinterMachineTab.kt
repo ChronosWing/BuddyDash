@@ -58,10 +58,18 @@ fun PrinterDetailLabels.machineTabCapabilities(
     )
 }
 
-fun formatMachineInfoUpdatedAt(iso: String?): String? {
-    if (iso.isNullOrBlank()) return null
-    return formatSpoolLastUsed(iso)
+fun formatWifiSignalDisplay(signalDbm: Int?, wiredNetwork: Boolean?): String? {
+    if (wiredNetwork == true) return null
+    return signalDbm?.let { "$it dBm" }
 }
+
+fun formatLanModeDisplay(wiredNetwork: Boolean?): String? =
+    wiredNetwork?.let { wired -> if (wired) "Wired" else "Wi-Fi" }
+
+fun formatYesNo(enabled: Boolean): String = if (enabled) "Yes" else "No"
+
+fun formatNozzleCountDisplay(count: Int?): String? =
+    count?.takeIf { it > 0 }?.let { it.toString() }
 
 fun buildMachineInfoRows(
     labels: PrinterDetailLabels,
@@ -69,15 +77,22 @@ fun buildMachineInfoRows(
     printerModel: String?,
     statusUpdatedAtMillis: Long?,
 ): List<Pair<String, String>> = buildList {
-    add(labels.connection.let { "connection" to it })
-    machineInfo?.ipAddress?.let { add("ip" to it) }
-    labels.wifiCompact?.let { add("network" to it) }
-    labels.firmwareLine?.let { add("firmware" to it) }
+    add("connection" to labels.connection)
+    add("state" to labels.currentActivity)
     val model = machineInfo?.model ?: printerModel
     model?.takeIf { it.isNotBlank() }?.let { add("model" to it) }
+    labels.firmwareLine?.let { add("firmware" to it) }
+
+    machineInfo?.ipAddress?.let { add("ip" to it) }
+    formatWifiSignalDisplay(labels.wifiSignalDbm, labels.wiredNetwork)?.let { add("wifi_signal" to it) }
+    formatLanModeDisplay(labels.wiredNetwork)?.let { add("lan_mode" to it) }
+
     machineInfo?.serialNumber?.let { add("serial" to it) }
-    machineInfo?.location?.takeIf { it.isNotBlank() }?.let { add("location" to it) }
-    formatMachineInfoUpdatedAt(machineInfo?.updatedAtIso)?.let { add("updated" to it) }
+    formatNozzleCountDisplay(machineInfo?.nozzleCount)?.let { add("nozzle_count" to it) }
+    labels.developerMode?.let { add("developer_mode" to formatYesNo(it)) }
+    labels.totalPrintTimeCompact?.let { add("print_hours" to it) }
+    machineInfo?.autoArchiveEnabled?.let { add("auto_archive" to formatYesNo(it)) }
+
     statusUpdatedAtMillis?.let { millis ->
         formatRelativeStatusUpdated(millis)?.let { add("status_updated" to it) }
     }

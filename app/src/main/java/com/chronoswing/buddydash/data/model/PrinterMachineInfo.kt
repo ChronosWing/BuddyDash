@@ -7,4 +7,6 @@ data class PrinterMachineInfo(
     val model: String? = null,
     val location: String? = null,
     val updatedAtIso: String? = null,
+    val nozzleCount: Int? = null,
+    val autoArchiveEnabled: Boolean? = null,
 )

@@ -235,9 +235,15 @@
     <string name="machine_disabled_offline">Unavailable while printer is offline</string>
     <string name="machine_disabled_busy">Unavailable while printing or busy</string>
     <string name="machine_disabled_unsupported">Not supported on this printer</string>
+    <string name="machine_info_state">State</string>
     <string name="machine_info_ip">IP address</string>
-    <string name="machine_info_network">Network</string>
+    <string name="machine_info_wifi_signal">Wi-Fi signal</string>
+    <string name="machine_info_lan_mode">LAN mode</string>
     <string name="machine_info_model">Model</string>
+    <string name="machine_info_nozzle_count">Nozzle count</string>
+    <string name="machine_info_developer_mode">Developer mode</string>
+    <string name="machine_info_print_hours">Print hours</string>
+    <string name="machine_info_auto_archive">Auto archive</string>
     <string name="machine_info_serial">Serial</string>
     <string name="machine_info_location">Location</string>
     <string name="machine_info_last_updated">Last updated</string>

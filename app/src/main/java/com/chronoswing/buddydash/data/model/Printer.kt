@@ -34,6 +34,7 @@ data class PrinterStatus(
     val amsUnits: List<AmsUnitInfo> = emptyList(),
     val wifiSignalDbm: Int? = null,
     val wiredNetwork: Boolean? = null,
+    val developerMode: Boolean? = null,
     val doorOpen: Boolean? = null,
     val firmwareVersion: String? = null,
     val partFanPercent: Int? = null,
