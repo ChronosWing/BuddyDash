@@ -42,7 +42,8 @@ import com.chronoswing.buddydash.ui.components.ArchiveDetailHeroImage
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.EmptyContent
-import com.chronoswing.buddydash.ui.components.ErrorContent
+import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
+import com.chronoswing.buddydash.util.isShowingStaleCachedContent
 import com.chronoswing.buddydash.ui.components.ArchiveMaterialRow
 import com.chronoswing.buddydash.ui.components.FilamentUsageText
 import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
@@ -83,8 +84,11 @@ fun ArchiveDetailScreen(
     ArchiveDetailScreenContent(
         archive = uiState.archive,
         isLoading = uiState.isLoading,
+        hasCompletedLoad = uiState.hasCompletedLoad,
         settingsReady = uiState.settingsReady,
         error = uiState.error,
+        isStaleCachedData = uiState.isStaleCachedData,
+        isLimitedFromListCache = uiState.isLimitedFromListCache,
         serverUrl = uiState.serverUrl,
         cameraToken = uiState.cameraToken,
         hasCredentials = uiState.hasCredentials,
@@ -114,8 +118,11 @@ fun ArchiveDetailScreen(
 private fun ArchiveDetailScreenContent(
     archive: PrintArchive?,
     isLoading: Boolean,
+    hasCompletedLoad: Boolean,
     settingsReady: Boolean,
     error: String?,
+    isStaleCachedData: Boolean,
+    isLimitedFromListCache: Boolean,
     serverUrl: String,
     cameraToken: String,
     hasCredentials: Boolean,
@@ -191,7 +198,8 @@ private fun ArchiveDetailScreenContent(
         bottomBar = {
             if (archive != null && hasCredentials) {
                 val queueAgainInteraction = rememberBuddyDashInteractionSource()
-                val queueAgainEnabled = !isLoading && !reprintSheet.isSubmitting
+                val queueAgainEnabled = !isLoading && !reprintSheet.isSubmitting &&
+                    !isShowingStaleCachedContent(isStaleCachedData, null)
                 Button(
                     onClick = onQueueAgain,
                     enabled = queueAgainEnabled,
@@ -207,8 +215,10 @@ private fun ArchiveDetailScreenContent(
             }
         },
     ) { innerPadding ->
+        val showInitialLoading = !settingsReady || !hasCompletedLoad
+        val showOfflineEmpty = hasCompletedLoad && archive == null && error != null
         when {
-            !settingsReady || (isLoading && archive == null) -> {
+            showInitialLoading -> {
                 PrinterDetailSkeleton(Modifier.padding(innerPadding))
             }
             settingsReady && !hasCredentials && archive == null -> {
@@ -218,10 +228,11 @@ private fun ArchiveDetailScreenContent(
                     modifier = Modifier.padding(innerPadding),
                 )
             }
-            error != null && archive == null -> {
-                ErrorContent(
-                    message = error,
-                    onRetry = onRetry,
+            showOfflineEmpty -> {
+                EmptyContent(
+                    message = stringResource(R.string.offline_empty_archive_detail_title),
+                    subtitle = stringResource(R.string.offline_empty_archive_detail_subtitle),
+                    icon = BuddyDashEmptyIcon.Archives.asImageVector(),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
@@ -234,6 +245,9 @@ private fun ArchiveDetailScreenContent(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
+                    if (isStaleCachedData) {
+                        OfflineStaleBanner(limited = isLimitedFromListCache)
+                    }
                     ArchiveDetailBody(
                         archive = archive,
                         serverUrl = serverUrl,

@@ -69,7 +69,9 @@ import com.chronoswing.buddydash.ui.components.DetailPrintSpeedCard
 import com.chronoswing.buddydash.ui.components.FilamentAmsEnvironmentSection
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
-import com.chronoswing.buddydash.ui.components.ErrorContent
+import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
+import com.chronoswing.buddydash.ui.components.EmptyContent
+import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.ui.components.FilamentAssignSpoolDialog
 import com.chronoswing.buddydash.ui.components.FilamentClearAssignmentDialog
 import com.chronoswing.buddydash.ui.components.FilamentDetailGroups
@@ -92,7 +94,12 @@ import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.motion.BuddyDashTabFadeContainer
 import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
+import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
 import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
+import com.chronoswing.buddydash.util.showConnectionStaleInHeader
+import com.chronoswing.buddydash.util.showHeaderUpdating
+import com.chronoswing.buddydash.util.showOfflineInHeader
+import com.chronoswing.buddydash.util.showStaleDataBanner
 import com.chronoswing.buddydash.util.ListLoadUi
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildPrintHeadline
@@ -137,6 +144,9 @@ fun PrinterDetailScreen(
         isRefreshing = uiState.isRefreshing,
         error = uiState.error,
         refreshError = uiState.refreshError,
+        isStaleCachedData = uiState.isStaleCachedData,
+        isLimitedFromHomeCache = uiState.isLimitedFromHomeCache,
+        hasCompletedLoad = uiState.hasCompletedLoad,
         labels = labels,
         isClearingPlate = uiState.isClearingPlate,
         isControlBusy = uiState.isControlBusy,
@@ -153,7 +163,6 @@ fun PrinterDetailScreen(
         onRetry = { viewModel.loadStatus() },
         onRefresh = { viewModel.loadStatus(showLoading = false, fromUser = true) },
         onPullRefresh = { viewModel.loadStatus(showLoading = false, fromPull = true) },
-        onRefreshErrorShown = viewModel::onRefreshErrorShown,
         onPollStatus = { showLoading ->
             viewModel.loadStatus(showLoading = showLoading)
         },
@@ -225,6 +234,9 @@ private fun PrinterDetailScreenContent(
     isRefreshing: Boolean,
     error: String?,
     refreshError: String?,
+    isStaleCachedData: Boolean,
+    isLimitedFromHomeCache: Boolean,
+    hasCompletedLoad: Boolean,
     labels: PrinterDetailLabels?,
     isClearingPlate: Boolean,
     isControlBusy: Boolean,
@@ -279,7 +291,6 @@ private fun PrinterDetailScreenContent(
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
-    onRefreshErrorShown: () -> Unit,
     onPollStatus: (showLoading: Boolean) -> Unit,
     onMarkPlateClear: () -> Unit,
     onPlateClearSnackbarShown: () -> Unit,
@@ -300,9 +311,33 @@ private fun PrinterDetailScreenContent(
     onMaintenanceResetSnackbarShown: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
-    val refreshFailedMessage = stringResource(R.string.refresh_failed)
     val hasCachedData = labels != null
-    val showInitialLoading = isLoading && !hasCachedData
+    val showStaleBanner = showStaleDataBanner(
+        hasCachedContent = hasCachedData,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+        lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
+    )
+    val preferOfflineInHeader = showOfflineInHeader(
+        hasCachedContent = hasCachedData,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+    )
+    val showConnectionStaleInHeader = showConnectionStaleInHeader(
+        hasCachedContent = hasCachedData,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+        lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
+    )
+    val showHeaderUpdating = showHeaderUpdating(
+        isRefreshActive = isRefreshing,
+        hasCachedContent = hasCachedData,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+        lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
+    )
+    val showInitialLoading = !hasCompletedLoad
+    val showOfflineEmpty = hasCompletedLoad && labels == null && error != null
     val showPullRefreshIndicator = ListLoadUi.showPullRefreshIndicator(
         isRefreshing = isRefreshing,
         cachedItemCount = if (hasCachedData) 1 else 0,
@@ -412,13 +447,6 @@ private fun PrinterDetailScreenContent(
         onFilamentAssignSnackbarShown()
     }
 
-    LaunchedEffect(refreshError) {
-        if (refreshError != null) {
-            snackbarHostState.showSnackbar(refreshFailedMessage)
-            onRefreshErrorShown()
-        }
-    }
-
     val assignAvailability = evaluateFilamentAssignAvailability(printerStatus)
     val filamentTabIndex = 1
 
@@ -498,9 +526,11 @@ private fun PrinterDetailScreenContent(
                         )
                         StatusLastUpdatedIndicator(
                             lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
-                            isRefreshing = isRefreshing,
+                            isRefreshing = showHeaderUpdating,
                             enabled = !isClearingPlate && !isControlBusy,
                             onRefresh = onRefresh,
+                            preferConnectionStale = showConnectionStaleInHeader,
+                            preferOffline = preferOfflineInHeader,
                             modifier = Modifier.padding(start = 8.dp),
                         )
                     }
@@ -518,9 +548,10 @@ private fun PrinterDetailScreenContent(
     ) { innerPadding ->
         when {
             showInitialLoading -> LoadingContent(Modifier.padding(innerPadding))
-            labels == null && error != null -> ErrorContent(
-                message = error,
-                onRetry = onRetry,
+            showOfflineEmpty -> EmptyContent(
+                message = stringResource(R.string.offline_empty_printer_detail_title),
+                subtitle = stringResource(R.string.offline_empty_printer_detail_subtitle),
+                icon = BuddyDashEmptyIcon.Printers.asImageVector(),
                 modifier = Modifier.padding(innerPadding),
             )
             labels == null -> Unit
@@ -530,6 +561,12 @@ private fun PrinterDetailScreenContent(
                         .fillMaxSize()
                         .padding(innerPadding),
                 ) {
+                    if (showStaleBanner) {
+                        OfflineStaleBanner(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            limited = isLimitedFromHomeCache,
+                        )
+                    }
                     PrimaryTabRow(selectedTabIndex = selectedTab) {
                         detailTabs.forEachIndexed { index, tabTitle ->
                             Tab(

@@ -3,6 +3,7 @@ package com.chronoswing.buddydash
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chronoswing.buddydash.data.ArchivesCacheRepository
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.network.BambuddyApiClient
@@ -19,19 +20,28 @@ import com.chronoswing.buddydash.util.ArchiveMaterialNavigation
 import com.chronoswing.buddydash.util.archiveHasMaterialDisplay
 import com.chronoswing.buddydash.util.buildArchiveSpoolLookupFilter
 import com.chronoswing.buddydash.util.evaluateQueueAndStartReadiness
+import com.chronoswing.buddydash.util.logArchiveDetailCacheRead
 import com.chronoswing.buddydash.util.logArchiveDetailFieldMapping
+import com.chronoswing.buddydash.util.logOfflineLoadState
 import com.chronoswing.buddydash.util.resolveArchiveMaterialNavigation
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.util.resolveActivityKind
 import com.chronoswing.buddydash.util.resolveArchiveReprintPrinters
 import com.chronoswing.buddydash.util.resolvePlateKind
+import com.chronoswing.buddydash.util.OfflineUiResolution
+import com.chronoswing.buddydash.util.toUserNetworkMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+
+private const val ARCHIVE_DETAIL_FETCH_TIMEOUT_MS = 30_000L
+private const val OFFLINE_NO_CACHE_MARKER = "offline_no_cache"
 
 enum class ArchiveReprintSnackbar {
     Queued,
@@ -59,6 +69,9 @@ data class ArchiveDetailUiState(
     val archive: PrintArchive? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
+    val isStaleCachedData: Boolean = false,
+    val isLimitedFromListCache: Boolean = false,
+    val hasCompletedLoad: Boolean = false,
     val serverUrl: String = "",
     val apiKey: String = "",
     val cameraToken: String = "",
@@ -74,10 +87,12 @@ data class ArchiveDetailUiState(
 class ArchiveDetailViewModel(
     private val settingsRepository: SettingsRepository,
     private val apiClient: BambuddyApiClient,
+    private val archivesCacheRepository: ArchivesCacheRepository,
 ) : ViewModel() {
 
     private var archiveId: Int = -1
     private var fetchJob: Job? = null
+    private var initJob: Job? = null
     private var printersJob: Job? = null
     private var readinessJob: Job? = null
     private var queueJob: Job? = null
@@ -113,7 +128,6 @@ class ArchiveDetailViewModel(
                         settingsReady = true,
                     )
                 }
-                maybeLoadArchive()
             }
         }
     }
@@ -121,62 +135,198 @@ class ArchiveDetailViewModel(
     fun init(archiveId: Int) {
         this.archiveId = archiveId
         _uiState.update { it.copy(error = null) }
-        maybeLoadArchive()
+        initJob?.cancel()
+        fetchJob?.cancel()
+        initJob = viewModelScope.launch {
+            syncCredentialsFromSettings()
+            val (archive, fromListFallback) = resolveCachedArchive()
+            val hasCache = archive != null
+            logArchiveDetailCacheRead(archiveId, hit = hasCache, fromListFallback = fromListFallback)
+            _uiState.update {
+                it.copy(
+                    archive = archive,
+                    hasCompletedLoad = true,
+                    isLoading = false,
+                    isStaleCachedData = hasCache,
+                    isLimitedFromListCache = fromListFallback,
+                    error = if (!hasCache && !it.hasCredentials) {
+                        OFFLINE_NO_CACHE_MARKER
+                    } else if (!hasCache) {
+                        null
+                    } else {
+                        null
+                    },
+                )
+            }
+            logOfflineLoadState(
+                screen = "ArchiveDetail",
+                onlineAttempt = _uiState.value.hasCredentials,
+                cacheResult = when {
+                    !hasCache -> "miss"
+                    fromListFallback -> "list_fallback"
+                    else -> "detail_hit"
+                },
+                finalState = when {
+                    !hasCache -> OfflineUiResolution.NoCacheOffline
+                    fromListFallback -> OfflineUiResolution.LimitedFromCache
+                    else -> OfflineUiResolution.StaleWithCache
+                },
+            )
+            archive?.let { loadSpoolsForMaterialLink(it) }
+            if (_uiState.value.hasCredentials) {
+                loadFromNetwork(isRefresh = hasCache)
+            } else if (!hasCache) {
+                _uiState.update { it.copy(error = OFFLINE_NO_CACHE_MARKER) }
+            }
+        }
+    }
+
+    private suspend fun syncCredentialsFromSettings() {
+        val url = settingsRepository.serverUrl.first()
+        val key = settingsRepository.apiKey.first()
+        val cameraToken = settingsRepository.cameraToken.first()
+        _uiState.update {
+            it.copy(
+                serverUrl = url,
+                apiKey = key,
+                cameraToken = cameraToken,
+                hasCredentials = url.isNotBlank() && key.isNotBlank(),
+                settingsReady = true,
+            )
+        }
+    }
+
+    private suspend fun resolveCachedArchive(): Pair<PrintArchive?, Boolean> {
+        if (archiveId < 0) return null to false
+        val serverUrl = _uiState.value.serverUrl
+        archivesCacheRepository.loadArchiveDetail(serverUrl, archiveId)?.let { archive ->
+            return archive to false
+        }
+        archivesCacheRepository.findArchive(serverUrl, archiveId)?.let { archive ->
+            return archive to true
+        }
+        return null to false
     }
 
     fun loadArchive() {
-        maybeLoadArchive(force = true)
-    }
-
-    private fun maybeLoadArchive(force: Boolean = false) {
-        val state = _uiState.value
         if (archiveId < 0) return
-        if (!state.settingsReady) {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-            return
-        }
-        if (!force && state.archive != null) return
-
-        if (!state.hasCredentials) {
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    error = "Configure server URL and API key in Settings",
-                )
-            }
-            return
-        }
-
         fetchJob?.cancel()
         fetchJob = viewModelScope.launch {
-            val creds = _uiState.value
+            if (!_uiState.value.hasCompletedLoad) {
+                val (archive, fromList) = resolveCachedArchive()
+                _uiState.update {
+                    it.copy(
+                        archive = archive,
+                        hasCompletedLoad = true,
+                        isLimitedFromListCache = fromList,
+                        isStaleCachedData = archive != null,
+                    )
+                }
+            }
+            if (_uiState.value.hasCredentials) {
+                loadFromNetwork(isRefresh = _uiState.value.archive != null)
+            }
+        }
+    }
+
+    private suspend fun loadFromNetwork(isRefresh: Boolean) {
+        val creds = _uiState.value
+        if (!creds.hasCredentials) return
+        if (!isRefresh) {
             _uiState.update { it.copy(isLoading = it.archive == null, error = null) }
-            val result = apiClient.fetchArchive(
+        }
+        val result = withTimeoutOrNull(ARCHIVE_DETAIL_FETCH_TIMEOUT_MS) {
+            apiClient.fetchArchive(
                 serverUrl = creds.serverUrl,
                 apiKey = creds.apiKey,
                 archiveId = archiveId,
             )
-            result.fold(
-                onSuccess = { archive ->
-                    logArchiveDetailFieldMapping(archive)
-                    _uiState.update {
-                        it.copy(isLoading = false, archive = archive, error = null)
-                    }
-                    loadSpoolsForMaterialLink(archive)
-                },
-                onFailure = { error ->
-                    if (DEBUG_LOG_ARCHIVE_DETAIL) {
-                        Log.e(TAG_ARCHIVE_DETAIL, "fetchArchive failed id=$archiveId", error)
-                    }
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = error.message ?: "Failed to load archive",
-                        )
-                    }
-                },
-            )
         }
+        if (result == null) {
+            finishNetworkFailure(Exception("Request timed out"), hadCache = creds.archive != null)
+            return
+        }
+        result.fold(
+            onSuccess = { archive ->
+                logArchiveDetailFieldMapping(archive)
+                archivesCacheRepository.saveArchiveDetail(creds.serverUrl, archive)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        archive = archive,
+                        error = null,
+                        isStaleCachedData = false,
+                        isLimitedFromListCache = false,
+                        hasCompletedLoad = true,
+                    )
+                }
+                loadSpoolsForMaterialLink(archive)
+                logOfflineLoadState(
+                    screen = "ArchiveDetail",
+                    onlineAttempt = true,
+                    cacheResult = "network_ok",
+                    finalState = OfflineUiResolution.LoadedFresh,
+                )
+            },
+            onFailure = { error ->
+                finishNetworkFailure(error, hadCache = creds.archive != null)
+            },
+        )
+    }
+
+    private suspend fun finishNetworkFailure(error: Throwable, hadCache: Boolean) {
+        if (!hadCache) {
+            val (archive, fromList) = resolveCachedArchive()
+            if (archive != null) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        archive = archive,
+                        error = null,
+                        isStaleCachedData = true,
+                        isLimitedFromListCache = fromList,
+                        hasCompletedLoad = true,
+                    )
+                }
+                logOfflineLoadState(
+                    screen = "ArchiveDetail",
+                    onlineAttempt = true,
+                    cacheResult = "failure_with_cache",
+                    finalState = if (fromList) {
+                        OfflineUiResolution.LimitedFromCache
+                    } else {
+                        OfflineUiResolution.StaleWithCache
+                    },
+                )
+                return
+            }
+        }
+        _uiState.update {
+            if (hadCache) {
+                it.copy(
+                    isLoading = false,
+                    error = null,
+                    isStaleCachedData = true,
+                    hasCompletedLoad = true,
+                )
+            } else {
+                it.copy(
+                    isLoading = false,
+                    error = OFFLINE_NO_CACHE_MARKER,
+                    hasCompletedLoad = true,
+                )
+            }
+        }
+        logOfflineLoadState(
+            screen = "ArchiveDetail",
+            onlineAttempt = true,
+            cacheResult = if (hadCache) "failure_stale" else "failure_no_cache",
+            finalState = if (hadCache) {
+                OfflineUiResolution.StaleWithCache
+            } else {
+                OfflineUiResolution.NoCacheOffline
+            },
+        )
     }
 
     fun onQueueAgainClick() {

@@ -40,8 +40,12 @@ import com.chronoswing.buddydash.SpoolsViewModel
 import com.chronoswing.buddydash.util.ArchiveMaterialNavigation
 import com.chronoswing.buddydash.util.ArchiveSpoolLookupFilter
 import com.chronoswing.buddydash.util.parseArchiveLookupColorHexesArg
+import com.chronoswing.buddydash.data.ArchivesCacheRepository
 import com.chronoswing.buddydash.data.HomePrintersCacheRepository
+import com.chronoswing.buddydash.data.PrinterDetailCacheRepository
 import com.chronoswing.buddydash.data.SettingsRepository
+import com.chronoswing.buddydash.data.SpoolDetailCacheRepository
+import com.chronoswing.buddydash.data.SpoolsCacheRepository
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.ui.components.AppForegroundResumeEffect
 import com.chronoswing.buddydash.ui.components.BuddyDashBottomNav
@@ -214,6 +218,10 @@ private fun NavHostController.onBottomNavTabSelected(
 fun BuddyDashNav(
     settingsRepository: SettingsRepository,
     homePrintersCacheRepository: HomePrintersCacheRepository,
+    spoolsCacheRepository: SpoolsCacheRepository,
+    archivesCacheRepository: ArchivesCacheRepository,
+    printerDetailCacheRepository: PrinterDetailCacheRepository,
+    spoolDetailCacheRepository: SpoolDetailCacheRepository,
     apiClient: BambuddyApiClient,
 ) {
     val navController = rememberNavController()
@@ -379,7 +387,11 @@ fun BuddyDashNav(
                 val initialPrinterName = decode("printerName")
                 val viewModel: ArchivesViewModel = viewModel(
                     factory = viewModelFactory {
-                        ArchivesViewModel(settingsRepository, apiClient)
+                        ArchivesViewModel(
+                            settingsRepository,
+                            apiClient,
+                            archivesCacheRepository,
+                        )
                     },
                 )
                 LaunchedEffect(initialSearch, initialPrinterId, initialPrinterName) {
@@ -464,7 +476,11 @@ fun BuddyDashNav(
                 }
                 val viewModel: SpoolsViewModel = viewModel(
                     factory = viewModelFactory {
-                        SpoolsViewModel(settingsRepository, apiClient)
+                        SpoolsViewModel(
+                            settingsRepository,
+                            apiClient,
+                            spoolsCacheRepository,
+                        )
                     },
                 )
                 val fromArchiveMaterialLookup = archiveMatch
@@ -515,7 +531,12 @@ fun BuddyDashNav(
                 val spoolId = backStackEntry.arguments?.getInt("spoolId") ?: return@composable
                 val viewModel: SpoolDetailViewModel = viewModel(
                     factory = viewModelFactory {
-                        SpoolDetailViewModel(settingsRepository, apiClient)
+                        SpoolDetailViewModel(
+                            settingsRepository,
+                            apiClient,
+                            spoolsCacheRepository,
+                            spoolDetailCacheRepository,
+                        )
                     },
                 )
                 SpoolDetailScreen(
@@ -548,7 +569,11 @@ fun BuddyDashNav(
                 val archiveId = backStackEntry.arguments?.getInt("archiveId") ?: return@composable
                 val viewModel: ArchiveDetailViewModel = viewModel(
                     factory = viewModelFactory {
-                        ArchiveDetailViewModel(settingsRepository, apiClient)
+                        ArchiveDetailViewModel(
+                            settingsRepository,
+                            apiClient,
+                            archivesCacheRepository,
+                        )
                     },
                 )
                 ArchiveDetailScreen(
@@ -610,7 +635,12 @@ fun BuddyDashNav(
 
                 val viewModel: PrinterDetailViewModel = viewModel(
                     factory = viewModelFactory {
-                        PrinterDetailViewModel(settingsRepository, apiClient)
+                        PrinterDetailViewModel(
+                            settingsRepository,
+                            apiClient,
+                            printerDetailCacheRepository,
+                            homePrintersCacheRepository,
+                        )
                     },
                 )
                 LaunchedEffect(printerDetailAppResumeNonce, currentRoute) {
@@ -653,7 +683,12 @@ fun BuddyDashNav(
                 val viewModel: PrinterDetailViewModel = viewModel(
                     viewModelStoreOwner = parentEntry,
                     factory = viewModelFactory {
-                        PrinterDetailViewModel(settingsRepository, apiClient)
+                        PrinterDetailViewModel(
+                            settingsRepository,
+                            apiClient,
+                            printerDetailCacheRepository,
+                            homePrintersCacheRepository,
+                        )
                     },
                 )
                 LaunchedEffect(printerDetailAppResumeNonce, currentRoute) {

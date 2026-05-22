@@ -3,6 +3,8 @@ package com.chronoswing.buddydash
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chronoswing.buddydash.data.ArchivesCacheRepository
+import com.chronoswing.buddydash.data.HomePrintersCacheRepository
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.network.BambuddyApiClient
@@ -15,6 +17,8 @@ import com.chronoswing.buddydash.util.applyArchiveListFilters
 import com.chronoswing.buddydash.util.computeArchiveStats
 import com.chronoswing.buddydash.util.filterArchivesForStatsRange
 import com.chronoswing.buddydash.util.BuddyDashDebug
+import com.chronoswing.buddydash.util.logArchivesListCacheRead
+import com.chronoswing.buddydash.util.logArchivesListCacheWrite
 import com.chronoswing.buddydash.util.logArchiveStatsDateFilterSummary
 import com.chronoswing.buddydash.util.RefreshGuard
 import com.chronoswing.buddydash.util.RefreshIntervals
@@ -38,6 +42,8 @@ data class ArchivesUiState(
     val isRefreshing: Boolean = false,
     val error: String? = null,
     val refreshError: String? = null,
+    val isStaleCachedData: Boolean = false,
+    val hasCompletedLoad: Boolean = false,
     val serverUrl: String = "",
     val apiKey: String = "",
     val cameraToken: String = "",
@@ -75,6 +81,7 @@ data class ArchivesUiState(
 class ArchivesViewModel(
     private val settingsRepository: SettingsRepository,
     private val apiClient: BambuddyApiClient,
+    private val archivesCacheRepository: ArchivesCacheRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArchivesUiState())
@@ -82,6 +89,7 @@ class ArchivesViewModel(
 
     private var fetchJob: Job? = null
     private val manualRefreshGuard = RefreshGuard()
+    private var lastNetworkLoadKey: String? = null
 
     init {
         viewModelScope.launch {
@@ -104,10 +112,49 @@ class ArchivesViewModel(
                         error = if (!wasReady) null else it.error,
                     )
                 }
-                if (!wasReady && hasCredentials) {
-                    loadArchives(showLoading = _uiState.value.archives.isEmpty())
+                if (hasCredentials) {
+                    val filterId = _uiState.value.printerFilter?.printerId
+                    val serverKey = HomePrintersCacheRepository.cacheServerKey(url)
+                    val loadKey = "$serverKey|$filterId"
+                    val shouldNetworkLoad = !wasReady || lastNetworkLoadKey != loadKey
+                    viewModelScope.launch {
+                        hydrateFromDiskCache(url, filterId)
+                        if (shouldNetworkLoad && serverKey != null) {
+                            lastNetworkLoadKey = loadKey
+                            loadArchives(showLoading = _uiState.value.archives.isEmpty())
+                        }
+                    }
+                } else {
+                    lastNetworkLoadKey = null
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            hasCompletedLoad = true,
+                        )
+                    }
                 }
             }
+        }
+    }
+
+    private suspend fun hydrateFromDiskCache(serverUrl: String, printerFilterId: Int?) {
+        val snapshot = archivesCacheRepository.load(serverUrl, printerFilterId)
+        logArchivesListCacheRead(
+            hit = snapshot != null,
+            count = snapshot?.archives?.size ?: 0,
+            printerFilterId = printerFilterId,
+        )
+        if (snapshot == null) return
+        _uiState.update {
+            it.copy(
+                archives = snapshot.archives,
+                lastUpdatedAtMillis = snapshot.lastUpdatedAtMillis,
+                hasCompletedLoad = true,
+                isLoading = false,
+                error = null,
+                refreshError = null,
+                isStaleCachedData = true,
+            )
         }
     }
 
@@ -169,7 +216,11 @@ class ArchivesViewModel(
                 section = ArchivesSection.History,
             )
         }
-        loadArchives(showLoading = current.archives.isEmpty())
+        lastNetworkLoadKey = null
+        viewModelScope.launch {
+            hydrateFromDiskCache(current.serverUrl, printerId)
+            loadArchives(showLoading = _uiState.value.archives.isEmpty())
+        }
     }
 
     fun clearPrinterFilter() {
@@ -240,7 +291,7 @@ class ArchivesViewModel(
                 return@launch
             }
             if (!isInitialLoad) {
-                _uiState.update { it.copy(isRefreshing = true, refreshError = null) }
+                _uiState.update { it.copy(isRefreshing = true) }
             } else if (showLoading) {
                 _uiState.update { it.copy(isLoading = true, error = null) }
             }
@@ -255,6 +306,18 @@ class ArchivesViewModel(
                         Log.d(TAG_ARCHIVES_VM, "bottomNavReselect refresh success")
                     }
                     logArchiveStatsDateFilterSummary(archives)
+                    val updatedAt = System.currentTimeMillis()
+                    val writeOk = archivesCacheRepository.save(
+                        serverUrl = credentials.serverUrl,
+                        printerFilterId = credentials.printerFilter?.printerId,
+                        archives = archives,
+                        lastUpdatedAtMillis = updatedAt,
+                    )
+                    logArchivesListCacheWrite(
+                        count = archives.size,
+                        success = writeOk,
+                        printerFilterId = credentials.printerFilter?.printerId,
+                    )
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -262,7 +325,9 @@ class ArchivesViewModel(
                             archives = archives,
                             error = null,
                             refreshError = null,
-                            lastUpdatedAtMillis = System.currentTimeMillis(),
+                            isStaleCachedData = false,
+                            hasCompletedLoad = true,
+                            lastUpdatedAtMillis = updatedAt,
                         )
                     }
                 },
@@ -282,6 +347,8 @@ class ArchivesViewModel(
                                 isLoading = false,
                                 isRefreshing = false,
                                 refreshError = message,
+                                isStaleCachedData = true,
+                                hasCompletedLoad = true,
                             )
                         } else {
                             current.copy(
@@ -289,6 +356,7 @@ class ArchivesViewModel(
                                 isRefreshing = false,
                                 error = message,
                                 refreshError = null,
+                                hasCompletedLoad = true,
                             )
                         }
                     }
