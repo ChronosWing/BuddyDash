@@ -1,10 +1,11 @@
 package com.chronoswing.buddydash.ui.components
 
 import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.view.OrientationEventListener
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -13,10 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,9 +31,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -47,6 +46,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.chronoswing.buddydash.R
+import com.chronoswing.buddydash.ui.findActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -76,10 +76,10 @@ fun PrinterCameraFullscreenDialog(
                 mutableLongStateOf(System.currentTimeMillis())
             }
             var isSnapshotLoading by remember { mutableStateOf(true) }
-            var rotatedFullscreen by remember { mutableStateOf(false) }
             val lifecycleOwner = LocalLifecycleOwner.current
+            val isLandscape = rememberPhysicalLandscapeHeld()
 
-            ImmersiveSystemBars(enabled = rotatedFullscreen)
+            ImmersiveSystemBars(enabled = isLandscape)
 
             LaunchedEffect(lifecycleOwner, printerId) {
                 lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -91,7 +91,6 @@ fun PrinterCameraFullscreenDialog(
             }
             Box(modifier = Modifier.fillMaxSize()) {
                 CameraSnapshotFitHost(
-                    rotatedFullscreen = rotatedFullscreen,
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
                     printerId = printerId,
@@ -103,7 +102,7 @@ fun PrinterCameraFullscreenDialog(
                         .align(Alignment.TopCenter)
                         .fillMaxSize()
                         .then(
-                            if (rotatedFullscreen) {
+                            if (isLandscape) {
                                 Modifier
                             } else {
                                 Modifier
@@ -133,27 +132,6 @@ fun PrinterCameraFullscreenDialog(
                                     .padding(end = 4.dp),
                                 strokeWidth = 2.dp,
                                 color = Color.White.copy(alpha = 0.7f),
-                            )
-                        }
-                        IconButton(onClick = { rotatedFullscreen = !rotatedFullscreen }) {
-                            Icon(
-                                imageVector = if (rotatedFullscreen) {
-                                    Icons.Default.FullscreenExit
-                                } else {
-                                    Icons.Default.ScreenRotation
-                                },
-                                contentDescription = stringResource(
-                                    if (rotatedFullscreen) {
-                                        R.string.camera_exit_rotated_fullscreen
-                                    } else {
-                                        R.string.camera_enter_rotated_fullscreen
-                                    },
-                                ),
-                                tint = if (rotatedFullscreen) {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.95f)
-                                } else {
-                                    Color.White.copy(alpha = 0.88f)
-                                },
                             )
                         }
                         IconButton(
@@ -187,38 +165,26 @@ fun PrinterCameraFullscreenDialog(
     }
 }
 
-/**
- * Normal mode: full frame with [ContentScale.Fit] on a dark background.
- * Rotated mode: 90° landscape fill using swapped constraints so Fit does not crop edges.
- */
 @Composable
 private fun CameraSnapshotFitHost(
-    rotatedFullscreen: Boolean,
     serverUrl: String,
     cameraToken: String,
     printerId: Int,
     refreshTick: Long,
     onLoadingChanged: (Boolean) -> Unit,
 ) {
-    BoxWithConstraints(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
-        val snapshotModifier = if (rotatedFullscreen) {
-            Modifier
-                .size(maxHeight, maxWidth)
-                .rotate(90f)
-        } else {
-            Modifier.fillMaxSize()
-        }
         PrinterLiveCameraSnapshot(
             serverUrl = serverUrl,
             cameraToken = cameraToken,
             printerId = printerId,
             refreshTick = refreshTick,
-            modifier = snapshotModifier,
+            modifier = Modifier.fillMaxSize(),
             fillMaxSize = true,
             contentScale = ContentScale.Fit,
             applyHeroScrim = false,
@@ -226,6 +192,45 @@ private fun CameraSnapshotFitHost(
             onLoadingChanged = onLoadingChanged,
         )
     }
+}
+
+/**
+ * Opens in portrait. Switches to landscape activity orientation only when the device
+ * is physically held in landscape (not on dialog open).
+ */
+@Composable
+private fun rememberPhysicalLandscapeHeld(): Boolean {
+    val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+    val heldLandscape = remember { mutableStateOf(false) }
+
+    DisposableEffect(context, activity) {
+        val host = activity
+        val listener = object : OrientationEventListener(context) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return
+                val landscape = orientation in 45..135 || orientation in 225..315
+                if (landscape == heldLandscape.value) return
+                heldLandscape.value = landscape
+                host?.requestedOrientation = if (landscape) {
+                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                } else {
+                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                }
+            }
+        }
+        heldLandscape.value = false
+        host?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        if (listener.canDetectOrientation()) {
+            listener.enable()
+        }
+        onDispose {
+            listener.disable()
+            host?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
+
+    return heldLandscape.value
 }
 
 @Composable
