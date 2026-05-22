@@ -2,7 +2,6 @@ package com.chronoswing.buddydash.ui.motion
 
 import android.content.Context
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -11,7 +10,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.navigation.NavBackStackEntry
 
 /** Detail push: gentle slide + fade (~220ms). */
@@ -109,26 +107,5 @@ fun AnimatedContentTransitionScope<NavBackStackEntry>.buddyDashSectionExit(
                 animationSpec = tween(duration, easing = easing),
                 targetOffsetY = { fullHeight -> -fullHeight / 28 },
             )
-    }
-}
-
-/** Printer detail tab content cross-fade. */
-fun buddyDashTabContentTransform(reducedMotion: Boolean): ContentTransform {
-    val duration = BuddyDashMotion.NAV_TAB_MS
-    val easing = FastOutSlowInEasing
-    return if (reducedMotion) {
-        fadeIn(tween(duration, easing = easing)) togetherWith
-            fadeOut(tween(duration, easing = easing))
-    } else {
-        (fadeIn(tween(duration, easing = easing)) +
-            slideInVertically(
-                animationSpec = tween(duration, easing = easing),
-                initialOffsetY = { height -> height / 18 },
-            )) togetherWith
-            (fadeOut(tween(duration, easing = easing)) +
-                slideOutVertically(
-                    animationSpec = tween(duration, easing = easing),
-                    targetOffsetY = { height -> -height / 22 },
-                ))
     }
 }
