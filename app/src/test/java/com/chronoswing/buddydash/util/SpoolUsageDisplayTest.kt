@@ -70,6 +70,37 @@ class SpoolUsageDisplayTest {
     }
 
     @Test
+    fun resolveSpoolUsageArchiveLink_compositeMatchChineseTitlePipeVsSpaces() {
+        val title =
+            "万能表探针固定夹 | 单手操作表笔辅助工具 | 电子维修防滑神器 | 提升测量效率"
+        val usageTitle =
+            "万能表探针固定夹 单手操作表笔辅助工具 电子维修防滑神器 提升测量效率"
+        val entry = SpoolUsageEntry(
+            id = 8,
+            spoolId = 1,
+            printerId = 3,
+            printName = usageTitle,
+            weightUsedGrams = 22.0,
+            percentUsed = null,
+            status = "completed",
+            createdAtIso = "2024-07-01T10:00:00Z",
+            rawJson = "{}",
+        )
+        val archives = listOf(
+            printArchive(
+                id = 200,
+                name = title,
+                printerId = 3,
+                grams = 22.0,
+                completedAt = "2024-07-01T10:00:02Z",
+            ),
+        )
+        val link = resolveSpoolUsageArchiveLink(entry, archives)
+        assertEquals(200, link.archiveId)
+        assertEquals(SpoolUsageArchiveLinkKind.CompositeKey, link.kind)
+    }
+
+    @Test
     fun resolveSpoolUsageArchiveLink_ambiguousCompositeReturnsNull() {
         val entry = SpoolUsageEntry(
             id = 1,

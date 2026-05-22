@@ -73,6 +73,37 @@ class FilenameDisplayTest {
     }
 
     @Test
+    fun normalizePrintTitleForMatch_pipeSlashAndSpacesEquivalent() {
+        val segments = "万能表探针固定夹 单手操作表笔辅助工具 电子维修防滑神器 提升测量效率"
+        val pipeSeparated =
+            "万能表探针固定夹 | 单手操作表笔辅助工具 | 电子维修防滑神器 | 提升测量效率"
+        val spaceSeparated =
+            "万能表探针固定夹 单手操作表笔辅助工具 电子维修防滑神器 提升测量效率"
+        val fullwidthPipe =
+            "万能表探针固定夹｜单手操作表笔辅助工具｜电子维修防滑神器｜提升测量效率"
+        assertEquals(segments, normalizePrintTitleForMatch(pipeSeparated))
+        assertEquals(segments, normalizePrintTitleForMatch(spaceSeparated))
+        assertEquals(segments, normalizePrintTitleForMatch(fullwidthPipe))
+        assertEquals(
+            segments,
+            normalizePrintTitleForMatch(
+                "万能表探针固定夹/单手操作表笔辅助工具-电子维修防滑神器_提升测量效率",
+            ),
+        )
+    }
+
+    @Test
+    fun printTitlesMatchForUsageLink_exactAfterSeparatorNormalization() {
+        val usage = normalizePrintTitleForMatch(
+            "万能表探针固定夹 单手操作表笔辅助工具 电子维修防滑神器 提升测量效率",
+        )!!
+        val archive = normalizePrintTitleForMatch(
+            "万能表探针固定夹 | 单手操作表笔辅助工具 | 电子维修防滑神器 | 提升测量效率",
+        )!!
+        assertTrue(printTitlesMatchForUsageLink(usage, setOf(archive)))
+    }
+
+    @Test
     fun titlesContainMatchHighConfidence_requiresStrongOverlap() {
         val usage = normalizePrintTitleForMatch("万能表探针固定夹_单手操作表笔辅助")!!
         val archive = normalizePrintTitleForMatch("万能表探针固定夹_单手操作表笔辅助工具")!!
