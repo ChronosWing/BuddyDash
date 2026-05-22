@@ -57,8 +57,8 @@ private val HeroScrimGradient = Brush.verticalGradient(
 )
 
 /**
- * Large hero image for the detail Status tab: live camera snapshot when available,
- * otherwise print cover. Invokes [onCameraHeroActive] when the camera image is showing.
+ * Large hero image for the detail Status tab: periodic camera snapshots when available,
+ * otherwise print cover. Full-screen camera view uses the MJPEG live stream instead.
  */
 @Composable
 fun DetailStatusHeroImage(
@@ -155,6 +155,7 @@ fun PrinterLiveCameraSnapshot(
     backgroundColor: Color = Color.Transparent,
     onLoadFailed: () -> Unit = {},
     onLoadingChanged: (Boolean) -> Unit = {},
+    snapshotCrossfadeMs: Int = SNAPSHOT_CROSSFADE_MS,
 ) {
     PrinterCameraSnapshotImage(
         serverUrl = serverUrl,
@@ -167,6 +168,7 @@ fun PrinterLiveCameraSnapshot(
         contentScale = contentScale,
         applyHeroScrim = applyHeroScrim,
         backgroundColor = backgroundColor,
+        snapshotCrossfadeMs = snapshotCrossfadeMs,
         onLoadFailed = onLoadFailed,
         onLoadingChanged = onLoadingChanged,
     )
@@ -184,6 +186,7 @@ private fun PrinterCameraSnapshotImage(
     contentScale: ContentScale = ContentScale.Crop,
     applyHeroScrim: Boolean = true,
     backgroundColor: Color = Color.Transparent,
+    snapshotCrossfadeMs: Int = SNAPSHOT_CROSSFADE_MS,
     onLoadFailed: () -> Unit,
     onLoadingChanged: (Boolean) -> Unit = {},
 ) {
@@ -247,7 +250,9 @@ private fun PrinterCameraSnapshotImage(
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             loading = {
-                LaunchedEffect(Unit) { onLoadingChanged(true) }
+                if (lastPainter == null) {
+                    LaunchedEffect(Unit) { onLoadingChanged(true) }
+                }
                 lastPainter?.let { painter ->
                     CameraSnapshotFrame(
                         painter = painter,
@@ -272,14 +277,23 @@ private fun PrinterCameraSnapshotImage(
             },
             success = { state ->
                 LaunchedEffect(Unit) { onLoadingChanged(false) }
-                Crossfade(
-                    targetState = state.painter,
-                    animationSpec = tween(SNAPSHOT_CROSSFADE_MS),
-                    label = "cameraSnapshot",
-                ) { painter ->
-                    lastPainter = painter
+                if (snapshotCrossfadeMs > 0) {
+                    Crossfade(
+                        targetState = state.painter,
+                        animationSpec = tween(snapshotCrossfadeMs),
+                        label = "cameraSnapshot",
+                    ) { painter ->
+                        lastPainter = painter
+                        CameraSnapshotFrame(
+                            painter = painter,
+                            contentScale = contentScale,
+                            applyHeroScrim = applyHeroScrim,
+                        )
+                    }
+                } else {
+                    lastPainter = state.painter
                     CameraSnapshotFrame(
-                        painter = painter,
+                        painter = state.painter,
                         contentScale = contentScale,
                         applyHeroScrim = applyHeroScrim,
                     )

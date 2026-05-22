@@ -58,6 +58,7 @@ fun MachineTab(
     onHomePrinter: () -> Unit,
     onToggleLight: (() -> Unit)? = null,
     onOpenPrinterArchives: () -> Unit = {},
+    onStopCameraStream: () -> Unit = {},
 ) {
     val caps = labels.machineTabCapabilities(cameraTokenConfigured = cameraToken.isNotBlank())
     var showCameraFullscreen by rememberSaveable { mutableStateOf(false) }
@@ -69,6 +70,7 @@ fun MachineTab(
         cameraToken = cameraToken,
         printerId = printerId,
         onDismiss = { showCameraFullscreen = false },
+        onStopCameraStream = onStopCameraStream,
         chamberLightOn = labels.chamberLightOn,
         canToggleLight = labels.canToggleLight && caps.utilitiesEnabled,
         onToggleLight = onToggleLight,

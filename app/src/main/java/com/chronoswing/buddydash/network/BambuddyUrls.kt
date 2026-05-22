@@ -50,7 +50,7 @@ fun tokenAuthenticatedImageUrl(
 fun printerCoverUrl(serverUrl: String, printerId: Int, cameraToken: String): String? =
     tokenAuthenticatedImageUrl(serverUrl, BambuddyApi.printerCoverPath(printerId), cameraToken)
 
-/** Live camera snapshot (OpenAPI: GET …/camera/snapshot?token=). */
+/** Camera still frame (OpenAPI: GET …/camera/snapshot?token=). */
 fun printerCameraSnapshotUrl(
     serverUrl: String,
     printerId: Int,
@@ -63,6 +63,22 @@ fun printerCameraSnapshotUrl(
         cameraToken,
         cacheBust = cacheBust,
     )
+
+/** Live MJPEG stream (OpenAPI: GET …/camera/stream?token=&fps=). */
+fun printerCameraStreamUrl(
+    serverUrl: String,
+    printerId: Int,
+    cameraToken: String,
+    fps: Int = 10,
+): String? {
+    val base = tokenAuthenticatedImageUrl(
+        serverUrl,
+        BambuddyApi.cameraStreamPath(printerId),
+        cameraToken,
+    ) ?: return null
+    val clampedFps = fps.coerceIn(1, 30)
+    return "$base&fps=$clampedFps"
+}
 
 data class QueueJobThumbnailUrl(
     val source: QueueThumbnailSource,

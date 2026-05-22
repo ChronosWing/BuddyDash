@@ -167,6 +167,7 @@ fun PrinterDetailScreen(
         onStartNextQueuedPrint = viewModel::startNextQueuedPrint,
         onStartQueuedPrintSnackbarShown = viewModel::onStartQueuedPrintSnackbarShown,
         onOpenPrinterArchives = onOpenPrinterArchives,
+        onStopCameraStream = viewModel::stopCameraStream,
     )
 }
 
@@ -195,6 +196,7 @@ private fun PrinterDetailScreenContent(
     onBack: () -> Unit,
     onViewFullQueue: () -> Unit,
     onOpenPrinterArchives: () -> Unit,
+    onStopCameraStream: () -> Unit,
     onStartNextQueuedPrint: () -> Unit,
     onStartQueuedPrintSnackbarShown: () -> Unit,
     onRetry: () -> Unit,
@@ -417,6 +419,7 @@ private fun PrinterDetailScreenContent(
                                     onHomePrinter = onHomePrinter,
                                     onToggleLight = onToggleLight,
                                     onOpenPrinterArchives = onOpenPrinterArchives,
+                                    onStopCameraStream = onStopCameraStream,
                                 )
                             }
                         }

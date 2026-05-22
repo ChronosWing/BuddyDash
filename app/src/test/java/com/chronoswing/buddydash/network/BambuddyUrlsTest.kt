@@ -18,11 +18,25 @@ class BambuddyUrlsTest {
         assertNotNull(url)
         assertTrue(url!!.contains("/api/v1/printers/3/camera/snapshot"))
         assertTrue(url.contains("token="))
-        assertTrue(url.contains("t=1700000000"))
+        assertTrue(url.contains("v=1700000000"))
         assertEquals(
-            "http://bambuddy.local/api/v1/printers/3/camera/snapshot?token=secret+token&t=1700000000",
+            "http://bambuddy.local/api/v1/printers/3/camera/snapshot?v=1700000000&token=secret+token",
             url,
         )
+    }
+
+    @Test
+    fun printerCameraStreamUrl_includesTokenAndFps() {
+        val url = printerCameraStreamUrl(
+            serverUrl = "http://bambuddy.local",
+            printerId = 3,
+            cameraToken = "secret token",
+            fps = 15,
+        )
+        assertNotNull(url)
+        assertTrue(url!!.contains("/api/v1/printers/3/camera/stream"))
+        assertTrue(url.contains("token="))
+        assertTrue(url.contains("fps=15"))
     }
 
     @Test
