@@ -1,8 +1,10 @@
 package com.chronoswing.buddydash.ui.components
 
+import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -11,14 +13,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -26,12 +32,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -65,8 +76,12 @@ fun PrinterCameraFullscreenDialog(
                 mutableLongStateOf(System.currentTimeMillis())
             }
             var isSnapshotLoading by remember { mutableStateOf(true) }
+            var rotatedFullscreen by remember { mutableStateOf(false) }
             val lifecycleOwner = LocalLifecycleOwner.current
-            androidx.compose.runtime.LaunchedEffect(lifecycleOwner, printerId) {
+
+            ImmersiveSystemBars(enabled = rotatedFullscreen)
+
+            LaunchedEffect(lifecycleOwner, printerId) {
                 lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                     while (isActive) {
                         delay(FULLSCREEN_SNAPSHOT_REFRESH_MS)
@@ -75,24 +90,27 @@ fun PrinterCameraFullscreenDialog(
                 }
             }
             Box(modifier = Modifier.fillMaxSize()) {
-                PrinterLiveCameraSnapshot(
+                CameraSnapshotFitHost(
+                    rotatedFullscreen = rotatedFullscreen,
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
                     printerId = printerId,
                     refreshTick = refreshTick,
-                    modifier = Modifier.fillMaxSize(),
-                    fillMaxSize = true,
-                    contentScale = ContentScale.Fit,
-                    applyHeroScrim = false,
-                    backgroundColor = Color.Black,
                     onLoadingChanged = { isSnapshotLoading = it },
                 )
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxSize()
-                        .statusBarsPadding()
-                        .navigationBarsPadding()
+                        .then(
+                            if (rotatedFullscreen) {
+                                Modifier
+                            } else {
+                                Modifier
+                                    .statusBarsPadding()
+                                    .navigationBarsPadding()
+                            },
+                        )
                         .padding(horizontal = 4.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Top,
@@ -115,6 +133,27 @@ fun PrinterCameraFullscreenDialog(
                                     .padding(end = 4.dp),
                                 strokeWidth = 2.dp,
                                 color = Color.White.copy(alpha = 0.7f),
+                            )
+                        }
+                        IconButton(onClick = { rotatedFullscreen = !rotatedFullscreen }) {
+                            Icon(
+                                imageVector = if (rotatedFullscreen) {
+                                    Icons.Default.FullscreenExit
+                                } else {
+                                    Icons.Default.ScreenRotation
+                                },
+                                contentDescription = stringResource(
+                                    if (rotatedFullscreen) {
+                                        R.string.camera_exit_rotated_fullscreen
+                                    } else {
+                                        R.string.camera_enter_rotated_fullscreen
+                                    },
+                                ),
+                                tint = if (rotatedFullscreen) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.95f)
+                                } else {
+                                    Color.White.copy(alpha = 0.88f)
+                                },
                             )
                         }
                         IconButton(
@@ -144,6 +183,74 @@ fun PrinterCameraFullscreenDialog(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Normal mode: full frame with [ContentScale.Fit] on a dark background.
+ * Rotated mode: 90° landscape fill using swapped constraints so Fit does not crop edges.
+ */
+@Composable
+private fun CameraSnapshotFitHost(
+    rotatedFullscreen: Boolean,
+    serverUrl: String,
+    cameraToken: String,
+    printerId: Int,
+    refreshTick: Long,
+    onLoadingChanged: (Boolean) -> Unit,
+) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        val snapshotModifier = if (rotatedFullscreen) {
+            Modifier
+                .size(maxHeight, maxWidth)
+                .rotate(90f)
+        } else {
+            Modifier.fillMaxSize()
+        }
+        PrinterLiveCameraSnapshot(
+            serverUrl = serverUrl,
+            cameraToken = cameraToken,
+            printerId = printerId,
+            refreshTick = refreshTick,
+            modifier = snapshotModifier,
+            fillMaxSize = true,
+            contentScale = ContentScale.Fit,
+            applyHeroScrim = false,
+            backgroundColor = Color.Black,
+            onLoadingChanged = onLoadingChanged,
+        )
+    }
+}
+
+@Composable
+private fun ImmersiveSystemBars(enabled: Boolean) {
+    val view = LocalView.current
+    DisposableEffect(enabled, view) {
+        if (!view.isInEditMode) {
+            val window = (view.context as? Activity)?.window
+            if (window != null) {
+                val controller = WindowCompat.getInsetsController(window, view)
+                if (enabled) {
+                    controller.hide(WindowInsetsCompat.Type.systemBars())
+                    controller.systemBarsBehavior =
+                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                } else {
+                    controller.show(WindowInsetsCompat.Type.systemBars())
+                }
+                onDispose {
+                    controller.show(WindowInsetsCompat.Type.systemBars())
+                }
+            } else {
+                onDispose { }
+            }
+        } else {
+            onDispose { }
         }
     }
 }
