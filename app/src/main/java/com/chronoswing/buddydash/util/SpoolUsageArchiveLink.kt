@@ -115,7 +115,8 @@ private fun archiveMatchesSpoolUsageComposite(
     archive: PrintArchive,
     usageTitleKey: String,
 ): Boolean {
-    if (!archiveTitleKeys(archive).contains(usageTitleKey)) return false
+    val archiveKeys = archiveTitleKeys(archive)
+    if (!printTitlesMatchForUsageLink(usageTitleKey, archiveKeys)) return false
 
     val usagePrinterId = entry.printerId
     val archivePrinterId = archive.printerId
@@ -215,15 +216,36 @@ fun logSpoolUsageLinkFailure(
             "createdAt=${entry.createdAtIso} plate=${entry.plateNumber}",
     )
     archives.take(8).forEach { archive ->
-        val archiveNorm = archiveTitleKeys(archive).joinToString("|")
+        val archiveKeys = archiveTitleKeys(archive)
+        val archiveNorm = archiveKeys.joinToString("|")
+        val titleExact = archiveKeys.contains(usageTitleKey)
+        val titleFuzzy = !titleExact && archiveKeys.any { key ->
+            titlesContainMatchHighConfidence(usageTitleKey, key)
+        }
         val printerMatch = entry.printerId != null && archive.printerId == entry.printerId
+        val printerReject = entry.printerId != null &&
+            archive.printerId != null &&
+            entry.printerId != archive.printerId
         val timeMatch = spoolUsageTimestampsAlign(entry.createdAtIso, archive)
+        val plateReject = entry.plateNumber != null &&
+            archive.plateNumber != null &&
+            entry.plateNumber != archive.plateNumber
+        val rejectReason = when {
+            !titleExact && !titleFuzzy -> "title_mismatch"
+            printerReject -> "printer_mismatch"
+            entry.printerId != null && archive.printerId == null -> "archive_missing_printer"
+            plateReject -> "plate_mismatch"
+            !timeMatch -> "time_out_of_tolerance"
+            else -> "would_match"
+        }
         Log.d(
             TAG_SPOOL_USAGE_LINK,
             "titleCompare archiveId=${archive.id} rawArchiveTitle=${archive.displayName} " +
                 "filename=${archive.filename} normalizedArchive=$archiveNorm " +
-                "printerMatch=$printerMatch timeMatch=$timeMatch " +
-                "usageGrams=${entry.weightUsedGrams} archiveGrams=${archive.filamentUsage?.weightGrams}",
+                "titleExact=$titleExact titleFuzzy=$titleFuzzy printerMatch=$printerMatch " +
+                "timeMatch=$timeMatch plate=${entry.plateNumber}/${archive.plateNumber} " +
+                "usageGrams=${entry.weightUsedGrams} archiveGrams=${archive.filamentUsage?.weightGrams} " +
+                "rejected=$rejectReason",
         )
     }
 }

@@ -98,9 +98,29 @@ internal fun stripPrintFileExtension(name: String): String {
 internal fun collapseRepeatedSpaces(text: String): String =
     text.replace(Regex("\\s+"), " ").trim()
 
-/** Underscores/hyphens become spaces for comparison only (CJK preserved). */
-internal fun normalizeSeparatorsForTitleMatch(text: String): String =
-    text.replace(Regex("[_\\-]+"), " ").let { collapseRepeatedSpaces(it) }
+/**
+ * Match-only: treat | ｜ / - _ and repeated whitespace as a single space (CJK preserved).
+ */
+private val TITLE_MATCH_SEPARATOR_PATTERN = Regex(
+    """[_\-/\\|｜\u2010-\u2015\u2212\uFF0F\u00B7\u30FB]+""",
+)
+
+internal fun normalizeSeparatorsForTitleMatch(text: String): String {
+    var result = text.replace(TITLE_MATCH_SEPARATOR_PATTERN, " ")
+    result = result.replace(Regex("""[\s\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]+"""), " ")
+    return collapseRepeatedSpaces(result)
+}
+
+/**
+ * True when normalized usage and archive titles are the same print name.
+ * Exact match after normalization, or high-confidence substring overlap (CJK-safe).
+ */
+fun printTitlesMatchForUsageLink(usageTitleKey: String, archiveTitleKeys: Set<String>): Boolean {
+    if (archiveTitleKeys.contains(usageTitleKey)) return true
+    return archiveTitleKeys.any { archiveKey ->
+        titlesContainMatchHighConfidence(usageTitleKey, archiveKey)
+    }
+}
 
 /** Lowercase Latin letters only; CJK and other scripts unchanged. */
 internal fun foldLatinCaseForTitleMatch(text: String): String = buildString(text.length) {
