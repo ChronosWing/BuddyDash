@@ -77,7 +77,8 @@ import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.network.printerCoverUrl
-import com.chronoswing.buddydash.ui.components.PrinterDetailSkeleton
+import com.chronoswing.buddydash.ui.components.LoadingContent
+import com.chronoswing.buddydash.ui.motion.BuddyDashTabFadeContainer
 import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
@@ -332,7 +333,7 @@ private fun PrinterDetailScreenContent(
         },
     ) { innerPadding ->
         when {
-            isLoading -> PrinterDetailSkeleton(Modifier.padding(innerPadding))
+            isLoading -> LoadingContent(Modifier.padding(innerPadding))
             error != null -> ErrorContent(
                 message = error,
                 onRetry = onRetry,
@@ -366,6 +367,7 @@ private fun PrinterDetailScreenContent(
                                 .padding(12.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
+                            BuddyDashTabFadeContainer(selectedTab = selectedTab) {
                             when (selectedTab) {
                                 0 -> StatusTab(
                                     labels = labels,
@@ -422,6 +424,7 @@ private fun PrinterDetailScreenContent(
                                     onStopCameraStream = onStopCameraStream,
                                 )
                             }
+                            }
                         }
                     }
                 }
@@ -430,6 +433,10 @@ private fun PrinterDetailScreenContent(
     }
 }
 
+/**
+ * Status tab sections — keep as a vertical [Column]; never wrap in Box/AnimatedContent.
+ * Order: camera → overview/print → queue → connectivity → fans → speed → maintenance.
+ */
 @Composable
 private fun StatusTab(
     labels: PrinterDetailLabels,
