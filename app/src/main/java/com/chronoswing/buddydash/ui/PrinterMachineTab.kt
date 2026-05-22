@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,7 +60,7 @@ fun MachineTab(
     onOpenPrinterArchives: () -> Unit = {},
 ) {
     val caps = labels.machineTabCapabilities(cameraTokenConfigured = cameraToken.isNotBlank())
-    var showCameraFullscreen by remember { mutableStateOf(false) }
+    var showCameraFullscreen by rememberSaveable { mutableStateOf(false) }
     var showHomeConfirm by remember { mutableStateOf(false) }
 
     PrinterCameraFullscreenDialog(

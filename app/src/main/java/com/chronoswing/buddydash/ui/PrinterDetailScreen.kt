@@ -232,7 +232,7 @@ private fun PrinterDetailScreenContent(
     val maintenanceResetFailedMessage = stringResource(R.string.maintenance_reset_failed)
     val printStartedMessage = stringResource(R.string.archive_reprint_started)
     val startNextPrintFailedMessage = stringResource(R.string.start_next_print_failed)
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val scrollState = rememberScrollState()
     var errorDetailsExpanded by rememberSaveable { mutableStateOf(false) }
     val errorCardScrollOffset = remember { mutableIntStateOf(0) }
