@@ -305,6 +305,15 @@ class PrinterDetailViewModel(
         }
     }
 
+    /** Release server camera stream resources when the live viewer closes. */
+    fun stopCameraStream() {
+        val state = _uiState.value
+        if (printerId < 0 || !state.hasCredentials) return
+        viewModelScope.launch {
+            apiClient.stopCameraStream(state.serverUrl, state.apiKey, printerId)
+        }
+    }
+
     fun setBedJogStepMm(stepMm: Float) {
         if (stepMm in BED_JOG_STEP_OPTIONS_MM) {
             _uiState.update { it.copy(bedJogStepMm = stepMm) }

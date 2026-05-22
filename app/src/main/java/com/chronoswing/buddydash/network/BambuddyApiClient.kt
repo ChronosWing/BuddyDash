@@ -632,6 +632,15 @@ class BambuddyApiClient {
         on: Boolean,
     ): Result<Unit> = postPrinterAction(serverUrl, apiKey, BambuddyApi.chamberLightPath(printerId, on))
 
+    /** Stop server-side camera stream when the viewer closes (OpenAPI: POST …/camera/stop). */
+    suspend fun stopCameraStream(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        postPrinterAction(serverUrl, apiKey, BambuddyApi.cameraStopPath(printerId))
+    }
+
     suspend fun fetchPrinterMachineInfo(
         serverUrl: String,
         apiKey: String,

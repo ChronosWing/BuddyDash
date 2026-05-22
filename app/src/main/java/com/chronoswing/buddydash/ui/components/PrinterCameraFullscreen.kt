@@ -2,7 +2,7 @@ package com.chronoswing.buddydash.ui.components
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
-import android.view.OrientationEventListener
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -28,11 +29,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -46,11 +50,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.chronoswing.buddydash.R
-import com.chronoswing.buddydash.ui.findActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import com.chronoswing.buddydash.network.printerCameraSnapshotUrl
+import com.chronoswing.buddydash.network.printerCameraStreamUrl
+import com.chronoswing.buddydash.ui.findActivity
 
-private const val FULLSCREEN_SNAPSHOT_REFRESH_MS = 5_000L
+private const val CAMERA_STREAM_FPS = 10
 
 @Composable
 fun PrinterCameraFullscreenDialog(
@@ -59,6 +65,7 @@ fun PrinterCameraFullscreenDialog(
     cameraToken: String,
     printerId: Int,
     onDismiss: () -> Unit,
+    onStopCameraStream: () -> Unit = {},
     chamberLightOn: Boolean? = null,
     canToggleLight: Boolean = false,
     onToggleLight: (() -> Unit)? = null,
@@ -72,31 +79,83 @@ fun PrinterCameraFullscreenDialog(
             modifier = Modifier.fillMaxSize(),
             color = Color.Black,
         ) {
-            var refreshTick by remember(printerId) {
+            val streamUrl = remember(serverUrl, printerId, cameraToken) {
+                printerCameraStreamUrl(serverUrl, printerId, cameraToken, fps = CAMERA_STREAM_FPS)
+            }
+            var streamFailed by remember(streamUrl) { mutableStateOf(streamUrl == null) }
+            var showLoadingIndicator by remember(streamUrl) { mutableStateOf(streamUrl != null) }
+            var snapshotRefreshTick by remember(printerId) {
                 mutableLongStateOf(System.currentTimeMillis())
             }
-            var isSnapshotLoading by remember { mutableStateOf(true) }
+            CameraOrientationWhileOpen()
+            val configuration = LocalConfiguration.current
+            val isLandscape =
+                configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
             val lifecycleOwner = LocalLifecycleOwner.current
-            val isLandscape = rememberPhysicalLandscapeHeld()
+            val scope = rememberCoroutineScope()
 
-            ImmersiveSystemBars(enabled = isLandscape)
+            LaunchedEffect(streamFailed) {
+                if (streamFailed) showLoadingIndicator = true
+            }
 
-            LaunchedEffect(lifecycleOwner, printerId) {
+            LaunchedEffect(streamFailed, lifecycleOwner, printerId) {
+                if (!streamFailed) return@LaunchedEffect
                 lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                     while (isActive) {
-                        delay(FULLSCREEN_SNAPSHOT_REFRESH_MS)
-                        refreshTick = System.currentTimeMillis()
+                        delay(5_000L)
+                        snapshotRefreshTick = System.currentTimeMillis()
                     }
                 }
             }
+
+            DisposableEffect(Unit) {
+                onDispose { onStopCameraStream() }
+            }
+
+            ImmersiveSystemBars(enabled = isLandscape)
+
             Box(modifier = Modifier.fillMaxSize()) {
-                CameraSnapshotFitHost(
-                    serverUrl = serverUrl,
-                    cameraToken = cameraToken,
-                    printerId = printerId,
-                    refreshTick = refreshTick,
-                    onLoadingChanged = { isSnapshotLoading = it },
-                )
+                when {
+                    streamUrl != null && !streamFailed -> {
+                        CameraViewerFrame {
+                            PrinterCameraMjpegStream(
+                                streamUrl = streamUrl,
+                                modifier = Modifier.fillMaxSize(),
+                                onStreamFailed = {
+                                    scope.launch { streamFailed = true }
+                                },
+                                onLoadingChanged = { loading ->
+                                    if (!loading) showLoadingIndicator = false
+                                },
+                            )
+                        }
+                    }
+                    streamUrl != null && streamFailed -> {
+                        CameraSnapshotFallback(
+                            serverUrl = serverUrl,
+                            cameraToken = cameraToken,
+                            printerId = printerId,
+                            refreshTick = snapshotRefreshTick,
+                            onLoadingChanged = { loading ->
+                                if (!loading) showLoadingIndicator = false
+                            },
+                        )
+                    }
+                    else -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.camera_stream_unavailable),
+                                color = Color.White.copy(alpha = 0.7f),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                }
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
@@ -125,7 +184,7 @@ fun PrinterCameraFullscreenDialog(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (isSnapshotLoading) {
+                        if (showLoadingIndicator) {
                             CircularProgressIndicator(
                                 modifier = Modifier
                                     .size(22.dp)
@@ -134,14 +193,16 @@ fun PrinterCameraFullscreenDialog(
                                 color = Color.White.copy(alpha = 0.7f),
                             )
                         }
-                        IconButton(
-                            onClick = { refreshTick = System.currentTimeMillis() },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = stringResource(R.string.refresh_status),
-                                tint = Color.White.copy(alpha = 0.88f),
-                            )
+                        if (streamFailed) {
+                            IconButton(
+                                onClick = { snapshotRefreshTick = System.currentTimeMillis() },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = stringResource(R.string.refresh_status),
+                                    tint = Color.White.copy(alpha = 0.88f),
+                                )
+                            }
                         }
                         if (canToggleLight && chamberLightOn != null && onToggleLight != null) {
                             IconButton(onClick = onToggleLight) {
@@ -166,19 +227,45 @@ fun PrinterCameraFullscreenDialog(
 }
 
 @Composable
-private fun CameraSnapshotFitHost(
-    serverUrl: String,
-    cameraToken: String,
-    printerId: Int,
-    refreshTick: Long,
-    onLoadingChanged: (Boolean) -> Unit,
-) {
+private fun CameraViewerFrame(content: @Composable () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
+        content()
+    }
+}
+
+/** Polling fallback when MJPEG stream cannot be displayed. */
+@Composable
+private fun CameraSnapshotFallback(
+    serverUrl: String,
+    cameraToken: String,
+    printerId: Int,
+    refreshTick: Long,
+    onLoadingChanged: (Boolean) -> Unit,
+) {
+    val snapshotUrl = remember(serverUrl, printerId, cameraToken, refreshTick) {
+        printerCameraSnapshotUrl(serverUrl, printerId, cameraToken, cacheBust = refreshTick)
+    }
+    if (snapshotUrl == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.camera_stream_unavailable),
+                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        return
+    }
+    CameraViewerFrame {
         PrinterLiveCameraSnapshot(
             serverUrl = serverUrl,
             cameraToken = cameraToken,
@@ -189,48 +276,32 @@ private fun CameraSnapshotFitHost(
             contentScale = ContentScale.Fit,
             applyHeroScrim = false,
             backgroundColor = Color.Black,
+            snapshotCrossfadeMs = 0,
             onLoadingChanged = onLoadingChanged,
         )
     }
 }
 
 /**
- * Opens in portrait. Switches to landscape activity orientation only when the device
- * is physically held in landscape (not on dialog open).
+ * Opens in portrait, then allows sensor rotation while the camera viewer is visible.
+ * [LocalConfiguration] drives landscape layout and immersive chrome.
  */
 @Composable
-private fun rememberPhysicalLandscapeHeld(): Boolean {
-    val context = LocalContext.current
-    val activity = remember(context) { context.findActivity() }
-    val heldLandscape = remember { mutableStateOf(false) }
+private fun CameraOrientationWhileOpen() {
+    val activity = LocalContext.current.findActivity()
 
-    DisposableEffect(context, activity) {
-        val host = activity
-        val listener = object : OrientationEventListener(context) {
-            override fun onOrientationChanged(orientation: Int) {
-                if (orientation == ORIENTATION_UNKNOWN) return
-                val landscape = orientation in 45..135 || orientation in 225..315
-                if (landscape == heldLandscape.value) return
-                heldLandscape.value = landscape
-                host?.requestedOrientation = if (landscape) {
-                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                } else {
-                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                }
-            }
-        }
-        heldLandscape.value = false
-        host?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        if (listener.canDetectOrientation()) {
-            listener.enable()
-        }
-        onDispose {
-            listener.disable()
-            host?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        }
+    LaunchedEffect(activity) {
+        val host = activity ?: return@LaunchedEffect
+        host.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        delay(350)
+        host.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
     }
 
-    return heldLandscape.value
+    DisposableEffect(activity) {
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
 }
 
 @Composable

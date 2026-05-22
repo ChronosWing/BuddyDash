@@ -164,7 +164,7 @@
     <string name="plate_clear_chip">Plate clear</string>
     <string name="plate_not_clear_chip">Plate not clear</string>
     <string name="print_cover">Print cover image</string>
-    <string name="camera_snapshot">Live camera snapshot</string>
+    <string name="camera_snapshot">Camera snapshot</string>
     <string name="nozzle_short">Nozzle %1$s</string>
     <string name="bed_short">Bed %1$s</string>
     <string name="hms_short">HMS %1$s</string>
@@ -186,6 +186,7 @@
     <string name="coming_soon">Coming soon</string>
     <string name="toggle_light">Toggle light</string>
     <string name="camera_view">Camera view</string>
+    <string name="camera_stream_unavailable">Camera stream unavailable</string>
     <string name="camera_enter_rotated_fullscreen">Rotate camera to fill screen</string>
     <string name="camera_exit_rotated_fullscreen">Exit rotated fullscreen</string>
     <string name="printer_files">Files</string>

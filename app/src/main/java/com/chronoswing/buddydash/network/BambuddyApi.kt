@@ -28,6 +28,8 @@ object BambuddyApi {
 
     const val CHAMBER_LIGHT_PATH = "/api/v1/printers/{printer_id}/chamber-light"
     const val CAMERA_SNAPSHOT_PATH = "/api/v1/printers/{printer_id}/camera/snapshot"
+    const val CAMERA_STREAM_PATH = "/api/v1/printers/{printer_id}/camera/stream"
+    const val CAMERA_STOP_PATH = "/api/v1/printers/{printer_id}/camera/stop"
     const val PRINTER_FILES_PATH = "/api/v1/printers/{printer_id}/files"
     const val PRINT_PAUSE_PATH = "/api/v1/printers/{printer_id}/print/pause"
     const val PRINT_RESUME_PATH = "/api/v1/printers/{printer_id}/print/resume"
@@ -104,6 +106,12 @@ object BambuddyApi {
 
     fun cameraSnapshotPath(printerId: Int): String =
         CAMERA_SNAPSHOT_PATH.replace("{printer_id}", printerId.toString())
+
+    fun cameraStreamPath(printerId: Int): String =
+        CAMERA_STREAM_PATH.replace("{printer_id}", printerId.toString())
+
+    fun cameraStopPath(printerId: Int): String =
+        CAMERA_STOP_PATH.replace("{printer_id}", printerId.toString())
 
     fun chamberLightPath(printerId: Int, on: Boolean): String =
         "${CHAMBER_LIGHT_PATH.replace("{printer_id}", printerId.toString())}?on=$on"

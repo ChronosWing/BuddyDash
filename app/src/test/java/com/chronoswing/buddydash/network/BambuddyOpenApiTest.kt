@@ -22,6 +22,13 @@ class BambuddyOpenApiTest {
     }
 
     @Test
+    fun cameraStreamEndpoint_matchesOpenApiSpec() {
+        val spec = findOpenApiSpec().readText()
+        assertTrue(spec.contains("\"${BambuddyApi.CAMERA_STREAM_PATH}\""))
+        assertTrue(spec.contains("camera_stream_api_v1_printers__printer_id__camera_stream_get"))
+    }
+
+    @Test
     fun archivesEndpoints_matchOpenApiSpec() {
         val spec = findOpenApiSpec().readText()
         assertTrue(spec.contains("\"${BambuddyApi.ARCHIVES_PATH}\""))
