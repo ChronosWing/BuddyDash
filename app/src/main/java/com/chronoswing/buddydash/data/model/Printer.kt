@@ -19,6 +19,12 @@ data class PrinterStatus(
     val rawState: String?,
     val progress: Float?,
     val fileName: String?,
+    /** Raw `current_print` from status JSON. */
+    val currentPrint: String? = null,
+    val subtaskName: String? = null,
+    val gcodeFile: String? = null,
+    /** `cover_url` hint from status (path or URL); used for thumbnail cache identity. */
+    val coverUrl: String? = null,
     val remainingTimeSeconds: Int?,
     val nozzleTemp: Double?,
     val bedTemp: Double?,

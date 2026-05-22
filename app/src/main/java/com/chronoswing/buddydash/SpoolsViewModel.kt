@@ -124,10 +124,29 @@ class SpoolsViewModel(
         _uiState.update { it.copy(refreshError = null) }
     }
 
+    /** Clears archive lookup and search when bottom nav opens unfiltered Spools root. */
+    fun applySectionRootFromNavigation() {
+        _uiState.update {
+            it.copy(
+                archiveLookupFilter = null,
+                searchQuery = "",
+            )
+        }
+    }
+
+    fun refreshFromBottomNavReselect() {
+        if (BuddyDashDebug.enabled) {
+            Log.d(TAG_SPOOLS_VM, "refreshFromBottomNavReselect")
+        }
+        applySectionRootFromNavigation()
+        loadSpools(showLoading = false, fromBottomNavReselect = true)
+    }
+
     fun loadSpools(
         showLoading: Boolean = false,
         fromPull: Boolean = false,
         fromUser: Boolean = false,
+        fromBottomNavReselect: Boolean = false,
     ) {
         val state = _uiState.value
         if (!state.hasCredentials) {
@@ -141,25 +160,33 @@ class SpoolsViewModel(
             }
             return
         }
-        if (fromUser && !fromPull && manualRefreshGuard.shouldSkipManualRefresh()) return
-        if (fromUser && fetchJob?.isActive == true) return
+        if (fromBottomNavReselect) {
+            fetchJob?.cancel()
+        } else {
+            if (fromUser && !fromPull && manualRefreshGuard.shouldSkipManualRefresh()) return
+            if (fromUser && fetchJob?.isActive == true) return
+        }
 
         val hadSpools = state.spools.isNotEmpty()
+        val isInitialLoad = !hadSpools
         if (BuddyDashDebug.enabled) {
             Log.d(
                 TAG_SPOOLS_VM,
                 "loadSpools start showLoading=$showLoading fromPull=$fromPull fromUser=$fromUser " +
-                    "hadSpools=$hadSpools hasCompletedLoad=${state.hasCompletedLoad} " +
+                    "fromBottomNavReselect=$fromBottomNavReselect hadSpools=$hadSpools " +
+                    "hasCompletedLoad=${state.hasCompletedLoad} " +
                     "endpoint=${BambuddyApi.inventorySpoolsPath()}",
             )
         }
 
-        fetchJob?.cancel()
+        if (!fromBottomNavReselect) {
+            fetchJob?.cancel()
+        }
         fetchJob = viewModelScope.launch {
             try {
-                if (fromPull) {
+                if (!isInitialLoad) {
                     _uiState.update { it.copy(isRefreshing = true, refreshError = null) }
-                } else if (showLoading && !hadSpools) {
+                } else if (showLoading) {
                     _uiState.update { it.copy(isLoading = true, error = null) }
                 }
 
@@ -179,6 +206,9 @@ class SpoolsViewModel(
                                 "loadSpools success mappedCount=${spools.size} " +
                                     "uiState=${_uiState.value.spools.size}->${spools.size}",
                             )
+                            if (fromBottomNavReselect) {
+                                Log.d(TAG_SPOOLS_VM, "bottomNavReselect refresh success")
+                            }
                         }
                         _uiState.update {
                             it.copy(
@@ -192,9 +222,17 @@ class SpoolsViewModel(
                         }
                     },
                     onFailure = { error ->
-                        val message = error.toUserNetworkMessage("Failed to load spools")
+                        val fallback = if (hadSpools) {
+                            "Could not refresh"
+                        } else {
+                            "Failed to load spools"
+                        }
+                        val message = error.toUserNetworkMessage(fallback)
                         if (BuddyDashDebug.enabled) {
                             Log.w(TAG_SPOOLS_VM, "loadSpools failure: $message", error)
+                            if (fromBottomNavReselect) {
+                                Log.w(TAG_SPOOLS_VM, "bottomNavReselect refresh failure", error)
+                            }
                         }
                         _uiState.update { current ->
                             if (current.spools.isNotEmpty()) {

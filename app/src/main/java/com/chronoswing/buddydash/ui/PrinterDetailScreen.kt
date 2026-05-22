@@ -50,14 +50,14 @@ import com.chronoswing.buddydash.util.ControlAction
 import com.chronoswing.buddydash.util.ControlFeedback
 import com.chronoswing.buddydash.MaintenanceResetSnackbar
 import com.chronoswing.buddydash.PlateClearSnackbar
-import com.chronoswing.buddydash.FilamentActionSnackbar
-import com.chronoswing.buddydash.FilamentConfirmRequest
+import com.chronoswing.buddydash.FilamentAssignSnackbar
 import com.chronoswing.buddydash.PrinterDetailViewModel
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.StartQueuedPrintSnackbar
 import com.chronoswing.buddydash.data.model.PrinterStatus
-import com.chronoswing.buddydash.util.FilamentAction
+import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.util.FilamentSlotDisplay
+import com.chronoswing.buddydash.util.evaluateFilamentAssignAvailability
 import com.chronoswing.buddydash.util.buildFilamentSlotDisplays
 import com.chronoswing.buddydash.network.BambuddyApi
 import com.chronoswing.buddydash.data.model.FilamentSlot
@@ -70,7 +70,11 @@ import com.chronoswing.buddydash.ui.components.FilamentAmsEnvironmentSection
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.ErrorContent
+import com.chronoswing.buddydash.ui.components.FilamentAssignSpoolDialog
+import com.chronoswing.buddydash.ui.components.FilamentClearAssignmentDialog
 import com.chronoswing.buddydash.ui.components.FilamentDetailGroups
+import com.chronoswing.buddydash.ui.components.FilamentSlotDetailSheet
+import com.chronoswing.buddydash.ui.components.FilamentSpoolPickerSheet
 import com.chronoswing.buddydash.ui.components.FilamentUsageText
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
 import com.chronoswing.buddydash.ui.components.DetailPrintQueueSection
@@ -84,12 +88,12 @@ import com.chronoswing.buddydash.ui.components.PrintFileHighlightWithCover
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
-import com.chronoswing.buddydash.network.printerCoverUrl
 import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.motion.BuddyDashTabFadeContainer
 import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
+import com.chronoswing.buddydash.util.ListLoadUi
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildPrintHeadline
 import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
@@ -132,6 +136,7 @@ fun PrinterDetailScreen(
         isLoading = uiState.isLoading,
         isRefreshing = uiState.isRefreshing,
         error = uiState.error,
+        refreshError = uiState.refreshError,
         labels = labels,
         isClearingPlate = uiState.isClearingPlate,
         isControlBusy = uiState.isControlBusy,
@@ -148,6 +153,7 @@ fun PrinterDetailScreen(
         onRetry = { viewModel.loadStatus() },
         onRefresh = { viewModel.loadStatus(showLoading = false, fromUser = true) },
         onPullRefresh = { viewModel.loadStatus(showLoading = false, fromPull = true) },
+        onRefreshErrorShown = viewModel::onRefreshErrorShown,
         onPollStatus = { showLoading ->
             viewModel.loadStatus(showLoading = showLoading)
         },
@@ -176,14 +182,28 @@ fun PrinterDetailScreen(
         onOpenSpoolDetail = onOpenSpoolDetail,
         filamentSlotDisplays = uiState.filamentSlotDisplays,
         printerStatus = uiState.status,
-        isFilamentActionBusy = uiState.isFilamentActionBusy,
-        filamentConfirm = uiState.filamentConfirm,
-        filamentSnackbar = uiState.filamentSnackbar,
-        onRequestFilamentLoad = viewModel::requestFilamentLoad,
-        onRequestFilamentUnload = viewModel::requestFilamentUnload,
-        onConfirmFilamentAction = viewModel::confirmFilamentAction,
-        onDismissFilamentConfirm = viewModel::dismissFilamentConfirm,
-        onFilamentSnackbarShown = viewModel::onFilamentSnackbarShown,
+        printingQueueJobId = uiState.printingQueueJobId,
+        filamentSlotSheet = uiState.filamentSlotSheet,
+        filamentSpoolPickerOpen = uiState.filamentSpoolPickerOpen,
+        spoolPickerSearchQuery = uiState.spoolPickerSearchQuery,
+        assignSpoolConfirm = uiState.assignSpoolConfirm,
+        clearAssignmentConfirm = uiState.clearAssignmentConfirm,
+        isFilamentAssignBusy = uiState.isFilamentAssignBusy,
+        filamentAssignSnackbar = uiState.filamentAssignSnackbar,
+        pickerSpools = viewModel.spoolsForPicker(),
+        assignConfirmSpoolTitle = viewModel.assignConfirmSpoolTitle(),
+        onOpenFilamentSlot = viewModel::openFilamentSlotSheet,
+        onDismissFilamentSlotSheet = viewModel::dismissFilamentSlotSheet,
+        onOpenFilamentSpoolPicker = viewModel::openFilamentSpoolPicker,
+        onDismissFilamentSpoolPicker = viewModel::dismissFilamentSpoolPicker,
+        onSpoolPickerSearchChange = viewModel::onSpoolPickerSearchChange,
+        onRequestAssignSpool = viewModel::requestAssignSpool,
+        onDismissAssignSpoolConfirm = viewModel::dismissAssignSpoolConfirm,
+        onConfirmAssignSpool = viewModel::confirmAssignSpool,
+        onRequestClearAssignment = viewModel::requestClearSlotAssignment,
+        onDismissClearAssignmentConfirm = viewModel::dismissClearAssignmentConfirm,
+        onConfirmClearAssignment = viewModel::confirmClearSlotAssignment,
+        onFilamentAssignSnackbarShown = viewModel::onFilamentAssignSnackbarShown,
     )
 }
 
@@ -198,6 +218,7 @@ private fun PrinterDetailScreenContent(
     isLoading: Boolean,
     isRefreshing: Boolean,
     error: String?,
+    refreshError: String?,
     labels: PrinterDetailLabels?,
     isClearingPlate: Boolean,
     isControlBusy: Boolean,
@@ -217,19 +238,34 @@ private fun PrinterDetailScreenContent(
     onStopCameraStream: () -> Unit,
     filamentSlotDisplays: List<FilamentSlotDisplay>,
     printerStatus: PrinterStatus?,
-    isFilamentActionBusy: Boolean,
-    filamentConfirm: FilamentConfirmRequest?,
-    filamentSnackbar: FilamentActionSnackbar?,
-    onRequestFilamentLoad: (FilamentSlotDisplay) -> Unit,
-    onRequestFilamentUnload: (FilamentSlotDisplay) -> Unit,
-    onConfirmFilamentAction: () -> Unit,
-    onDismissFilamentConfirm: () -> Unit,
-    onFilamentSnackbarShown: () -> Unit,
+    printingQueueJobId: Int?,
+    filamentSlotSheet: FilamentSlotDisplay?,
+    filamentSpoolPickerOpen: Boolean,
+    spoolPickerSearchQuery: String,
+    assignSpoolConfirm: com.chronoswing.buddydash.AssignSpoolConfirm?,
+    clearAssignmentConfirm: FilamentSlotDisplay?,
+    isFilamentAssignBusy: Boolean,
+    filamentAssignSnackbar: FilamentAssignSnackbar?,
+    pickerSpools: List<SpoolInventoryItem>,
+    assignConfirmSpoolTitle: String,
+    onOpenFilamentSlot: (FilamentSlotDisplay) -> Unit,
+    onDismissFilamentSlotSheet: () -> Unit,
+    onOpenFilamentSpoolPicker: () -> Unit,
+    onDismissFilamentSpoolPicker: () -> Unit,
+    onSpoolPickerSearchChange: (String) -> Unit,
+    onRequestAssignSpool: (SpoolInventoryItem) -> Unit,
+    onDismissAssignSpoolConfirm: () -> Unit,
+    onConfirmAssignSpool: () -> Unit,
+    onRequestClearAssignment: () -> Unit,
+    onDismissClearAssignmentConfirm: () -> Unit,
+    onConfirmClearAssignment: () -> Unit,
+    onFilamentAssignSnackbarShown: () -> Unit,
     onStartNextQueuedPrint: () -> Unit,
     onStartQueuedPrintSnackbarShown: () -> Unit,
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
+    onRefreshErrorShown: () -> Unit,
     onPollStatus: (showLoading: Boolean) -> Unit,
     onMarkPlateClear: () -> Unit,
     onPlateClearSnackbarShown: () -> Unit,
@@ -250,6 +286,13 @@ private fun PrinterDetailScreenContent(
     onMaintenanceResetSnackbarShown: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val refreshFailedMessage = stringResource(R.string.refresh_failed)
+    val hasCachedData = labels != null
+    val showInitialLoading = isLoading && !hasCachedData
+    val showPullRefreshIndicator = ListLoadUi.showPullRefreshIndicator(
+        isRefreshing = isRefreshing,
+        cachedItemCount = if (hasCachedData) 1 else 0,
+    )
     val plateClearSuccessMessage = stringResource(R.string.plate_clear_success)
     val plateClearFailedMessage = stringResource(R.string.plate_clear_failed)
     val controlSuccessMessage = stringResource(R.string.control_success)
@@ -338,57 +381,72 @@ private fun PrinterDetailScreenContent(
         onStartQueuedPrintSnackbarShown()
     }
 
-    val filamentLoadStartedMessage = stringResource(R.string.filament_load_started)
-    val filamentUnloadStartedMessage = stringResource(R.string.filament_unload_started)
-    val filamentLoadFailedMessage = stringResource(R.string.filament_load_failed)
-    val filamentUnloadFailedMessage = stringResource(R.string.filament_unload_failed)
+    val filamentAssignSuccessMessage = stringResource(R.string.filament_assign_success)
+    val filamentAssignFailedMessage = stringResource(R.string.filament_assign_failed)
+    val filamentClearSuccessMessage = stringResource(R.string.filament_clear_success)
+    val filamentClearFailedMessage = stringResource(R.string.filament_clear_failed)
 
-    LaunchedEffect(filamentSnackbar) {
-        val message = when (filamentSnackbar) {
-            FilamentActionSnackbar.LoadStarted -> filamentLoadStartedMessage
-            FilamentActionSnackbar.UnloadStarted -> filamentUnloadStartedMessage
-            FilamentActionSnackbar.LoadFailed -> filamentLoadFailedMessage
-            FilamentActionSnackbar.UnloadFailed -> filamentUnloadFailedMessage
+    LaunchedEffect(filamentAssignSnackbar) {
+        val message = when (filamentAssignSnackbar) {
+            FilamentAssignSnackbar.Assigned -> filamentAssignSuccessMessage
+            FilamentAssignSnackbar.AssignFailed -> filamentAssignFailedMessage
+            FilamentAssignSnackbar.Cleared -> filamentClearSuccessMessage
+            FilamentAssignSnackbar.ClearFailed -> filamentClearFailedMessage
             null -> return@LaunchedEffect
         }
         snackbarHostState.showSnackbar(message)
-        onFilamentSnackbarShown()
+        onFilamentAssignSnackbarShown()
     }
 
-    filamentConfirm?.let { confirm ->
-        val title = when (confirm.action) {
-            FilamentAction.Load -> stringResource(R.string.filament_confirm_load_title)
-            FilamentAction.Unload -> stringResource(R.string.filament_confirm_unload_title)
+    LaunchedEffect(refreshError) {
+        if (refreshError != null) {
+            snackbarHostState.showSnackbar(refreshFailedMessage)
+            onRefreshErrorShown()
         }
-        val body = stringResource(
-            when (confirm.action) {
-                FilamentAction.Load -> R.string.filament_confirm_load_message
-                FilamentAction.Unload -> R.string.filament_confirm_unload_message
-            },
-            confirm.slotDisplay.slot.label,
-            confirm.slotDisplay.primaryTitle,
+    }
+
+    val assignAvailability = evaluateFilamentAssignAvailability(printerStatus)
+
+    filamentSlotSheet?.let { sheet ->
+        FilamentSlotDetailSheet(
+            display = sheet,
+            assignAvailability = assignAvailability,
+            isBusy = isFilamentAssignBusy,
+            onDismiss = onDismissFilamentSlotSheet,
+            onChangeSpool = onOpenFilamentSpoolPicker,
+            onClearAssignment = onRequestClearAssignment,
+            onViewSpool = onOpenSpoolDetail,
         )
-        val confirmLabel = when (confirm.action) {
-            FilamentAction.Load -> stringResource(R.string.filament_action_load)
-            FilamentAction.Unload -> stringResource(R.string.filament_action_unload)
-        }
-        AlertDialog(
-            onDismissRequest = onDismissFilamentConfirm,
-            title = { Text(title) },
-            text = { Text(body) },
-            confirmButton = {
-                TextButton(
-                    onClick = onConfirmFilamentAction,
-                    enabled = !isFilamentActionBusy,
-                ) {
-                    Text(confirmLabel)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismissFilamentConfirm) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+    }
+
+    if (filamentSpoolPickerOpen) {
+        val slotLabel = filamentSlotSheet?.slot?.label ?: ""
+        FilamentSpoolPickerSheet(
+            spools = pickerSpools,
+            searchQuery = spoolPickerSearchQuery,
+            slotLabel = slotLabel,
+            onSearchQueryChange = onSpoolPickerSearchChange,
+            onDismiss = onDismissFilamentSpoolPicker,
+            onSpoolSelected = onRequestAssignSpool,
+        )
+    }
+
+    assignSpoolConfirm?.let { confirm ->
+        FilamentAssignSpoolDialog(
+            spoolTitle = assignConfirmSpoolTitle,
+            slotLabel = confirm.slotDisplay.slot.label,
+            isBusy = isFilamentAssignBusy,
+            onConfirm = onConfirmAssignSpool,
+            onDismiss = onDismissAssignSpoolConfirm,
+        )
+    }
+
+    clearAssignmentConfirm?.let { slot ->
+        FilamentClearAssignmentDialog(
+            slotLabel = slot.slot.label,
+            isBusy = isFilamentAssignBusy,
+            onConfirm = onConfirmClearAssignment,
+            onDismiss = onDismissClearAssignmentConfirm,
         )
     }
 
@@ -429,7 +487,7 @@ private fun PrinterDetailScreenContent(
         },
     ) { innerPadding ->
         when {
-            isLoading && labels == null -> LoadingContent(Modifier.padding(innerPadding))
+            showInitialLoading -> LoadingContent(Modifier.padding(innerPadding))
             labels == null && error != null -> ErrorContent(
                 message = error,
                 onRetry = onRetry,
@@ -442,16 +500,6 @@ private fun PrinterDetailScreenContent(
                         .fillMaxSize()
                         .padding(innerPadding),
                 ) {
-                    if (error != null) {
-                        Text(
-                            text = error,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                        )
-                    }
                     PrimaryTabRow(selectedTabIndex = selectedTab) {
                         detailTabs.forEachIndexed { index, tabTitle ->
                             Tab(
@@ -462,7 +510,7 @@ private fun PrinterDetailScreenContent(
                         }
                     }
                     PullToRefreshBox(
-                        isRefreshing = isRefreshing,
+                        isRefreshing = showPullRefreshIndicator,
                         onRefresh = onPullRefresh,
                         modifier = Modifier.fillMaxSize(),
                     ) {
@@ -477,6 +525,8 @@ private fun PrinterDetailScreenContent(
                             when (selectedTab) {
                                 0 -> StatusTab(
                                     labels = labels,
+                                    printerStatus = printerStatus,
+                                    printingQueueJobId = printingQueueJobId,
                                     errorDetailsExpanded = errorDetailsExpanded,
                                     onExpandErrorDetails = { errorDetailsExpanded = true },
                                     onErrorChipClick = {
@@ -513,12 +563,8 @@ private fun PrinterDetailScreenContent(
                                 1 -> FilamentTab(
                                     labels = labels,
                                     printerId = printerId,
-                                    printerStatus = printerStatus,
                                     filamentSlotDisplays = filamentSlotDisplays,
-                                    isFilamentActionBusy = isFilamentActionBusy,
-                                    onOpenSpoolDetail = onOpenSpoolDetail,
-                                    onRequestLoad = onRequestFilamentLoad,
-                                    onRequestUnload = onRequestFilamentUnload,
+                                    onOpenFilamentSlot = onOpenFilamentSlot,
                                 )
                                 2 -> MachineTab(
                                     labels = labels,
@@ -555,6 +601,8 @@ private fun PrinterDetailScreenContent(
 @Composable
 private fun StatusTab(
     labels: PrinterDetailLabels,
+    printerStatus: PrinterStatus?,
+    printingQueueJobId: Int?,
     printerName: String,
     printerId: Int,
     serverUrl: String,
@@ -603,6 +651,8 @@ private fun StatusTab(
         if (labels.isActivePrint) {
             ActivePrintStatusTab(
                 labels = labels,
+                printerStatus = printerStatus,
+                printingQueueJobId = printingQueueJobId,
                 printerId = printerId,
                 serverUrl = serverUrl,
                 cameraToken = cameraToken,
@@ -618,6 +668,8 @@ private fun StatusTab(
         } else {
             IdleStatusTab(
                 labels = labels,
+                printerStatus = printerStatus,
+                printingQueueJobId = printingQueueJobId,
                 printerId = printerId,
                 serverUrl = serverUrl,
                 cameraToken = cameraToken,
@@ -666,6 +718,8 @@ private fun DetailOperationalStats(
 @Composable
 private fun ActivePrintStatusTab(
     labels: PrinterDetailLabels,
+    printerStatus: PrinterStatus?,
+    printingQueueJobId: Int?,
     printerId: Int,
     serverUrl: String,
     cameraToken: String,
@@ -683,6 +737,8 @@ private fun ActivePrintStatusTab(
         serverUrl = serverUrl,
         cameraToken = cameraToken,
         printerId = printerId,
+        status = printerStatus,
+        printingQueueJobId = printingQueueJobId,
         motion = labels.cardMicroMotion,
         onCameraHeroActive = { cameraHeroActive = it },
     )
@@ -728,6 +784,8 @@ private fun ActivePrintStatusTab(
                 cameraToken = cameraToken,
                 printerId = printerId,
                 showCoverThumbnail = cameraHeroActive,
+                status = printerStatus,
+                printingQueueJobId = printingQueueJobId,
             )
         }
         if (labels.showEta) {
@@ -767,6 +825,8 @@ private fun ActivePrintStatusTab(
 @Composable
 private fun IdleStatusTab(
     labels: PrinterDetailLabels,
+    printerStatus: PrinterStatus?,
+    printingQueueJobId: Int?,
     printerId: Int,
     serverUrl: String,
     cameraToken: String,
@@ -784,6 +844,8 @@ private fun IdleStatusTab(
         serverUrl = serverUrl,
         cameraToken = cameraToken,
         printerId = printerId,
+        status = printerStatus,
+        printingQueueJobId = printingQueueJobId,
         onCameraHeroActive = { cameraHeroActive = it },
     )
     DetailInfoCard {
@@ -845,29 +907,16 @@ private fun IdleStatusTab(
                 )
             }
             if (labels.showFile) {
-                if (cameraHeroActive && printerCoverUrl(serverUrl, printerId, cameraToken) != null) {
-                    PrintFileHighlightWithCover(
-                        label = labels.fileLabel,
-                        fileName = labels.fileName,
-                        serverUrl = serverUrl,
-                        cameraToken = cameraToken,
-                        printerId = printerId,
-                        showCoverThumbnail = true,
-                    )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = labels.fileLabel,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        PrintFileNameText(
-                            fileName = labels.fileName.ifBlank { "—" },
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
+                PrintFileHighlightWithCover(
+                    label = labels.fileLabel,
+                    fileName = labels.fileName,
+                    serverUrl = serverUrl,
+                    cameraToken = cameraToken,
+                    printerId = printerId,
+                    showCoverThumbnail = cameraHeroActive,
+                    status = printerStatus,
+                    printingQueueJobId = printingQueueJobId,
+                )
             }
         }
     }
@@ -919,12 +968,8 @@ private fun controlFeedbackMessage(
 private fun FilamentTab(
     labels: PrinterDetailLabels,
     printerId: Int,
-    printerStatus: PrinterStatus?,
     filamentSlotDisplays: List<FilamentSlotDisplay>,
-    isFilamentActionBusy: Boolean,
-    onOpenSpoolDetail: (Int) -> Unit,
-    onRequestLoad: (FilamentSlotDisplay) -> Unit,
-    onRequestUnload: (FilamentSlotDisplay) -> Unit,
+    onOpenFilamentSlot: (FilamentSlotDisplay) -> Unit,
 ) {
     val slots = labels.filamentSlots
     if (slots.isEmpty()) {
@@ -948,12 +993,8 @@ private fun FilamentTab(
     FilamentAmsEnvironmentSection(labels)
     FilamentDetailGroups(
         slotDisplays = displays,
-        status = printerStatus,
         cardMicroMotion = labels.cardMicroMotion,
-        isFilamentActionBusy = isFilamentActionBusy,
-        onSlotClick = onOpenSpoolDetail,
-        onRequestLoad = onRequestLoad,
-        onRequestUnload = onRequestUnload,
+        onSlotClick = onOpenFilamentSlot,
         modifier = Modifier.fillMaxWidth(),
     )
 }

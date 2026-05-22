@@ -52,7 +52,9 @@ fun BuddyDashFadeInThumbnail(
     val reduced = rememberPrefersReducedMotion()
     val fadeMs = if (reduced) 0 else BuddyDashMotion.THUMBNAIL_FADE_MS
 
-    var lastPainter by remember(cacheKey ?: imageUrl) { mutableStateOf<Painter?>(null) }
+    val retainKey = cacheKey ?: imageUrl
+    var lastPainter by remember(retainKey) { mutableStateOf<Painter?>(null) }
+    var loadedForKey by remember(retainKey) { mutableStateOf<String?>(null) }
     val request = remember(imageUrl, cacheKey) {
         ImageRequest.Builder(context)
             .data(imageUrl)
@@ -79,7 +81,7 @@ fun BuddyDashFadeInThumbnail(
                 .clip(shape),
             contentScale = contentScale,
             loading = {
-                if (lastPainter != null) {
+                if (loadedForKey == retainKey && lastPainter != null) {
                     Image(
                         painter = lastPainter!!,
                         contentDescription = null,
@@ -91,7 +93,7 @@ fun BuddyDashFadeInThumbnail(
                 }
             },
             error = {
-                if (lastPainter != null) {
+                if (loadedForKey == retainKey && lastPainter != null) {
                     Image(
                         painter = lastPainter!!,
                         contentDescription = null,
@@ -104,6 +106,7 @@ fun BuddyDashFadeInThumbnail(
             },
             success = { state ->
                 lastPainter = state.painter
+                loadedForKey = retainKey
                 if (fadeMs <= 0) {
                     Image(
                         painter = state.painter,

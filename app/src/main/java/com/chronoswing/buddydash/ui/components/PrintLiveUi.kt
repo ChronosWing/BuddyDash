@@ -26,8 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
-import com.chronoswing.buddydash.network.printerCoverUrl
+import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.util.formatFilenameForDisplay
+import com.chronoswing.buddydash.util.rememberCurrentPrintThumbnailIdentity
 
 @Composable
 fun PrintFileNameText(
@@ -80,11 +81,16 @@ fun PrintFileHighlightWithCover(
     printerId: Int,
     showCoverThumbnail: Boolean,
     modifier: Modifier = Modifier,
+    status: PrinterStatus? = null,
+    printingQueueJobId: Int? = null,
 ) {
-    val coverAvailable = remember(serverUrl, printerId, cameraToken) {
-        printerCoverUrl(serverUrl, printerId, cameraToken) != null
-    }
-    if (showCoverThumbnail && coverAvailable) {
+    val thumbnailIdentity = rememberCurrentPrintThumbnailIdentity(
+        printerId = printerId,
+        status = status,
+        fileName = fileName,
+        queueJobId = printingQueueJobId,
+    )
+    if (showCoverThumbnail) {
         Row(
             modifier = modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -93,7 +99,7 @@ fun PrintFileHighlightWithCover(
             PrinterCoverImage(
                 serverUrl = serverUrl,
                 cameraToken = cameraToken,
-                printerId = printerId,
+                thumbnailIdentity = thumbnailIdentity,
                 size = 52.dp,
                 cornerRadius = 8.dp,
             )

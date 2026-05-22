@@ -84,10 +84,19 @@ class HomeViewModel(
         _uiState.update { it.copy(refreshError = null) }
     }
 
+    /** Bottom-nav reselect on Printers: immediate refresh, no debounce. */
+    fun refreshFromBottomNavReselect() {
+        if (BuddyDashDebug.enabled) {
+            Log.d(TAG_HOME_VM, "refreshFromBottomNavReselect")
+        }
+        loadPrinters(showLoading = false, fromBottomNavReselect = true)
+    }
+
     fun loadPrinters(
         showLoading: Boolean = false,
         fromPull: Boolean = false,
         fromUser: Boolean = false,
+        fromBottomNavReselect: Boolean = false,
     ) {
         val state = _uiState.value
         if (!state.hasCredentials) {
@@ -102,22 +111,31 @@ class HomeViewModel(
             }
             return
         }
-        if (fromUser && !fromPull && manualRefreshGuard.shouldSkipManualRefresh()) return
-        if (fromUser && (listFetchJob?.isActive == true || enrichJob?.isActive == true)) return
+        if (fromBottomNavReselect) {
+            listFetchJob?.cancel()
+            enrichJob?.cancel()
+        } else {
+            if (fromUser && !fromPull && manualRefreshGuard.shouldSkipManualRefresh()) return
+            if (fromUser && (listFetchJob?.isActive == true || enrichJob?.isActive == true)) return
+        }
 
         val hadPrinters = state.printers.isNotEmpty()
+        val isInitialLoad = !hadPrinters
         if (BuddyDashDebug.enabled) {
             Log.d(
                 TAG_HOME_VM,
-                "loadPrinters showLoading=$showLoading fromPull=$fromPull hadPrinters=$hadPrinters",
+                "loadPrinters showLoading=$showLoading fromPull=$fromPull fromUser=$fromUser " +
+                    "fromBottomNavReselect=$fromBottomNavReselect hadPrinters=$hadPrinters",
             )
         }
 
-        listFetchJob?.cancel()
-        enrichJob?.cancel()
+        if (!fromBottomNavReselect) {
+            listFetchJob?.cancel()
+            enrichJob?.cancel()
+        }
         listFetchJob = viewModelScope.launch {
             try {
-                if (fromPull || hadPrinters) {
+                if (!isInitialLoad) {
                     _uiState.update { it.copy(isRefreshing = true, refreshError = null) }
                 } else if (showLoading) {
                     _uiState.update { it.copy(isLoading = true, error = null) }
@@ -134,35 +152,71 @@ class HomeViewModel(
 
                 listResult.fold(
                     onSuccess = { basePrinters ->
+                        if (fromBottomNavReselect && basePrinters.isNotEmpty() && BuddyDashDebug.enabled) {
+                            Log.d(TAG_HOME_VM, "bottomNavReselect list fetch success")
+                        }
                         HomeLoadTiming.log(
                             "printer list response (count=${basePrinters.size})",
                         )
-                        _uiState.update {
-                            it.copy(
-                                printers = basePrinters,
-                                isLoading = false,
-                                hasCompletedLoad = true,
-                                error = null,
-                                refreshError = null,
-                                isEnriching = basePrinters.isNotEmpty(),
-                                isRefreshing = basePrinters.isNotEmpty() || it.isRefreshing,
-                            )
-                        }
-                        HomeLoadTiming.log("first printer cards available in state")
-
                         if (basePrinters.isEmpty()) {
+                            if (fromBottomNavReselect && BuddyDashDebug.enabled) {
+                                Log.d(TAG_HOME_VM, "bottomNavReselect refresh success")
+                            }
                             _uiState.update {
-                                it.copy(isRefreshing = false, isEnriching = false)
+                                it.copy(
+                                    printers = emptyList(),
+                                    isLoading = false,
+                                    isRefreshing = false,
+                                    isEnriching = false,
+                                    hasCompletedLoad = true,
+                                    error = null,
+                                    refreshError = null,
+                                    lastUpdatedAtMillis = System.currentTimeMillis(),
+                                )
                             }
                             return@launch
                         }
 
+                        if (hadPrinters) {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    isRefreshing = true,
+                                    isEnriching = true,
+                                    refreshError = null,
+                                )
+                            }
+                        } else {
+                            _uiState.update {
+                                it.copy(
+                                    printers = basePrinters,
+                                    isLoading = false,
+                                    hasCompletedLoad = true,
+                                    error = null,
+                                    refreshError = null,
+                                    isEnriching = true,
+                                    isRefreshing = true,
+                                )
+                            }
+                            HomeLoadTiming.log("first printer cards available in state")
+                        }
+
                         enrichJob = viewModelScope.launch {
-                            enrichPrinters(credentials.serverUrl, credentials.apiKey, basePrinters)
+                            enrichPrinters(
+                                credentials.serverUrl,
+                                credentials.apiKey,
+                                basePrinters,
+                                fromBottomNavReselect = fromBottomNavReselect,
+                            )
                         }
                     },
                     onFailure = { error ->
-                        val message = error.toUserNetworkMessage("Failed to load printers")
+                        val message = error.toUserNetworkMessage(
+                            if (hadPrinters) "Could not refresh" else "Failed to load printers",
+                        )
+                        if (fromBottomNavReselect && BuddyDashDebug.enabled) {
+                            Log.w(TAG_HOME_VM, "bottomNavReselect refresh failure: $message", error)
+                        }
                         _uiState.update { current ->
                             if (current.printers.isNotEmpty()) {
                                 current.copy(
@@ -194,6 +248,7 @@ class HomeViewModel(
         serverUrl: String,
         apiKey: String,
         basePrinters: List<Printer>,
+        fromBottomNavReselect: Boolean = false,
     ) {
         try {
             currentCoroutineContext().ensureActive()
@@ -201,12 +256,16 @@ class HomeViewModel(
             currentCoroutineContext().ensureActive()
             result.fold(
                 onSuccess = { enriched ->
+                    if (fromBottomNavReselect && BuddyDashDebug.enabled) {
+                        Log.d(TAG_HOME_VM, "bottomNavReselect refresh success")
+                    }
                     _uiState.update {
                         it.copy(
                             printers = enriched,
                             isEnriching = false,
                             isRefreshing = false,
                             lastUpdatedAtMillis = System.currentTimeMillis(),
+                            refreshError = null,
                         )
                     }
                     HomeLoadTiming.log("secondary data applied to printer cards")
@@ -214,14 +273,15 @@ class HomeViewModel(
                 onFailure = { error ->
                     if (BuddyDashDebug.enabled) {
                         Log.w(TAG_HOME_VM, "enrichPrinters failed", error)
+                        if (fromBottomNavReselect) {
+                            Log.w(TAG_HOME_VM, "bottomNavReselect refresh failure", error)
+                        }
                     }
                     _uiState.update {
                         it.copy(
                             isEnriching = false,
                             isRefreshing = false,
-                            refreshError = error.toUserNetworkMessage(
-                                "Could not refresh printer status",
-                            ),
+                            refreshError = error.toUserNetworkMessage("Could not refresh"),
                         )
                     }
                 },

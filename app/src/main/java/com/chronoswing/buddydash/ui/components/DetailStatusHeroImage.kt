@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,14 +35,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.network.BambuddyApi
 import com.chronoswing.buddydash.network.normalizeBambuddyBaseUrl
+import com.chronoswing.buddydash.network.cameraSnapshotImageCacheKey
 import com.chronoswing.buddydash.network.printerCameraSnapshotUrl
+import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.printerCoverUrl
 import com.chronoswing.buddydash.ui.motion.BuddyDashMotion
 import com.chronoswing.buddydash.util.CardMicroMotion
+import com.chronoswing.buddydash.util.rememberCurrentPrintThumbnailIdentity
 
 import com.chronoswing.buddydash.util.BuddyDashDebug
 private const val TAG_CAMERA = "BuddyDash/Camera"
@@ -66,11 +71,18 @@ fun DetailStatusHeroImage(
     serverUrl: String,
     cameraToken: String,
     printerId: Int,
+    status: PrinterStatus? = null,
+    printingQueueJobId: Int? = null,
     motion: CardMicroMotion = CardMicroMotion.None,
     modifier: Modifier = Modifier,
     height: Dp = 160.dp,
     onCameraHeroActive: (Boolean) -> Unit = {},
 ) {
+    val coverThumbnailIdentity = rememberCurrentPrintThumbnailIdentity(
+        printerId = printerId,
+        status = status,
+        queueJobId = printingQueueJobId,
+    )
     val coverAvailable = remember(serverUrl, printerId, cameraToken) {
         printerCoverUrl(serverUrl, printerId, cameraToken) != null
     }
@@ -87,6 +99,7 @@ fun DetailStatusHeroImage(
     var refreshTick by remember(printerId) {
         mutableLongStateOf(System.currentTimeMillis())
     }
+    var refreshTickNumber by remember(printerId) { mutableIntStateOf(0) }
 
     LaunchedEffect(showCamera) {
         onCameraHeroActive(showCamera)
@@ -99,6 +112,7 @@ fun DetailStatusHeroImage(
             while (isActive) {
                 delay(SNAPSHOT_REFRESH_MS)
                 refreshTick = System.currentTimeMillis()
+                refreshTickNumber += 1
             }
         }
     }
@@ -111,6 +125,7 @@ fun DetailStatusHeroImage(
                     cameraToken = cameraToken,
                     printerId = printerId,
                     refreshTick = refreshTick,
+                    refreshTickNumber = refreshTickNumber,
                     height = height,
                     fillMaxSize = false,
                     frameModifier = Modifier,
@@ -121,7 +136,7 @@ fun DetailStatusHeroImage(
                 PrinterCoverImage(
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
-                    printerId = printerId,
+                    thumbnailIdentity = coverThumbnailIdentity,
                     height = height,
                 )
             }
@@ -148,6 +163,7 @@ fun PrinterLiveCameraSnapshot(
     cameraToken: String,
     printerId: Int,
     refreshTick: Long,
+    refreshTickNumber: Int = 0,
     modifier: Modifier = Modifier,
     fillMaxSize: Boolean = false,
     height: Dp = 160.dp,
@@ -163,6 +179,7 @@ fun PrinterLiveCameraSnapshot(
         cameraToken = cameraToken,
         printerId = printerId,
         refreshTick = refreshTick,
+        refreshTickNumber = refreshTickNumber,
         height = height,
         fillMaxSize = fillMaxSize,
         frameModifier = modifier,
@@ -181,6 +198,7 @@ private fun PrinterCameraSnapshotImage(
     cameraToken: String,
     printerId: Int,
     refreshTick: Long,
+    refreshTickNumber: Int,
     height: Dp,
     fillMaxSize: Boolean = false,
     frameModifier: Modifier = Modifier,
@@ -194,36 +212,57 @@ private fun PrinterCameraSnapshotImage(
     val imageUrl = remember(serverUrl, printerId, cameraToken, refreshTick) {
         printerCameraSnapshotUrl(serverUrl, printerId, cameraToken, cacheBust = refreshTick)
     }
+    val imageCacheKey = remember(printerId, refreshTick) {
+        cameraSnapshotImageCacheKey(printerId, refreshTick)
+    }
     if (imageUrl == null) {
         LaunchedEffect(Unit) { onLoadFailed() }
         return
     }
 
-    if (BuddyDashDebug.enabled) {
-        LaunchedEffect(imageUrl) {
-            Log.d(TAG_CAMERA, "Snapshot URL printerId=$printerId url=${redactImageToken(imageUrl)}")
-        }
+    LaunchedEffect(refreshTickNumber, refreshTick, imageUrl, imageCacheKey) {
+        if (!BuddyDashDebug.enabled) return@LaunchedEffect
+        Log.d(
+            TAG_CAMERA,
+            "Snapshot refresh tickNumber=$refreshTickNumber cacheBust=$refreshTick " +
+                "cacheKey=$imageCacheKey url=${redactImageToken(imageUrl)}",
+        )
     }
 
-    var lastPainter by remember(printerId) { mutableStateOf<Painter?>(null) }
+    var displayedPainter by remember(printerId) { mutableStateOf<Painter?>(null) }
+    var displayedRefreshTick by remember(printerId) { mutableLongStateOf(-1L) }
     val context = LocalContext.current
-    val request = remember(imageUrl, printerId) {
+    val request = remember(imageUrl, imageCacheKey) {
         ImageRequest.Builder(context)
             .data(imageUrl)
-            .memoryCacheKey("camera-snapshot-$printerId")
-            .diskCacheKey("camera-snapshot-$printerId")
+            .memoryCacheKey(imageCacheKey)
+            .diskCachePolicy(CachePolicy.DISABLED)
             .crossfade(false)
             .listener(
+                onStart = {
+                    if (BuddyDashDebug.enabled) {
+                        Log.d(
+                            TAG_CAMERA,
+                            "Snapshot load start tickNumber=$refreshTickNumber " +
+                                "cacheBust=$refreshTick cacheKey=$imageCacheKey",
+                        )
+                    }
+                },
                 onSuccess = { _, _ ->
                     if (BuddyDashDebug.enabled) {
-                        Log.d(TAG_CAMERA, "Snapshot load ok printerId=$printerId")
+                        Log.d(
+                            TAG_CAMERA,
+                            "Snapshot load ok tickNumber=$refreshTickNumber " +
+                                "cacheBust=$refreshTick cacheKey=$imageCacheKey",
+                        )
                     }
                 },
                 onError = { _, result ->
                     if (BuddyDashDebug.enabled) {
                         Log.d(
                             TAG_CAMERA,
-                            "Snapshot load failed printerId=$printerId url=${redactImageToken(imageUrl)} " +
+                            "Snapshot load failed tickNumber=$refreshTickNumber " +
+                                "cacheBust=$refreshTick cacheKey=$imageCacheKey " +
                                 "error=${result.throwable.message}",
                         )
                     }
@@ -253,10 +292,10 @@ private fun PrinterCameraSnapshotImage(
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             loading = {
-                if (lastPainter == null) {
+                if (displayedPainter == null) {
                     LaunchedEffect(Unit) { onLoadingChanged(true) }
                 }
-                lastPainter?.let { painter ->
+                displayedPainter?.let { painter ->
                     CameraSnapshotFrame(
                         painter = painter,
                         contentScale = contentScale,
@@ -266,10 +305,10 @@ private fun PrinterCameraSnapshotImage(
             },
             error = {
                 LaunchedEffect(Unit) { onLoadingChanged(false) }
-                if (lastPainter == null) {
+                if (displayedPainter == null) {
                     LaunchedEffect(imageUrl) { onLoadFailed() }
                 } else {
-                    lastPainter?.let { painter ->
+                    displayedPainter?.let { painter ->
                         CameraSnapshotFrame(
                             painter = painter,
                             contentScale = contentScale,
@@ -280,26 +319,42 @@ private fun PrinterCameraSnapshotImage(
             },
             success = { state ->
                 LaunchedEffect(Unit) { onLoadingChanged(false) }
-                if (snapshotCrossfadeMs > 0) {
-                    Crossfade(
-                        targetState = state.painter,
-                        animationSpec = tween(snapshotCrossfadeMs),
-                        label = "cameraSnapshot",
-                    ) { painter ->
-                        lastPainter = painter
+                val newPainter = state.painter
+                if (refreshTick == displayedRefreshTick) {
+                    CameraSnapshotFrame(
+                        painter = newPainter,
+                        contentScale = contentScale,
+                        applyHeroScrim = applyHeroScrim,
+                    )
+                } else {
+                    val priorPainter = displayedPainter
+                    if (snapshotCrossfadeMs > 0 && priorPainter != null) {
+                        Crossfade(
+                            targetState = refreshTick,
+                            animationSpec = tween(snapshotCrossfadeMs),
+                            label = "cameraSnapshot",
+                        ) { tick ->
+                            val painter = if (tick == refreshTick) newPainter else priorPainter
+                            CameraSnapshotFrame(
+                                painter = painter,
+                                contentScale = contentScale,
+                                applyHeroScrim = applyHeroScrim,
+                            )
+                        }
+                        LaunchedEffect(refreshTick) {
+                            delay(snapshotCrossfadeMs.toLong())
+                            displayedPainter = newPainter
+                            displayedRefreshTick = refreshTick
+                        }
+                    } else {
+                        displayedPainter = newPainter
+                        displayedRefreshTick = refreshTick
                         CameraSnapshotFrame(
-                            painter = painter,
+                            painter = newPainter,
                             contentScale = contentScale,
                             applyHeroScrim = applyHeroScrim,
                         )
                     }
-                } else {
-                    lastPainter = state.painter
-                    CameraSnapshotFrame(
-                        painter = state.painter,
-                        contentScale = contentScale,
-                        applyHeroScrim = applyHeroScrim,
-                    )
                 }
             },
         )

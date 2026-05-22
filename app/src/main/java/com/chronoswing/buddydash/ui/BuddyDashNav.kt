@@ -6,7 +6,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.chronoswing.buddydash.util.BuddyDashDebug
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -159,6 +163,35 @@ private fun logNavState(
     )
 }
 
+private fun logBottomNavTap(
+    tab: BottomNavTab,
+    currentRoute: String?,
+    wasCurrent: Boolean,
+    refreshTriggered: Boolean,
+) {
+    if (!BuddyDashDebug.enabled) return
+    Log.d(
+        TAG_NAV,
+        "bottomNavTap tab=$tab wasCurrent=$wasCurrent refreshTriggered=$refreshTriggered " +
+            "currentRoute=$currentRoute",
+    )
+}
+
+private fun NavHostController.onBottomNavTabSelected(
+    tab: BottomNavTab,
+    currentRoute: String?,
+    rootRoute: String,
+    onReselectRefresh: () -> Unit,
+) {
+    val wasCurrent = Routes.bottomNavTab(currentRoute) == tab
+    val refreshTriggered = wasCurrent && tab != BottomNavTab.SETTINGS
+    logBottomNavTap(tab, currentRoute, wasCurrent, refreshTriggered)
+    navigateToSectionRoot(rootRoute)
+    if (refreshTriggered) {
+        onReselectRefresh()
+    }
+}
+
 @Composable
 fun BuddyDashNav(
     settingsRepository: SettingsRepository,
@@ -167,6 +200,9 @@ fun BuddyDashNav(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    var printersReselectNonce by remember { mutableIntStateOf(0) }
+    var spoolsReselectNonce by remember { mutableIntStateOf(0) }
+    var archivesReselectNonce by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         if (debugLogNavDestinations) {
@@ -187,20 +223,39 @@ fun BuddyDashNav(
             BuddyDashBottomNav(
                 currentRoute = currentRoute,
                 onPrinters = {
-                    logNavState("tapPrinters", currentRoute, "action=sectionRoot")
-                    navController.navigateToSectionRoot(Routes.HOME)
+                    navController.onBottomNavTabSelected(
+                        tab = BottomNavTab.PRINTERS,
+                        currentRoute = currentRoute,
+                        rootRoute = Routes.HOME,
+                    ) {
+                        printersReselectNonce++
+                    }
                 },
                 onSpools = {
-                    logNavState("tapSpools", currentRoute, "action=sectionRoot")
-                    navController.navigateToSectionRoot(Routes.spools())
+                    navController.onBottomNavTabSelected(
+                        tab = BottomNavTab.SPOOLS,
+                        currentRoute = currentRoute,
+                        rootRoute = Routes.spools(),
+                    ) {
+                        spoolsReselectNonce++
+                    }
                 },
                 onArchives = {
-                    logNavState("tapArchives", currentRoute, "action=sectionRoot")
-                    navController.navigateToSectionRoot(Routes.archives())
+                    navController.onBottomNavTabSelected(
+                        tab = BottomNavTab.ARCHIVES,
+                        currentRoute = currentRoute,
+                        rootRoute = Routes.archives(),
+                    ) {
+                        archivesReselectNonce++
+                    }
                 },
                 onSettings = {
-                    logNavState("tapSettings", currentRoute, "action=sectionRoot")
-                    navController.navigateToSectionRoot(Routes.SETTINGS)
+                    navController.onBottomNavTabSelected(
+                        tab = BottomNavTab.SETTINGS,
+                        currentRoute = currentRoute,
+                        rootRoute = Routes.SETTINGS,
+                        onReselectRefresh = {},
+                    )
                 },
             )
         },
@@ -221,6 +276,11 @@ fun BuddyDashNav(
                         HomeViewModel(settingsRepository, apiClient)
                     },
                 )
+                LaunchedEffect(printersReselectNonce) {
+                    if (printersReselectNonce > 0) {
+                        viewModel.refreshFromBottomNavReselect()
+                    }
+                }
                 HomeScreen(
                     viewModel = viewModel,
                     onPrinterClick = { printer ->
@@ -271,6 +331,13 @@ fun BuddyDashNav(
                     }
                     if (initialSearch.isNotBlank()) {
                         viewModel.applyInitialSearchQuery(initialSearch)
+                    } else {
+                        viewModel.clearSearchQuery()
+                    }
+                }
+                LaunchedEffect(archivesReselectNonce) {
+                    if (archivesReselectNonce > 0) {
+                        viewModel.refreshFromBottomNavReselect()
                     }
                 }
                 ArchivesScreen(
@@ -337,6 +404,11 @@ fun BuddyDashNav(
                     },
                 )
                 val fromArchiveMaterialLookup = archiveMatch
+                LaunchedEffect(spoolsReselectNonce) {
+                    if (spoolsReselectNonce > 0) {
+                        viewModel.refreshFromBottomNavReselect()
+                    }
+                }
                 SpoolsScreen(
                     viewModel = viewModel,
                     initialSearchQuery = initialSearch,

@@ -19,9 +19,12 @@ data class FilamentSlotDisplay(
     val matchKind: FilamentSpoolMatchKind,
     val primaryTitle: String,
     val subtitle: String?,
-    /** Bambuddy tray_id query for POST …/ams/load (ams_id*4+slot_id or 254 external). */
-    val trayGlobalId: Int,
+    /** Inventory assignment spool id for this tray (POST/DELETE assignments). */
+    val assignedSpoolId: Int?,
+    val isEmpty: Boolean,
+    val canAssign: Boolean,
     val isActive: Boolean,
+    /** Opens slot sheet when inventory assignment is supported. */
     val isTappable: Boolean,
 )
 
@@ -65,9 +68,11 @@ fun buildFilamentSlotDisplays(
         }
 
         val (primaryTitle, subtitle) = formatFilamentSlotTitles(slot, spool, inventory)
-        val trayGlobalId = encodeBambuddyTrayId(slot) ?: -1
+        val assignedSpoolId = assignmentSpoolId?.takeIf { it >= 0 }
+            ?: inventory?.spoolId?.takeIf { it >= 0 }
+        val isEmpty = !slot.isLoaded && spool == null && inventory == null
+        val canAssign = slot.canAssignInventory()
         val isActive = slot.isActiveSlot(activeKey)
-        val isTappable = spool != null && matchKind != FilamentSpoolMatchKind.None
 
         FilamentSlotDisplay(
             slot = slot,
@@ -76,9 +81,11 @@ fun buildFilamentSlotDisplays(
             matchKind = matchKind,
             primaryTitle = primaryTitle,
             subtitle = subtitle,
-            trayGlobalId = trayGlobalId,
+            assignedSpoolId = assignedSpoolId,
+            isEmpty = isEmpty,
+            canAssign = canAssign,
             isActive = isActive,
-            isTappable = isTappable,
+            isTappable = canAssign,
         )
     }
 
@@ -87,6 +94,9 @@ private fun formatFilamentSlotTitles(
     spool: SpoolInventoryItem?,
     inventory: SlotInventoryInfo?,
 ): Pair<String, String?> {
+    if (!slot.isLoaded && spool == null && inventory == null) {
+        return "" to null
+    }
     if (spool != null) {
         return formatSpoolCardTitle(spool) to formatSpoolMaterialSubtitle(spool)
     }

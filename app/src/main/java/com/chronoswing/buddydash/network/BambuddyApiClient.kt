@@ -782,6 +782,54 @@ class BambuddyApiClient {
                 .map { it[printerId].orEmpty() }
         }
 
+    suspend fun assignSpoolToSlot(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+        amsId: Int,
+        trayId: Int,
+        spoolId: Int,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasInventoryAssignEndpoint) {
+            return@withContext Result.failure(
+                UnsupportedOperationException("Inventory assign endpoint not found"),
+            )
+        }
+        val body = JSONObject().apply {
+            put("spool_id", spoolId)
+            put("printer_id", printerId)
+            put("ams_id", amsId)
+            put("tray_id", trayId)
+        }
+        runApiCall(
+            serverUrl = serverUrl,
+            apiKey = apiKey,
+            path = BambuddyApi.INVENTORY_ASSIGNMENTS_PATH,
+            method = "POST",
+            postBody = body.toString(),
+        ) { Unit }
+    }
+
+    suspend fun unassignSpoolFromSlot(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+        amsId: Int,
+        trayId: Int,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasInventoryUnassignEndpoint) {
+            return@withContext Result.failure(
+                UnsupportedOperationException("Inventory unassign endpoint not found"),
+            )
+        }
+        runApiCall(
+            serverUrl = serverUrl,
+            apiKey = apiKey,
+            path = BambuddyApi.inventoryUnassignPath(printerId, amsId, trayId),
+            method = "DELETE",
+        ) { Unit }
+    }
+
     suspend fun bedJog(
         serverUrl: String,
         apiKey: String,
@@ -844,6 +892,10 @@ class BambuddyApiClient {
                 .takeIf { json.has("progress") && !json.isNull("progress") }
                 ?.toFloat(),
             fileName = resolveFileName(json),
+            currentPrint = json.optString("current_print").takeIf { it.isNotBlank() },
+            subtaskName = json.optString("subtask_name").takeIf { it.isNotBlank() },
+            gcodeFile = json.optString("gcode_file").takeIf { it.isNotBlank() },
+            coverUrl = json.optString("cover_url").takeIf { it.isNotBlank() },
             remainingTimeSeconds = run {
                 val rawState = json.optString("state").takeIf { it.isNotBlank() }
                 val seconds = parseRemainingTimeSeconds(json)

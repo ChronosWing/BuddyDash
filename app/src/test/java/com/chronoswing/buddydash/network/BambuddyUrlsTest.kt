@@ -18,10 +18,21 @@ class BambuddyUrlsTest {
         assertNotNull(url)
         assertTrue(url!!.contains("/api/v1/printers/3/camera/snapshot"))
         assertTrue(url.contains("token="))
-        assertTrue(url.contains("v=1700000000"))
+        assertTrue(url.contains("ts=1700000000"))
         assertEquals(
-            "http://bambuddy.local/api/v1/printers/3/camera/snapshot?v=1700000000&token=secret+token",
+            "http://bambuddy.local/api/v1/printers/3/camera/snapshot?ts=1700000000&token=secret+token",
             url,
+        )
+    }
+
+    @Test
+    fun cameraSnapshotImageCacheKey_includesRefreshToken() {
+        assertEquals(
+            "camera-snapshot-3-1700000000",
+            cameraSnapshotImageCacheKey(printerId = 3, refreshTick = 1_700_000_000L),
+        )
+        assertTrue(
+            cameraSnapshotImageCacheKey(3, 1L) != cameraSnapshotImageCacheKey(3, 2L),
         )
     }
 
