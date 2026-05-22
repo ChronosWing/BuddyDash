@@ -225,6 +225,7 @@ private fun PrinterDetailScreenContent(
     val plateClearSuccessMessage = stringResource(R.string.plate_clear_success)
     val plateClearFailedMessage = stringResource(R.string.plate_clear_failed)
     val controlSuccessMessage = stringResource(R.string.control_success)
+    val homeStartedMessage = stringResource(R.string.machine_home_started)
     val controlFailedMessage = stringResource(R.string.control_failed)
     val homeFailedMessage = stringResource(R.string.machine_home_failed)
     val bedJogFailedMessage = stringResource(R.string.machine_bed_jog_failed)
@@ -265,6 +266,7 @@ private fun PrinterDetailScreenContent(
             controlFeedbackMessage(
                 feedback = feedback,
                 genericSuccessMessage = controlSuccessMessage,
+                homeSuccessMessage = homeStartedMessage,
                 genericFailedMessage = controlFailedMessage,
                 homeFailedMessage = homeFailedMessage,
                 bedJogFailedMessage = bedJogFailedMessage,
@@ -776,6 +778,7 @@ private fun IdleStatusTab(
 private fun controlFeedbackMessage(
     feedback: ControlFeedback,
     genericSuccessMessage: String,
+    homeSuccessMessage: String,
     genericFailedMessage: String,
     homeFailedMessage: String,
     bedJogFailedMessage: String,
@@ -786,6 +789,7 @@ private fun controlFeedbackMessage(
     if (feedback.success) {
         return when (feedback.action) {
             ControlAction.Stop -> printStoppedSuccessMessage
+            ControlAction.HomeAxes -> homeSuccessMessage
             else -> genericSuccessMessage
         }
     }

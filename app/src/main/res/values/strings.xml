@@ -17,7 +17,11 @@
     <string name="empty_hint_search">Try a different search or filter.</string>
     <string name="empty_hint_archives">Finished prints from your server show up here.</string>
     <string name="empty_hint_spools">Spools from Bambuddy inventory will list here.</string>
-    <string name="empty_hint_queue">Queue a print from an archive or Bambuddy.</string>
+    <string name="empty_hint_queue">Nothing waiting right now</string>
+    <string name="empty_hint_no_matching_filament">Try clearing the filter</string>
+    <string name="spool_usage_empty">No print history yet</string>
+    <string name="empty_hint_spool_usage">Usage records will appear after prints</string>
+    <string name="snackbar_no_matching_filament">No matching filament found</string>
     <string name="search_printers">Search printers</string>
     <string name="search_printers_hint">Search printers…</string>
     <string name="close_search">Close search</string>
@@ -36,7 +40,7 @@
     <string name="queue_unnamed_print">Unnamed print</string>
     <string name="queue_more_count">+%1$d more</string>
     <string name="queue_view_full">View full queue →</string>
-    <string name="queue_empty">No jobs in queue</string>
+    <string name="queue_empty">No queued prints</string>
     <string name="nav_printers">Printers</string>
     <string name="nav_archives">Archives</string>
     <string name="nav_spools">Spools</string>
@@ -113,7 +117,7 @@
     <string name="spools_search_hint">Search material, color, brand…</string>
     <string name="spools_empty">No spools in inventory</string>
     <string name="spools_no_match">No spools match your search</string>
-    <string name="spools_archive_no_matching_filament">No matching filament found</string>
+    <string name="spools_archive_no_matching_filament">No matching filament</string>
     <string name="spools_matching_filament_header">Likely filament matches</string>
     <string name="spools_matching_material_header">Matching material</string>
     <string name="spools_archive_no_exact_color_match">No exact color match found</string>
@@ -259,7 +263,8 @@
     <string name="close">Close</string>
     <string name="control_success">Command sent</string>
     <string name="control_failed">Command failed</string>
-    <string name="machine_home_failed">Home axes failed</string>
+    <string name="machine_home_started">Home axes started</string>
+    <string name="machine_home_failed">Could not home axes</string>
     <string name="machine_bed_jog_failed">Could not move bed</string>
     <string name="machine_chamber_light_failed">Could not toggle chamber light</string>
     <string name="printer_error_details_title">Error</string>

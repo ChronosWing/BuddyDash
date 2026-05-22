@@ -50,6 +50,9 @@ import com.chronoswing.buddydash.ui.components.PrinterDetailSkeleton
 import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.ui.motion.buddyDashButtonPress
 import com.chronoswing.buddydash.ui.motion.rememberBuddyDashInteractionSource
+import com.chronoswing.buddydash.ui.motion.successPulseOn
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.util.ARCHIVE_DISPLAY_NAME_FALLBACK
 import com.chronoswing.buddydash.util.ArchiveMaterialNavigation
@@ -132,6 +135,7 @@ private fun ArchiveDetailScreenContent(
     onMaterialNavigation: (ArchiveMaterialNavigation) -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    var queueSuccessPulse by remember { mutableIntStateOf(0) }
     val queuedMessage = stringResource(R.string.archive_reprint_success)
     val startedMessage = stringResource(R.string.archive_reprint_started)
     val queuedStartFailedMessage = stringResource(R.string.archive_reprint_queued_start_failed)
@@ -144,6 +148,7 @@ private fun ArchiveDetailScreenContent(
             ArchiveReprintSnackbar.Started,
             ArchiveReprintSnackbar.QueuedStartFailed,
             -> {
+                queueSuccessPulse++
                 val message = when (reprintSnackbar) {
                     ArchiveReprintSnackbar.Queued -> queuedMessage
                     ArchiveReprintSnackbar.Started -> startedMessage
@@ -194,6 +199,7 @@ private fun ArchiveDetailScreenContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .successPulseOn(queueSuccessPulse)
                         .buddyDashButtonPress(queueAgainEnabled, queueAgainInteraction),
                 ) {
                     Text(stringResource(R.string.archive_reprint_queue_again))

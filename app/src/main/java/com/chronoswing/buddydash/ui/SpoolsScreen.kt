@@ -20,6 +20,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -29,6 +31,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -115,7 +118,17 @@ private fun SpoolsScreenContent(
     onSpoolClick: (Int) -> Unit,
     onBack: (() -> Unit)?,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val noMatchMessage = stringResource(R.string.snackbar_no_matching_filament)
+
+    LaunchedEffect(archiveLookupFilter, spools.isEmpty(), isLoading) {
+        if (archiveLookupFilter != null && spools.isEmpty() && !isLoading && totalCount > 0) {
+            snackbarHostState.showSnackbar(noMatchMessage)
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -190,8 +203,9 @@ private fun SpoolsScreenContent(
                                     else -> stringResource(R.string.spools_no_match)
                                 },
                                 subtitle = when {
-                                    archiveLookupFilter != null || totalCount > 0 ->
-                                        stringResource(R.string.empty_hint_search)
+                                    archiveLookupFilter != null ->
+                                        stringResource(R.string.empty_hint_no_matching_filament)
+                                    totalCount > 0 -> stringResource(R.string.empty_hint_search)
                                     else -> stringResource(R.string.empty_hint_spools)
                                 },
                                 icon = when {

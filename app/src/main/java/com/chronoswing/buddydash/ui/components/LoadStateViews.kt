@@ -112,6 +112,7 @@ enum class BuddyDashEmptyIcon {
     Queue,
     Search,
     Settings,
+    SpoolUsage,
 }
 
 fun BuddyDashEmptyIcon.asImageVector(): ImageVector = when (this) {
@@ -121,4 +122,5 @@ fun BuddyDashEmptyIcon.asImageVector(): ImageVector = when (this) {
     BuddyDashEmptyIcon.Queue -> Icons.Outlined.Queue
     BuddyDashEmptyIcon.Search -> Icons.Outlined.Search
     BuddyDashEmptyIcon.Settings -> Icons.Outlined.Settings
+    BuddyDashEmptyIcon.SpoolUsage -> Icons.Outlined.History
 }
