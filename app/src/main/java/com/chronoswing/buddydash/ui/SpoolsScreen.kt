@@ -46,6 +46,8 @@ import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentColorSwatch
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
+import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
+import com.chronoswing.buddydash.util.showStaleDataBanner
 import com.chronoswing.buddydash.ui.components.SpoolInventoryRow
 import com.chronoswing.buddydash.ui.components.SpoolListSkeleton
 import com.chronoswing.buddydash.ui.components.asImageVector
@@ -96,6 +98,8 @@ fun SpoolsScreen(
         hasCompletedLoad = uiState.hasCompletedLoad,
         error = uiState.error,
         refreshError = uiState.refreshError,
+        isStaleCachedData = uiState.isStaleCachedData,
+        lastUpdatedAtMillis = uiState.lastUpdatedAtMillis,
         hasCredentials = uiState.hasCredentials,
         searchQuery = uiState.searchQuery,
         filter = uiState.filter,
@@ -110,7 +114,6 @@ fun SpoolsScreen(
             )
         },
         onPullRefresh = { viewModel.loadSpools(showLoading = false, fromPull = true) },
-        onRefreshErrorShown = viewModel::onRefreshErrorShown,
         onSpoolClick = onSpoolClick,
         onBack = onBack,
         cardUsageFor = uiState::cardUsageFor,
@@ -127,6 +130,8 @@ private fun SpoolsScreenContent(
     hasCompletedLoad: Boolean,
     error: String?,
     refreshError: String?,
+    isStaleCachedData: Boolean,
+    lastUpdatedAtMillis: Long?,
     hasCredentials: Boolean,
     searchQuery: String,
     filter: SpoolInventoryFilter,
@@ -136,15 +141,19 @@ private fun SpoolsScreenContent(
     onClearArchiveLookup: () -> Unit,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
-    onRefreshErrorShown: () -> Unit,
     onSpoolClick: (Int) -> Unit,
     onBack: (() -> Unit)?,
     cardUsageFor: (SpoolInventoryItem) -> SpoolInventoryCardUsage,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val noMatchMessage = stringResource(R.string.snackbar_no_matching_filament)
-    val refreshFailedMessage = stringResource(R.string.refresh_failed)
     val cachedCount = totalCount
+    val showStaleBanner = showStaleDataBanner(
+        hasCachedContent = cachedCount > 0,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+        lastUpdatedAtMillis = lastUpdatedAtMillis,
+    )
     val showInitialSkeleton = ListLoadUi.showInitialSkeleton(
         hasCredentials = hasCredentials,
         cachedItemCount = cachedCount,
@@ -155,13 +164,6 @@ private fun SpoolsScreenContent(
         isRefreshing = isRefreshing,
         cachedItemCount = cachedCount,
     )
-
-    LaunchedEffect(refreshError) {
-        if (refreshError != null) {
-            snackbarHostState.showSnackbar(refreshFailedMessage)
-            onRefreshErrorShown()
-        }
-    }
 
     LaunchedEffect(archiveLookupFilter, spools.isEmpty(), isLoading, hasCompletedLoad) {
         if (
@@ -216,9 +218,10 @@ private fun SpoolsScreenContent(
                 SpoolListSkeleton(Modifier.padding(innerPadding))
             }
             error != null && totalCount == 0 && hasCompletedLoad -> {
-                ErrorContent(
-                    message = error,
-                    onRetry = onRefresh,
+                EmptyContent(
+                    message = stringResource(R.string.offline_empty_spools_title),
+                    subtitle = stringResource(R.string.offline_empty_spools_subtitle),
+                    icon = BuddyDashEmptyIcon.Spools.asImageVector(),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
@@ -231,6 +234,11 @@ private fun SpoolsScreenContent(
                         .padding(innerPadding),
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {
+                        if (showStaleBanner) {
+                            OfflineStaleBanner(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            )
+                        }
                         SpoolSearchAndFilters(
                             searchQuery = searchQuery,
                             filter = filter,

@@ -47,6 +47,8 @@ import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
+import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
+import com.chronoswing.buddydash.util.showStaleDataBanner
 import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.util.ArchivePrinterFilter
 import com.chronoswing.buddydash.util.ArchiveResultFilter
@@ -81,6 +83,9 @@ fun ArchivesScreen(
         isRefreshing = uiState.isRefreshing,
         error = uiState.error,
         refreshError = uiState.refreshError,
+        isStaleCachedData = uiState.isStaleCachedData,
+        hasCompletedLoad = uiState.hasCompletedLoad,
+        lastUpdatedAtMillis = uiState.lastUpdatedAtMillis,
         settingsReady = uiState.settingsReady,
         hasCredentials = uiState.hasCredentials,
         serverUrl = uiState.serverUrl,
@@ -102,7 +107,6 @@ fun ArchivesScreen(
             )
         },
         onPullRefresh = { viewModel.loadArchives(showLoading = false, fromPull = true) },
-        onRefreshErrorShown = viewModel::onRefreshErrorShown,
         onArchiveClick = onArchiveClick,
         onClearPrinterFilter = onClearPrinterFilter,
     )
@@ -117,6 +121,9 @@ private fun ArchivesScreenContent(
     isRefreshing: Boolean,
     error: String?,
     refreshError: String?,
+    isStaleCachedData: Boolean,
+    hasCompletedLoad: Boolean,
+    lastUpdatedAtMillis: Long?,
     settingsReady: Boolean,
     hasCredentials: Boolean,
     serverUrl: String,
@@ -133,30 +140,26 @@ private fun ArchivesScreenContent(
     onFilterChange: (ArchiveResultFilter) -> Unit,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
-    onRefreshErrorShown: () -> Unit,
     onArchiveClick: (PrintArchive) -> Unit,
     onClearPrinterFilter: () -> Unit,
 ) {
-    val snackbarHostState = remember { SnackbarHostState() }
-    val refreshFailedMessage = stringResource(R.string.refresh_failed)
     val cachedCount = totalCount
+    val showStaleBanner = showStaleDataBanner(
+        hasCachedContent = cachedCount > 0,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+        lastUpdatedAtMillis = lastUpdatedAtMillis,
+    )
     val showInitialSkeleton = ListLoadUi.showInitialSkeleton(
         hasCredentials = hasCredentials,
         cachedItemCount = cachedCount,
         isInitialLoading = isLoading,
-        hasCompletedLoad = true,
+        hasCompletedLoad = hasCompletedLoad,
     )
     val showPullRefreshIndicator = ListLoadUi.showPullRefreshIndicator(
         isRefreshing = isRefreshing,
         cachedItemCount = cachedCount,
     )
-
-    LaunchedEffect(refreshError) {
-        if (refreshError != null) {
-            snackbarHostState.showSnackbar(refreshFailedMessage)
-            onRefreshErrorShown()
-        }
-    }
 
     val selectedTabIndex = when (section) {
         ArchivesSection.History -> 0
@@ -164,7 +167,6 @@ private fun ArchivesScreenContent(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -196,10 +198,11 @@ private fun ArchivesScreenContent(
             showInitialSkeleton -> {
                 ArchiveListSkeleton(Modifier.padding(innerPadding))
             }
-            error != null && totalCount == 0 -> {
-                ErrorContent(
-                    message = error,
-                    onRetry = onRefresh,
+            error != null && totalCount == 0 && hasCompletedLoad -> {
+                EmptyContent(
+                    message = stringResource(R.string.offline_empty_archives_title),
+                    subtitle = stringResource(R.string.offline_empty_archives_subtitle),
+                    icon = BuddyDashEmptyIcon.Archives.asImageVector(),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
@@ -209,6 +212,11 @@ private fun ArchivesScreenContent(
                         .fillMaxSize()
                         .padding(innerPadding),
                 ) {
+                    if (showStaleBanner) {
+                        OfflineStaleBanner(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        )
+                    }
                     PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
                         Tab(
                             selected = section == ArchivesSection.History,

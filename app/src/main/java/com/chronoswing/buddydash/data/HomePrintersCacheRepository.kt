@@ -35,6 +35,9 @@ class HomePrintersCacheRepository(private val context: Context) {
         }
     }
 
+    suspend fun findPrinter(serverUrl: String, printerId: Int): Printer? =
+        load(serverUrl)?.printers?.find { it.id == printerId }
+
     suspend fun clear(serverUrl: String) {
         val key = cacheServerKey(serverUrl) ?: return
         context.homePrintersCacheDataStore.edit { preferences ->

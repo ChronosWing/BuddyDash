@@ -338,4 +338,8 @@ object HomePrintersCacheCodec {
 
     private fun JSONObject.optNullableBoolean(key: String): Boolean? =
         if (has(key) && !isNull(key)) optBoolean(key) else null
+
+    fun encodePrinterStatusForCache(status: PrinterStatus): JSONObject = encodeStatus(status)
+
+    fun decodePrinterStatusForCache(obj: JSONObject): PrinterStatus = decodeStatus(obj)
 }

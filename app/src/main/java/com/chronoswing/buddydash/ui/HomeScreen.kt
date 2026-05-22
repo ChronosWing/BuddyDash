@@ -66,6 +66,7 @@ import com.chronoswing.buddydash.ui.components.HomePrinterSearchFilterChips
 import com.chronoswing.buddydash.ui.components.HomeCardMicroMotionFrame
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
 import com.chronoswing.buddydash.ui.components.MicroMotionThumbnailFrame
+import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterCoverImage
@@ -316,7 +317,7 @@ private fun HomeScreenContent(
                         onFilterSelected = { searchFilter = it },
                     )
                     if (showStaleBanner) {
-                        HomePrintersStaleBanner(
+                        OfflineStaleBanner(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         )
                     }
@@ -500,22 +501,6 @@ private fun GlancePrinterCard(
             )
             }
         }
-    }
-}
-
-@Composable
-private fun HomePrintersStaleBanner(modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-    ) {
-        Text(
-            text = stringResource(R.string.home_stale_banner),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
-        )
     }
 }
 

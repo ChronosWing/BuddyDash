@@ -61,54 +61,45 @@ fun showHomeStaleDataBanner(
     isStaleCachedData: Boolean,
     refreshError: String? = null,
     lastUpdatedAtMillis: Long?,
-): Boolean =
-    printers.isNotEmpty() &&
-        (isStaleCachedData ||
-            refreshError != null ||
-            isConnectionDisplayStale(lastUpdatedAtMillis))
+): Boolean = showStaleDataBanner(
+    hasCachedContent = printers.isNotEmpty(),
+    isStaleCachedData = isStaleCachedData,
+    refreshError = refreshError,
+    lastUpdatedAtMillis = lastUpdatedAtMillis,
+)
 
-/**
- * Offline header while showing cached printers before a successful refresh, or after an
- * unreachable-host / timeout failure.
- */
 fun showHomeOfflineInHeader(
     printers: List<Printer>,
     isStaleCachedData: Boolean,
     refreshError: String?,
-): Boolean =
-    printers.isNotEmpty() &&
-        isStaleCachedData &&
-        (refreshError == null || isHomeRefreshOfflineError(refreshError))
+): Boolean = showOfflineInHeader(
+    hasCachedContent = printers.isNotEmpty(),
+    isStaleCachedData = isStaleCachedData,
+    refreshError = refreshError,
+)
 
-/** Connection stale when cached data is aged or refresh failed for a non-offline reason. */
 fun showHomeConnectionStaleInHeader(
     printers: List<Printer>,
     isStaleCachedData: Boolean = false,
     refreshError: String?,
     lastUpdatedAtMillis: Long?,
-): Boolean {
-    if (printers.isEmpty()) return false
-    if (showHomeOfflineInHeader(printers, isStaleCachedData, refreshError)) return false
-    return isConnectionDisplayStale(lastUpdatedAtMillis) ||
-        (refreshError != null && !isHomeRefreshOfflineError(refreshError))
-}
+): Boolean = showConnectionStaleInHeader(
+    hasCachedContent = printers.isNotEmpty(),
+    isStaleCachedData = isStaleCachedData,
+    refreshError = refreshError,
+    lastUpdatedAtMillis = lastUpdatedAtMillis,
+)
 
-/**
- * "Updating..." only when a refresh is in-flight and connectivity is not in offline/stale mode.
- */
 fun showHomeHeaderUpdating(
     isRefreshActive: Boolean,
     printers: List<Printer>,
     isStaleCachedData: Boolean,
     refreshError: String?,
     lastUpdatedAtMillis: Long?,
-): Boolean =
-    isRefreshActive &&
-        printers.isNotEmpty() &&
-        !showHomeOfflineInHeader(printers, isStaleCachedData, refreshError) &&
-        !showHomeConnectionStaleInHeader(
-            printers = printers,
-            isStaleCachedData = isStaleCachedData,
-            refreshError = refreshError,
-            lastUpdatedAtMillis = lastUpdatedAtMillis,
-        )
+): Boolean = showHeaderUpdating(
+    isRefreshActive = isRefreshActive,
+    hasCachedContent = printers.isNotEmpty(),
+    isStaleCachedData = isStaleCachedData,
+    refreshError = refreshError,
+    lastUpdatedAtMillis = lastUpdatedAtMillis,
+)

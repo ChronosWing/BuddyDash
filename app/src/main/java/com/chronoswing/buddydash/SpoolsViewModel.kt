@@ -3,7 +3,9 @@ package com.chronoswing.buddydash
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chronoswing.buddydash.data.HomePrintersCacheRepository
 import com.chronoswing.buddydash.data.SettingsRepository
+import com.chronoswing.buddydash.data.SpoolsCacheRepository
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.network.BambuddyApi
 import com.chronoswing.buddydash.network.BambuddyApiClient
@@ -41,6 +43,7 @@ data class SpoolsUiState(
     val error: String? = null,
     /** Snackbar-only error after a failed refresh when spools are already shown. */
     val refreshError: String? = null,
+    val isStaleCachedData: Boolean = false,
     /** True after the first fetch finishes (success or failure). */
     val hasCompletedLoad: Boolean = false,
     val lastUpdatedAtMillis: Long? = null,
@@ -69,6 +72,7 @@ data class SpoolsUiState(
 class SpoolsViewModel(
     private val settingsRepository: SettingsRepository,
     private val apiClient: BambuddyApiClient,
+    private val spoolsCacheRepository: SpoolsCacheRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SpoolsUiState())
@@ -76,6 +80,7 @@ class SpoolsViewModel(
 
     private var fetchJob: Job? = null
     private val manualRefreshGuard = RefreshGuard()
+    private var lastNetworkLoadServerKey: String? = null
 
     init {
         viewModelScope.launch {
@@ -94,10 +99,37 @@ class SpoolsViewModel(
                         hasCredentials = hasCredentials,
                     )
                 }
-                if (hasCredentials && (!hadCredentials || !_uiState.value.hasCompletedLoad)) {
-                    loadSpools(showLoading = _uiState.value.spools.isEmpty())
+                if (hasCredentials) {
+                    val serverKey = HomePrintersCacheRepository.cacheServerKey(url)
+                    val shouldNetworkLoad =
+                        !hadCredentials || lastNetworkLoadServerKey != serverKey
+                    viewModelScope.launch {
+                        hydrateFromDiskCache(url)
+                        if (shouldNetworkLoad && serverKey != null) {
+                            lastNetworkLoadServerKey = serverKey
+                            loadSpools(showLoading = _uiState.value.spools.isEmpty())
+                        }
+                    }
+                } else {
+                    lastNetworkLoadServerKey = null
                 }
             }
+        }
+    }
+
+    private suspend fun hydrateFromDiskCache(serverUrl: String) {
+        val snapshot = spoolsCacheRepository.load(serverUrl) ?: return
+        _uiState.update {
+            it.copy(
+                spools = snapshot.spools,
+                printerFilamentActivityById = snapshot.printerFilamentActivityById,
+                lastUpdatedAtMillis = snapshot.lastUpdatedAtMillis,
+                hasCompletedLoad = true,
+                isLoading = false,
+                error = null,
+                refreshError = null,
+                isStaleCachedData = true,
+            )
         }
     }
 
@@ -130,10 +162,6 @@ class SpoolsViewModel(
                 searchQuery = "",
             )
         }
-    }
-
-    fun onRefreshErrorShown() {
-        _uiState.update { it.copy(refreshError = null) }
     }
 
     /** Clears archive lookup and search when bottom nav opens unfiltered Spools root. */
@@ -212,7 +240,7 @@ class SpoolsViewModel(
         fetchJob = viewModelScope.launch {
             try {
                 if (!isInitialLoad) {
-                    _uiState.update { it.copy(isRefreshing = true, refreshError = null) }
+                    _uiState.update { it.copy(isRefreshing = true) }
                 } else if (showLoading) {
                     _uiState.update { it.copy(isLoading = true, error = null) }
                 }
@@ -247,6 +275,13 @@ class SpoolsViewModel(
                                 Log.d(TAG_SPOOLS_VM, "bottomNavReselect refresh success")
                             }
                         }
+                        val updatedAt = System.currentTimeMillis()
+                        spoolsCacheRepository.save(
+                            credentials.serverUrl,
+                            spools,
+                            activityById,
+                            updatedAt,
+                        )
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
@@ -255,8 +290,9 @@ class SpoolsViewModel(
                                 printerFilamentActivityById = activityById,
                                 error = null,
                                 refreshError = null,
+                                isStaleCachedData = false,
                                 hasCompletedLoad = true,
-                                lastUpdatedAtMillis = System.currentTimeMillis(),
+                                lastUpdatedAtMillis = updatedAt,
                             )
                         }
                     },
@@ -279,6 +315,7 @@ class SpoolsViewModel(
                                     isLoading = false,
                                     isRefreshing = false,
                                     refreshError = message,
+                                    isStaleCachedData = true,
                                     hasCompletedLoad = true,
                                 )
                             } else {

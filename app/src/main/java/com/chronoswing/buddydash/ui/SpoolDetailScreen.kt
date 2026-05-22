@@ -1,8 +1,5 @@
 package com.chronoswing.buddydash.ui
 
-import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
-import com.chronoswing.buddydash.ui.components.EmptyContent
-import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -40,7 +37,10 @@ import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.ui.components.SpoolUsageThumbnail
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
-import com.chronoswing.buddydash.ui.components.ErrorContent
+import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
+import com.chronoswing.buddydash.ui.components.EmptyContent
+import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
+import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.ui.components.FilamentColorSwatch
 import com.chronoswing.buddydash.ui.components.FilamentRemainingBar
 import com.chronoswing.buddydash.ui.components.FilamentUsageText
@@ -74,7 +74,10 @@ fun SpoolDetailScreen(
         serverUrl = uiState.serverUrl,
         cameraToken = uiState.cameraToken,
         isLoading = uiState.isLoading,
+        hasCompletedLoad = uiState.hasCompletedLoad,
         error = uiState.error,
+        isStaleCachedData = uiState.isStaleCachedData,
+        isLimitedFromListCache = uiState.isLimitedFromListCache,
         onBack = onBack,
         onRetry = { viewModel.load(force = true) },
         onArchiveClick = onArchiveClick,
@@ -89,11 +92,17 @@ private fun SpoolDetailScreenContent(
     serverUrl: String,
     cameraToken: String,
     isLoading: Boolean,
+    hasCompletedLoad: Boolean,
     error: String?,
+    isStaleCachedData: Boolean,
+    isLimitedFromListCache: Boolean,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onArchiveClick: (Int) -> Unit,
 ) {
+    val showStaleBanner = spool != null && isStaleCachedData
+    val showInitialLoading = !hasCompletedLoad
+    val showOfflineEmpty = hasCompletedLoad && spool == null && error != null
     Scaffold(
         topBar = {
             TopAppBar(
@@ -117,10 +126,11 @@ private fun SpoolDetailScreenContent(
         },
     ) { innerPadding ->
         when {
-            isLoading && spool == null -> PrinterDetailSkeleton(Modifier.padding(innerPadding))
-            error != null && spool == null -> ErrorContent(
-                message = error,
-                onRetry = onRetry,
+            showInitialLoading -> PrinterDetailSkeleton(Modifier.padding(innerPadding))
+            showOfflineEmpty -> EmptyContent(
+                message = stringResource(R.string.offline_empty_spool_detail_title),
+                subtitle = stringResource(R.string.offline_empty_spool_detail_subtitle),
+                icon = BuddyDashEmptyIcon.Spools.asImageVector(),
                 modifier = Modifier.padding(innerPadding),
             )
             spool != null -> {
@@ -131,19 +141,26 @@ private fun SpoolDetailScreenContent(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
+                    if (showStaleBanner) {
+                        item(key = "offline_banner") {
+                            OfflineStaleBanner(limited = isLimitedFromListCache)
+                        }
+                    }
                     item(key = "hero") {
                         SpoolDetailHero(spool = spool)
                     }
                     item(key = "fields") {
                         SpoolDetailFields(spool = spool)
                     }
-                    item(key = "usage_section") {
-                        SpoolUsageHistorySection(
-                            items = usageDisplayItems,
-                            serverUrl = serverUrl,
-                            cameraToken = cameraToken,
-                            onArchiveClick = onArchiveClick,
-                        )
+                    if (!isLimitedFromListCache || usageDisplayItems.isNotEmpty()) {
+                        item(key = "usage_section") {
+                            SpoolUsageHistorySection(
+                                items = usageDisplayItems,
+                                serverUrl = serverUrl,
+                                cameraToken = cameraToken,
+                                onArchiveClick = onArchiveClick,
+                            )
+                        }
                     }
                 }
             }
