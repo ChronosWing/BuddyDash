@@ -96,9 +96,6 @@ import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
 import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
-import com.chronoswing.buddydash.util.showConnectionStaleInHeader
-import com.chronoswing.buddydash.util.showHeaderUpdating
-import com.chronoswing.buddydash.util.showOfflineInHeader
 import com.chronoswing.buddydash.util.showStaleDataBanner
 import com.chronoswing.buddydash.util.ListLoadUi
 import com.chronoswing.buddydash.util.PrinterDetailLabels
@@ -318,24 +315,6 @@ private fun PrinterDetailScreenContent(
         refreshError = refreshError,
         lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
     )
-    val preferOfflineInHeader = showOfflineInHeader(
-        hasCachedContent = hasCachedData,
-        isStaleCachedData = isStaleCachedData,
-        refreshError = refreshError,
-    )
-    val showConnectionStaleInHeader = showConnectionStaleInHeader(
-        hasCachedContent = hasCachedData,
-        isStaleCachedData = isStaleCachedData,
-        refreshError = refreshError,
-        lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
-    )
-    val showHeaderUpdating = showHeaderUpdating(
-        isRefreshActive = isRefreshing,
-        hasCachedContent = hasCachedData,
-        isStaleCachedData = isStaleCachedData,
-        refreshError = refreshError,
-        lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
-    )
     val showInitialLoading = !hasCompletedLoad
     val showOfflineEmpty = hasCompletedLoad && labels == null && error != null
     val showPullRefreshIndicator = ListLoadUi.showPullRefreshIndicator(
@@ -526,11 +505,12 @@ private fun PrinterDetailScreenContent(
                         )
                         StatusLastUpdatedIndicator(
                             lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
-                            isRefreshing = showHeaderUpdating,
+                            isRefreshing = isRefreshing,
                             enabled = !isClearingPlate && !isControlBusy,
                             onRefresh = onRefresh,
-                            preferConnectionStale = showConnectionStaleInHeader,
-                            preferOffline = preferOfflineInHeader,
+                            hasCachedContent = hasCachedData,
+                            isStaleCachedData = isStaleCachedData,
+                            refreshError = refreshError,
                             modifier = Modifier.padding(start = 8.dp),
                         )
                     }

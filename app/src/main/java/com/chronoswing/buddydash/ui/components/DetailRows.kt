@@ -22,19 +22,12 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
 import com.chronoswing.buddydash.R
-import com.chronoswing.buddydash.util.StatusRefreshFreshness
-import com.chronoswing.buddydash.util.formatStatusUpdatedAgo
-import com.chronoswing.buddydash.util.resolveStatusRefreshFreshness
+import com.chronoswing.buddydash.util.HeaderStatusAttention
+import com.chronoswing.buddydash.util.resolveHeaderStatusAttention
 import androidx.compose.ui.graphics.Color
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -193,76 +186,65 @@ fun SectionHeaderRow(
     }
 }
 
-/** Passive last-updated label with optional subtle manual refresh tap. */
+/**
+ * Calm header status: hidden when healthy, spinner-only while refreshing,
+ * persistent muted text only for offline or refresh-failure attention states.
+ */
 @Composable
 fun StatusLastUpdatedIndicator(
-    lastUpdatedAtMillis: Long?,
+    @Suppress("UNUSED_PARAMETER") lastUpdatedAtMillis: Long?,
     isRefreshing: Boolean,
     enabled: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
-    preferConnectionStale: Boolean = false,
-    preferOffline: Boolean = false,
+    hasCachedContent: Boolean = true,
+    isStaleCachedData: Boolean = false,
+    refreshError: String? = null,
 ) {
-    var tick by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(lastUpdatedAtMillis) {
-        while (true) {
-            delay(1_000L)
-            tick = System.currentTimeMillis()
-        }
-    }
-    val now = if (tick == 0L) System.currentTimeMillis() else tick
-    val freshness = resolveStatusRefreshFreshness(lastUpdatedAtMillis, now) ?: return
-    val ago = formatStatusUpdatedAgo(lastUpdatedAtMillis, now)
-    val label = when {
-        isRefreshing -> stringResource(R.string.status_updating)
-        preferOffline -> stringResource(R.string.status_offline)
-        preferConnectionStale || freshness == StatusRefreshFreshness.ConnectionStale ->
-            stringResource(R.string.status_connection_stale)
-        ago != null -> stringResource(R.string.status_updated_ago, ago)
-        else -> return
-    }
+    val display = resolveHeaderStatusAttention(
+        isRefreshActive = isRefreshing,
+        hasCachedContent = hasCachedContent,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+    )
+    if (display == HeaderStatusAttention.None) return
 
-    val dueSoonTint = Color(0xFFFBBF24)
-    val (textColor, iconTint) = when {
-        isRefreshing -> {
-            val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-            muted to muted
-        }
-        preferOffline || preferConnectionStale ->
-            MaterialTheme.colorScheme.error.copy(alpha = 0.88f) to
-                MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
-        freshness == StatusRefreshFreshness.Live ->
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f) to
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.52f)
-        freshness == StatusRefreshFreshness.Aging ->
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f) to
-                dueSoonTint.copy(alpha = 0.7f)
-        freshness == StatusRefreshFreshness.Stale ->
-            dueSoonTint to dueSoonTint.copy(alpha = 0.9f)
-        else ->
-            MaterialTheme.colorScheme.error.copy(alpha = 0.88f) to
-                MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
+    val attentionColor = MaterialTheme.colorScheme.error.copy(alpha = 0.82f)
+    val message = when (display) {
+        HeaderStatusAttention.Refreshing -> null
+        HeaderStatusAttention.Offline -> stringResource(R.string.status_header_offline)
+        HeaderStatusAttention.RefreshFailed -> stringResource(R.string.status_header_refresh_failed)
+        HeaderStatusAttention.None -> return
+    }
+    val iconTint = when (display) {
+        HeaderStatusAttention.Refreshing -> muted
+        else -> attentionColor.copy(alpha = 0.75f)
     }
 
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FadeValueText(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = textColor,
-            maxLines = 1,
-        )
+        message?.let { text ->
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                color = attentionColor,
+                maxLines = 2,
+            )
+        }
         Icon(
             imageVector = Icons.Default.Refresh,
             contentDescription = stringResource(R.string.cd_refresh_status),
             modifier = Modifier
-                .size(12.dp)
-                .refreshSpinning(isRefreshing)
-                .buddyDashClickable(enabled = enabled && !isRefreshing, onClick = onRefresh),
+                .size(if (display == HeaderStatusAttention.Refreshing) 14.dp else 12.dp)
+                .refreshSpinning(display == HeaderStatusAttention.Refreshing)
+                .buddyDashClickable(
+                    enabled = enabled && display != HeaderStatusAttention.Refreshing,
+                    onClick = onRefresh,
+                ),
             tint = iconTint,
         )
     }
