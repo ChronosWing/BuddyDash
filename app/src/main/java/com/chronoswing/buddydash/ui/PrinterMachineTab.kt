@@ -219,13 +219,17 @@ private fun MachinePrinterInfoCard(
             rows.forEach { (key, value) ->
                 val label = when (key) {
                     "connection" -> stringResource(R.string.connection)
-                    "ip" -> stringResource(R.string.machine_info_ip)
-                    "network" -> stringResource(R.string.machine_info_network)
-                    "firmware" -> stringResource(R.string.firmware)
+                    "state" -> stringResource(R.string.machine_info_state)
                     "model" -> stringResource(R.string.machine_info_model)
+                    "firmware" -> stringResource(R.string.firmware)
+                    "ip" -> stringResource(R.string.machine_info_ip)
+                    "wifi_signal" -> stringResource(R.string.machine_info_wifi_signal)
+                    "lan_mode" -> stringResource(R.string.machine_info_lan_mode)
                     "serial" -> stringResource(R.string.machine_info_serial)
-                    "location" -> stringResource(R.string.machine_info_location)
-                    "updated" -> stringResource(R.string.machine_info_last_updated)
+                    "nozzle_count" -> stringResource(R.string.machine_info_nozzle_count)
+                    "developer_mode" -> stringResource(R.string.machine_info_developer_mode)
+                    "print_hours" -> stringResource(R.string.machine_info_print_hours)
+                    "auto_archive" -> stringResource(R.string.machine_info_auto_archive)
                     "status_updated" -> stringResource(R.string.machine_info_status_refreshed)
                     else -> key
                 }

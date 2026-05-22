@@ -279,6 +279,14 @@ class BambuddyApiClient {
             model = json.optString("model").takeIf { it.isNotBlank() },
             location = json.optString("location").takeIf { it.isNotBlank() },
             updatedAtIso = json.optString("updated_at").takeIf { it.isNotBlank() },
+            nozzleCount = json.optInt("nozzle_count").takeIf {
+                json.has("nozzle_count") && !json.isNull("nozzle_count") && it > 0
+            },
+            autoArchiveEnabled = if (json.has("auto_archive") && !json.isNull("auto_archive")) {
+                json.getBoolean("auto_archive")
+            } else {
+                null
+            },
         )
 
     suspend fun clearPlate(serverUrl: String, apiKey: String, printerId: Int): Result<String> =
@@ -743,6 +751,7 @@ class BambuddyApiClient {
             chamberFanPercent = operational.chamberFanPercent,
             speedLevel = operational.speedLevel,
             chamberLightOn = operational.chamberLightOn,
+            developerMode = operational.developerMode,
             nozzleDiameterDisplay = metadata.nozzleDiameterDisplay,
             filamentUsage = filamentUsage,
         )
@@ -807,6 +816,7 @@ class BambuddyApiClient {
         val chamberFanPercent: Int?,
         val speedLevel: Int?,
         val chamberLightOn: Boolean?,
+        val developerMode: Boolean?,
     )
 
     private fun parseOperationalFields(
@@ -843,6 +853,11 @@ class BambuddyApiClient {
         } else {
             null
         }
+        val developerMode = if (json.has("developer_mode") && !json.isNull("developer_mode")) {
+            json.getBoolean("developer_mode")
+        } else {
+            null
+        }
 
         if (DEBUG_LOG_DETAIL_RAW) {
             Log.d(
@@ -867,6 +882,7 @@ class BambuddyApiClient {
             chamberFanPercent = chamberFanPercent,
             speedLevel = speedLevel,
             chamberLightOn = chamberLightOn,
+            developerMode = developerMode,
         )
     }
 
