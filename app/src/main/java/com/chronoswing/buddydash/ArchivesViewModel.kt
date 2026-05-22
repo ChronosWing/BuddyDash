@@ -14,6 +14,8 @@ import com.chronoswing.buddydash.util.applyArchiveListFilters
 import com.chronoswing.buddydash.util.computeArchiveStats
 import com.chronoswing.buddydash.util.filterArchivesForStatsRange
 import com.chronoswing.buddydash.util.logArchiveStatsDateFilterSummary
+import com.chronoswing.buddydash.util.RefreshGuard
+import com.chronoswing.buddydash.util.toUserNetworkMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -69,6 +71,7 @@ class ArchivesViewModel(
     val uiState: StateFlow<ArchivesUiState> = _uiState.asStateFlow()
 
     private var fetchJob: Job? = null
+    private val manualRefreshGuard = RefreshGuard()
 
     init {
         viewModelScope.launch {
@@ -138,7 +141,11 @@ class ArchivesViewModel(
         _uiState.update { it.copy(statsTimeRange = range) }
     }
 
-    fun loadArchives(showLoading: Boolean = false, fromPull: Boolean = false) {
+    fun loadArchives(
+        showLoading: Boolean = false,
+        fromPull: Boolean = false,
+        fromUser: Boolean = false,
+    ) {
         val state = _uiState.value
         if (!state.settingsReady) {
             _uiState.update { it.copy(isLoading = true, error = null) }
@@ -149,11 +156,13 @@ class ArchivesViewModel(
                 it.copy(
                     isLoading = false,
                     isRefreshing = false,
-                    error = "Configure server URL and API key in Settings",
+                    error = null,
                 )
             }
             return
         }
+        if (fromUser && !fromPull && manualRefreshGuard.shouldSkipManualRefresh()) return
+        if (fromUser && fetchJob?.isActive == true) return
 
         fetchJob?.cancel()
         fetchJob = viewModelScope.launch {
@@ -191,12 +200,16 @@ class ArchivesViewModel(
                         it.copy(
                             isLoading = false,
                             isRefreshing = false,
-                            archives = emptyList(),
-                            error = error.message ?: "Failed to load archives",
+                            error = error.toUserNetworkMessage("Failed to load archives"),
                         )
                     }
                 },
             )
         }
+    }
+
+    override fun onCleared() {
+        fetchJob?.cancel()
+        super.onCleared()
     }
 }

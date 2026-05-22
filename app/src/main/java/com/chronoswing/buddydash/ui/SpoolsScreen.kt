@@ -70,12 +70,11 @@ fun SpoolsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LifecyclePollingEffect(
-        enabled = uiState.hasCredentials,
+        enabled = uiState.hasCredentials && uiState.hasCompletedLoad,
         intervalMs = 30_000L,
-        onPoll = {
-            val showLoading = uiState.spools.isEmpty() && uiState.error == null
-            viewModel.loadSpools(showLoading = showLoading)
-        },
+        initialDelayMs = 30_000L,
+        pollImmediately = false,
+        onPoll = { viewModel.loadSpools(showLoading = false) },
     )
 
     SpoolsScreenContent(
@@ -83,7 +82,9 @@ fun SpoolsScreen(
         totalCount = uiState.spools.size,
         isLoading = uiState.isLoading,
         isRefreshing = uiState.isRefreshing,
+        hasCompletedLoad = uiState.hasCompletedLoad,
         error = uiState.error,
+        refreshError = uiState.refreshError,
         hasCredentials = uiState.hasCredentials,
         searchQuery = uiState.searchQuery,
         filter = uiState.filter,
@@ -91,8 +92,14 @@ fun SpoolsScreen(
         onSearchQueryChange = viewModel::onSearchQueryChange,
         onFilterChange = viewModel::onFilterChange,
         onClearArchiveLookup = onClearArchiveLookup,
-        onRefresh = { viewModel.loadSpools(showLoading = uiState.spools.isEmpty()) },
+        onRefresh = {
+            viewModel.loadSpools(
+                showLoading = uiState.spools.isEmpty(),
+                fromUser = true,
+            )
+        },
         onPullRefresh = { viewModel.loadSpools(showLoading = false, fromPull = true) },
+        onRefreshErrorShown = viewModel::onRefreshErrorShown,
         onSpoolClick = onSpoolClick,
         onBack = onBack,
     )
@@ -105,7 +112,9 @@ private fun SpoolsScreenContent(
     totalCount: Int,
     isLoading: Boolean,
     isRefreshing: Boolean,
+    hasCompletedLoad: Boolean,
     error: String?,
+    refreshError: String?,
     hasCredentials: Boolean,
     searchQuery: String,
     filter: SpoolInventoryFilter,
@@ -115,14 +124,29 @@ private fun SpoolsScreenContent(
     onClearArchiveLookup: () -> Unit,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
+    onRefreshErrorShown: () -> Unit,
     onSpoolClick: (Int) -> Unit,
     onBack: (() -> Unit)?,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val noMatchMessage = stringResource(R.string.snackbar_no_matching_filament)
+    val refreshFailedMessage = stringResource(R.string.spools_refresh_failed)
 
-    LaunchedEffect(archiveLookupFilter, spools.isEmpty(), isLoading) {
-        if (archiveLookupFilter != null && spools.isEmpty() && !isLoading && totalCount > 0) {
+    LaunchedEffect(refreshError) {
+        if (refreshError != null) {
+            snackbarHostState.showSnackbar(refreshFailedMessage)
+            onRefreshErrorShown()
+        }
+    }
+
+    LaunchedEffect(archiveLookupFilter, spools.isEmpty(), isLoading, hasCompletedLoad) {
+        if (
+            archiveLookupFilter != null &&
+            spools.isEmpty() &&
+            !isLoading &&
+            hasCompletedLoad &&
+            totalCount > 0
+        ) {
             snackbarHostState.showSnackbar(noMatchMessage)
         }
     }
@@ -164,10 +188,10 @@ private fun SpoolsScreenContent(
                     modifier = Modifier.padding(innerPadding),
                 )
             }
-            isLoading && totalCount == 0 -> {
+            !hasCompletedLoad && totalCount == 0 -> {
                 SpoolListSkeleton(Modifier.padding(innerPadding))
             }
-            error != null && totalCount == 0 -> {
+            error != null && totalCount == 0 && hasCompletedLoad -> {
                 ErrorContent(
                     message = error,
                     onRetry = onRefresh,
@@ -194,7 +218,7 @@ private fun SpoolsScreenContent(
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                         )
-                        if (spools.isEmpty()) {
+                        if (spools.isEmpty() && hasCompletedLoad) {
                             EmptyContent(
                                 message = when {
                                     archiveLookupFilter != null ->

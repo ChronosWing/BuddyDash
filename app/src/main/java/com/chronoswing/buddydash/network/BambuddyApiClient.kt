@@ -33,7 +33,9 @@ import com.chronoswing.buddydash.util.mergeSpoolsWithAssignments
 import com.chronoswing.buddydash.util.parseInventoryByPrinter
 import com.chronoswing.buddydash.util.parseLowStockThreshold
 import com.chronoswing.buddydash.util.parseSpoolAssignments
+import com.chronoswing.buddydash.util.BuddyDashDebug
 import com.chronoswing.buddydash.util.DEBUG_LOG_SPOOL_USAGE
+import com.chronoswing.buddydash.util.toUserNetworkMessage
 import com.chronoswing.buddydash.util.logFullJsonPayload
 import com.chronoswing.buddydash.util.logSpoolUsageFetch
 import com.chronoswing.buddydash.util.TAG_SPOOL_USAGE_LINK
@@ -71,10 +73,13 @@ import com.chronoswing.buddydash.util.queueHasThumbnailHint
 import com.chronoswing.buddydash.util.queueJsonPlateId
 import com.chronoswing.buddydash.util.resolveQueueThumbnailSource
 import com.chronoswing.buddydash.network.queueJobThumbnailUrl
+import com.chronoswing.buddydash.util.HomeLoadTiming
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -88,18 +93,14 @@ import java.util.concurrent.TimeUnit
 class BambuddyApiClient {
 
     companion object {
-        /** Temporary: log raw AMS / vt_tray JSON from status responses. Set false before release. */
-        private const val DEBUG_LOG_FILAMENT_RAW = true
+        private val debugLogFilamentRaw: Boolean get() = BuddyDashDebug.enabled
         private const val TAG_FILAMENT = "BuddyDash/Filament"
-        /** Temporary: log ETA-related raw fields during active prints. Set false before release. */
-        private const val DEBUG_LOG_ETA_RAW = true
+        private val debugLogEtaRaw: Boolean get() = BuddyDashDebug.enabled
         private const val TAG_ETA = "BuddyDash/Eta"
-        /** Temporary: log newly parsed detail/status fields. Set false before release. */
-        private const val DEBUG_LOG_DETAIL_RAW = true
+        private val debugLogDetailRaw: Boolean get() = BuddyDashDebug.enabled
         private const val TAG_DETAIL = "BuddyDash/Detail"
         private const val TAG_MOTION = "BuddyDash/Motion"
-        /** Temporary: log queue API responses. Set false before release. */
-        private const val DEBUG_LOG_QUEUE = true
+        private val debugLogQueue: Boolean get() = BuddyDashDebug.enabled
         private const val TAG_QUEUE = "BuddyDash/Queue"
         private const val QUEUE_STATUS_PENDING = "pending"
         private const val QUEUE_STATUS_PRINTING = "printing"
@@ -150,6 +151,13 @@ class BambuddyApiClient {
                 List(array.length()) { index ->
                     parsePrinterFromConfig(array.getJSONObject(index))
                 }
+            }.also { result ->
+                if (BuddyDashDebug.enabled) {
+                    result.fold(
+                        onSuccess = { HomeLoadTiming.log("fetchPrinters parsed count=${it.size}") },
+                        onFailure = { Log.w(TAG_DETAIL, "fetchPrinters failed", it) },
+                    )
+                }
             }
         }
 
@@ -157,44 +165,83 @@ class BambuddyApiClient {
     suspend fun fetchPrintersWithStatus(serverUrl: String, apiKey: String): Result<List<Printer>> =
         withContext(Dispatchers.IO) {
             fetchPrinters(serverUrl, apiKey).mapCatching { printers ->
-                val inventoryByPrinter = fetchInventoryByPrinter(serverUrl, apiKey, printerId = null)
-                    .getOrElse { emptyMap() }
+                enrichPrintersForHome(serverUrl, apiKey, printers).getOrThrow()
+            }
+        }
+
+    /**
+     * Enriches base printer config rows with status, maintenance, and queue counts.
+     * Safe to call after the list is already on screen (parallel per printer, limited concurrency).
+     */
+    suspend fun enrichPrintersForHome(
+        serverUrl: String,
+        apiKey: String,
+        printers: List<Printer>,
+    ): Result<List<Printer>> =
+        withContext(Dispatchers.IO) {
+            if (printers.isEmpty()) return@withContext Result.success(emptyList())
+            runCatching {
+                HomeLoadTiming.log("secondary enrichment started (count=${printers.size})")
                 coroutineScope {
+                    val inventoryDeferred = async {
+                        fetchInventoryByPrinter(serverUrl, apiKey, printerId = null)
+                            .getOrElse { emptyMap() }
+                    }
+                    val inventoryByPrinter = inventoryDeferred.await()
+                    val concurrency = Semaphore(4)
                     printers.map { printer ->
                         async {
-                            val statusResult = fetchPrinterStatus(
-                                serverUrl = serverUrl,
-                                apiKey = apiKey,
-                                printerId = printer.id,
-                                inventoryBySlot = inventoryByPrinter[printer.id],
-                            )
-                            val maintenanceIndicator = if (BambuddyApi.hasMaintenanceEndpoint) {
-                                fetchMaintenance(serverUrl, apiKey, printer.id)
-                                    .getOrNull()
-                                    ?.items
-                                    ?.let { resolveMaintenanceHomeIndicator(it) }
-                                    ?: MaintenanceHomeIndicator.None
-                            } else {
-                                MaintenanceHomeIndicator.None
+                            concurrency.withPermit {
+                                enrichPrinterForHome(
+                                    serverUrl = serverUrl,
+                                    apiKey = apiKey,
+                                    printer = printer,
+                                    inventoryBySlot = inventoryByPrinter[printer.id],
+                                )
                             }
-                            val pendingQueueCount = if (BambuddyApi.hasQueueEndpoint) {
-                                fetchPrintQueue(serverUrl, apiKey, printer.id)
-                                    .getOrNull()
-                                    ?.size
-                                    ?: 0
-                            } else {
-                                0
-                            }
-                            printer.copy(
-                                liveStatus = statusResult.getOrNull(),
-                                maintenanceIndicator = maintenanceIndicator,
-                                pendingQueueCount = pendingQueueCount,
-                            )
                         }
                     }.awaitAll()
+                }.also {
+                    HomeLoadTiming.log("secondary enrichment finished (count=${it.size})")
                 }
             }
         }
+
+    private suspend fun enrichPrinterForHome(
+        serverUrl: String,
+        apiKey: String,
+        printer: Printer,
+        inventoryBySlot: Map<SlotInventoryKey, SlotInventoryInfo>?,
+    ): Printer {
+        val statusResult = fetchPrinterStatus(
+            serverUrl = serverUrl,
+            apiKey = apiKey,
+            printerId = printer.id,
+            inventoryBySlot = inventoryBySlot,
+        )
+        val maintenanceIndicator = if (BambuddyApi.hasMaintenanceEndpoint) {
+            fetchMaintenance(serverUrl, apiKey, printer.id)
+                .getOrNull()
+                ?.items
+                ?.let { resolveMaintenanceHomeIndicator(it) }
+                ?: MaintenanceHomeIndicator.None
+        } else {
+            MaintenanceHomeIndicator.None
+        }
+        val pendingQueueCount = if (BambuddyApi.hasQueueEndpoint) {
+            fetchPrintQueue(serverUrl, apiKey, printer.id)
+                .getOrNull()
+                ?.size
+                ?: 0
+        } else {
+            0
+        }
+        return printer.copy(
+            liveStatus = statusResult.getOrNull(),
+            maintenanceIndicator = maintenanceIndicator,
+            pendingQueueCount = pendingQueueCount,
+        )
+    }
 
     suspend fun fetchPrinterStatus(
         serverUrl: String,
@@ -249,7 +296,7 @@ class BambuddyApiClient {
             else -> requestBuilder.get().build()
         }
 
-        return runCatching {
+        val result = runCatching {
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
@@ -263,6 +310,10 @@ class BambuddyApiClient {
                 parse(body)
             }
         }
+        return result.fold(
+            onSuccess = { Result.success(it) },
+            onFailure = { Result.failure(Exception(it.toUserNetworkMessage("Request failed"))) },
+        )
     }
 
     /** Config row from GET /api/v1/printers — no live connection/state fields. */
@@ -315,7 +366,7 @@ class BambuddyApiClient {
         val body = JSONObject().apply {
             if (!notes.isNullOrBlank()) put("notes", notes)
         }
-        if (DEBUG_LOG_DETAIL_RAW) {
+        if (debugLogDetailRaw) {
             Log.d(TAG_DETAIL, "POST ${BambuddyApi.maintenancePerformPath(itemId)} body=$body")
         }
         runApiCall(
@@ -377,8 +428,17 @@ class BambuddyApiClient {
     ): Result<List<SpoolInventoryItem>> =
         withContext(Dispatchers.IO) {
             if (!BambuddyApi.hasSpoolInventoryEndpoint) {
+                if (BuddyDashDebug.enabled) {
+                    Log.w(TAG_SPOOL_USAGE_LINK, "fetchSpoolInventory: endpoint not available")
+                }
                 return@withContext Result.failure(
                     UnsupportedOperationException("Spool inventory endpoint not found"),
+                )
+            }
+            if (BuddyDashDebug.enabled) {
+                Log.d(
+                    TAG_SPOOL_USAGE_LINK,
+                    "fetchSpoolInventory: GET ${BambuddyApi.inventorySpoolsPath()}",
                 )
             }
             runCatching {
@@ -401,11 +461,26 @@ class BambuddyApiClient {
                     val globalThreshold = parseLowStockThreshold(settingsDeferred.await())
                     val spools = parseSpoolInventoryList(spoolsDeferred.await(), globalThreshold)
                     val assignments = parseSpoolAssignments(assignmentsDeferred.await())
-                    mergeSpoolsWithAssignments(spools, assignments)
+                    val merged = mergeSpoolsWithAssignments(spools, assignments)
                         .sortedWith(
                             compareBy<SpoolInventoryItem> { it.assignment == null }
                                 .thenBy { it.displayName.lowercase() },
                         )
+                    if (BuddyDashDebug.enabled) {
+                        Log.d(
+                            TAG_SPOOL_USAGE_LINK,
+                            "fetchSpoolInventory: parsed=${spools.size} assignments=${assignments.size} " +
+                                "merged=${merged.size}",
+                        )
+                    }
+                    merged
+                }
+            }.also { result ->
+                if (BuddyDashDebug.enabled) {
+                    result.fold(
+                        onSuccess = { Log.d(TAG_SPOOL_USAGE_LINK, "fetchSpoolInventory: success count=${it.size}") },
+                        onFailure = { Log.w(TAG_SPOOL_USAGE_LINK, "fetchSpoolInventory: failed", it) },
+                    )
                 }
             }
         }
@@ -682,7 +757,7 @@ class BambuddyApiClient {
             )
         }
         val path = BambuddyApi.bedJogPath(printerId, distanceMm)
-        if (DEBUG_LOG_DETAIL_RAW) {
+        if (debugLogDetailRaw) {
             Log.d(TAG_MOTION, "POST $path")
         }
         postPrinterAction(serverUrl, apiKey, path)
@@ -735,7 +810,7 @@ class BambuddyApiClient {
             remainingTimeSeconds = run {
                 val rawState = json.optString("state").takeIf { it.isNotBlank() }
                 val seconds = parseRemainingTimeSeconds(json)
-                if (DEBUG_LOG_ETA_RAW) {
+                if (debugLogEtaRaw) {
                     etaDebugLogLine(json, rawState, seconds)?.let { line ->
                         Log.d(TAG_ETA, line)
                     }
@@ -780,7 +855,7 @@ class BambuddyApiClient {
         val activeExtruder = json.optInt("active_extruder", 0)
         val nozzleDiameterDisplay = parseNozzleDiameterFromStatus(json, activeExtruder)
 
-        if (DEBUG_LOG_DETAIL_RAW) {
+        if (debugLogDetailRaw) {
             Log.d(
                 TAG_DETAIL,
                 "metadata active_extruder=$activeExtruder " +
@@ -868,7 +943,7 @@ class BambuddyApiClient {
             null
         }
 
-        if (DEBUG_LOG_DETAIL_RAW) {
+        if (debugLogDetailRaw) {
             Log.d(
                 TAG_DETAIL,
                 "operational wifi=$wifiSignalDbm wired=$wiredNetwork door=$doorOpen " +
@@ -927,7 +1002,7 @@ class BambuddyApiClient {
                     humidityPercent = humidity,
                 ),
             )
-            if (DEBUG_LOG_DETAIL_RAW) {
+            if (debugLogDetailRaw) {
                 Log.d(
                     TAG_DETAIL,
                     "ams unit $amsId module_type=$moduleType lite=$isLite temp=$temp humidity=$humidity " +
@@ -957,7 +1032,7 @@ class BambuddyApiClient {
                 item.has("hours_since_maintenance") && !item.isNull("hours_since_maintenance")
             }
             val intervalType = item.optString("interval_type").takeIf { it.isNotBlank() }
-            if (DEBUG_LOG_DETAIL_RAW) {
+            if (debugLogDetailRaw) {
                 Log.d(
                     TAG_DETAIL,
                     "maintenance raw id=${item.optInt("id")} name=${item.optString("maintenance_type_name")} " +
@@ -980,7 +1055,7 @@ class BambuddyApiClient {
         }
         val totalPrintHours = json.optDouble("total_print_hours")
             .takeIf { json.has("total_print_hours") && !json.isNull("total_print_hours") && it > 0.0 }
-        if (DEBUG_LOG_DETAIL_RAW) {
+        if (debugLogDetailRaw) {
             Log.d(
                 TAG_DETAIL,
                 "maintenance items=${items.size} due=${json.optInt("due_count")} " +
@@ -1003,7 +1078,7 @@ class BambuddyApiClient {
         inventoryBySlot: Map<SlotInventoryKey, SlotInventoryInfo>,
     ): FilamentParseResult {
         val printerName = json.optString("name", "")
-        if (DEBUG_LOG_FILAMENT_RAW) {
+        if (debugLogFilamentRaw) {
             val printerId = json.optInt("id", -1)
             Log.d(
                 TAG_FILAMENT,
@@ -1019,7 +1094,7 @@ class BambuddyApiClient {
             for (unitIndex in 0 until amsArray.length()) {
                 val unit = amsArray.optJSONObject(unitIndex) ?: continue
                 val amsId = unit.optInt("id", unitIndex)
-                if (DEBUG_LOG_DETAIL_RAW) {
+                if (debugLogDetailRaw) {
                     Log.d(
                         TAG_DETAIL,
                         "ams[$amsId] temp=${unit.opt("temp")} humidity=${unit.opt("humidity")}",
@@ -1061,12 +1136,12 @@ class BambuddyApiClient {
             slots = slots,
             inventoryBySlot = inventoryBySlot,
             printerName = printerName.ifBlank { "printer ${json.optInt("id", -1)}" },
-            logColors = DEBUG_LOG_FILAMENT_RAW,
+            logColors = debugLogFilamentRaw,
         )
         val activeKey = resolveActiveFilamentSlot(
             statusJson = json,
             slots = enriched,
-            logRaw = DEBUG_LOG_FILAMENT_RAW,
+            logRaw = debugLogFilamentRaw,
         )
         return FilamentParseResult(slots = enriched, activeKey = activeKey)
     }
@@ -1083,7 +1158,7 @@ class BambuddyApiClient {
         val traySwatch = FilamentSwatchColors.fromTrayColor(trayJson.optString("tray_color"))
         val meta = trayJson.optString("tray_id_name").takeIf { it.isNotBlank() }
         val loaded = isTrayLoaded(type, traySwatch.colorHexes.firstOrNull(), remainPercent = null, meta)
-        if (DEBUG_LOG_FILAMENT_RAW) {
+        if (debugLogFilamentRaw) {
             Log.d(
                 TAG_FILAMENT,
                 "tray $label ams=$amsId tray=$trayId loaded=$loaded type=$type remainRaw=${trayJson.opt("remain")}",
@@ -1128,7 +1203,7 @@ class BambuddyApiClient {
             val job = parsePrintQueueItem(json)
             parsed.add(Triple(job, status, json))
         }
-        if (DEBUG_LOG_QUEUE) {
+        if (debugLogQueue) {
             Log.d(
                 TAG_QUEUE,
                 "GET queue rawCount=${array.length()} " +
@@ -1177,7 +1252,7 @@ class BambuddyApiClient {
             .filter { (_, status, _) -> status == QUEUE_STATUS_PENDING }
             .map { (job, _, _) -> job }
             .sortedBy { it.position }
-        if (DEBUG_LOG_QUEUE) {
+        if (debugLogQueue) {
             Log.d(
                 TAG_QUEUE,
                 "upcomingCount=${upcoming.size} printing=${printing?.id} " +

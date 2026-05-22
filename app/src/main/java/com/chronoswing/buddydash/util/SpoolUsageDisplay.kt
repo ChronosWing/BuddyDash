@@ -8,7 +8,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Temporary: spool usage history diagnostics. Set false before release. */
-const val DEBUG_LOG_SPOOL_USAGE = true // set false before release
+val DEBUG_LOG_SPOOL_USAGE: Boolean get() = BuddyDashDebug.enabled
 
 const val TAG_SPOOL_USAGE = "BuddyDash/SpoolUsage"
 

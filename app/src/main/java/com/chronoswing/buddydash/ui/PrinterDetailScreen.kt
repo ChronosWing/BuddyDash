@@ -105,15 +105,6 @@ fun PrinterDetailScreen(
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LifecyclePollingEffect(
-        enabled = uiState.hasCredentials && printerId >= 0,
-        intervalMs = 5_000L,
-        onPoll = {
-            val showLoading = uiState.status == null && uiState.error == null && !uiState.isClearingPlate
-            viewModel.loadStatus(showLoading = showLoading)
-        },
-    )
-
     val printerErrorNoDetails = stringResource(R.string.printer_error_no_details)
     val labels = uiState.status?.toDetailLabels(
         maintenanceItems = uiState.maintenanceItems,
@@ -128,6 +119,7 @@ fun PrinterDetailScreen(
         printerId = printerId,
         serverUrl = uiState.serverUrl,
         cameraToken = uiState.cameraToken,
+        hasCredentials = uiState.hasCredentials,
         isLoading = uiState.isLoading,
         isRefreshing = uiState.isRefreshing,
         error = uiState.error,
@@ -144,9 +136,12 @@ fun PrinterDetailScreen(
         isStartingQueuedPrint = uiState.isStartingQueuedPrint,
         startQueuedPrintSnackbar = uiState.startQueuedPrintSnackbar,
         onBack = onBack,
-        onRetry = viewModel::loadStatus,
-        onRefresh = { viewModel.loadStatus(showLoading = false) },
+        onRetry = { viewModel.loadStatus() },
+        onRefresh = { viewModel.loadStatus(showLoading = false, fromUser = true) },
         onPullRefresh = { viewModel.loadStatus(showLoading = false, fromPull = true) },
+        onPollStatus = { showLoading ->
+            viewModel.loadStatus(showLoading = showLoading)
+        },
         onMarkPlateClear = viewModel::markPlateClear,
         onPlateClearSnackbarShown = viewModel::onPlateClearSnackbarShown,
         onControlFeedbackShown = viewModel::onControlFeedbackShown,
@@ -179,6 +174,7 @@ private fun PrinterDetailScreenContent(
     printerId: Int,
     serverUrl: String,
     cameraToken: String,
+    hasCredentials: Boolean,
     isLoading: Boolean,
     isRefreshing: Boolean,
     error: String?,
@@ -203,6 +199,7 @@ private fun PrinterDetailScreenContent(
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
+    onPollStatus: (showLoading: Boolean) -> Unit,
     onMarkPlateClear: () -> Unit,
     onPlateClearSnackbarShown: () -> Unit,
     onControlFeedbackShown: () -> Unit,
@@ -237,6 +234,18 @@ private fun PrinterDetailScreenContent(
     val printStartedMessage = stringResource(R.string.archive_reprint_started)
     val startNextPrintFailedMessage = stringResource(R.string.start_next_print_failed)
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    val statusTabIndex = 0
+    val pollIntervalMs = if (selectedTab == statusTabIndex) 5_000L else 15_000L
+    LifecyclePollingEffect(
+        enabled = hasCredentials && printerId >= 0,
+        intervalMs = pollIntervalMs,
+        initialDelayMs = pollIntervalMs,
+        pollImmediately = false,
+        onPoll = {
+            val showLoading = labels == null && error == null && !isClearingPlate
+            onPollStatus(showLoading)
+        },
+    )
     val scrollState = rememberScrollState()
     var errorDetailsExpanded by rememberSaveable { mutableStateOf(false) }
     val errorCardScrollOffset = remember { mutableIntStateOf(0) }
@@ -335,8 +344,8 @@ private fun PrinterDetailScreenContent(
         },
     ) { innerPadding ->
         when {
-            isLoading -> LoadingContent(Modifier.padding(innerPadding))
-            error != null -> ErrorContent(
+            isLoading && labels == null -> LoadingContent(Modifier.padding(innerPadding))
+            labels == null && error != null -> ErrorContent(
                 message = error,
                 onRetry = onRetry,
                 modifier = Modifier.padding(innerPadding),
@@ -348,6 +357,16 @@ private fun PrinterDetailScreenContent(
                         .fillMaxSize()
                         .padding(innerPadding),
                 ) {
+                    if (error != null) {
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                        )
+                    }
                     PrimaryTabRow(selectedTabIndex = selectedTab) {
                         detailTabs.forEachIndexed { index, tabTitle ->
                             Tab(

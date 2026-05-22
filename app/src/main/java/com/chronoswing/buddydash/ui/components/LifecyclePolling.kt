@@ -19,13 +19,20 @@ fun LifecyclePollingEffect(
     enabled: Boolean,
     intervalMs: Long,
     onPoll: () -> Unit,
+    /** Delay before the first poll after resume (avoids doubling with initial load). */
+    initialDelayMs: Long = intervalMs,
+    /** When true, polls immediately on resume then waits [intervalMs] between polls. */
+    pollImmediately: Boolean = false,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState()
 
-    LaunchedEffect(enabled, intervalMs, lifecycleOwner, lifecycleState) {
+    LaunchedEffect(enabled, intervalMs, initialDelayMs, pollImmediately, lifecycleOwner, lifecycleState) {
         if (!enabled) return@LaunchedEffect
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            if (!pollImmediately && initialDelayMs > 0L) {
+                delay(initialDelayMs)
+            }
             while (isActive) {
                 onPoll()
                 delay(intervalMs)

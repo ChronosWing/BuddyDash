@@ -5,11 +5,13 @@ import com.chronoswing.buddydash.data.model.AmsUnitInfo
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.BambuddyApi
 
-private const val DEBUG_LOG_CAPABILITIES = true
+import com.chronoswing.buddydash.util.BuddyDashDebug
+
+private val debugLogCapabilities: Boolean get() = BuddyDashDebug.enabled
 private const val TAG_CAPABILITIES = "BuddyDash/Capabilities"
 
 private fun logCapabilities(message: String) {
-    if (!DEBUG_LOG_CAPABILITIES) return
+    if (!debugLogCapabilities) return
     try {
         Log.d(TAG_CAPABILITIES, message)
     } catch (_: RuntimeException) {

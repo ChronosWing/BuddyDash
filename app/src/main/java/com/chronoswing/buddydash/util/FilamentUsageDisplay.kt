@@ -5,7 +5,7 @@ import org.json.JSONObject
 import kotlin.math.roundToInt
 
 /** Temporary: log filament usage field discovery. Set false before release. */
-const val DEBUG_LOG_FILAMENT_USAGE = true
+val DEBUG_LOG_FILAMENT_USAGE: Boolean get() = BuddyDashDebug.enabled
 
 const val TAG_FILAMENT_USAGE = "BuddyDash/FilamentUsage"
 

@@ -122,7 +122,7 @@ enum class BottomNavTab {
 }
 
 /** Temporary: verify bottom-tab destinations. Set false before release. */
-private const val DEBUG_LOG_NAV_DESTINATIONS = true
+private val debugLogNavDestinations: Boolean get() = com.chronoswing.buddydash.util.BuddyDashDebug.enabled
 private const val TAG_NAV = "BuddyDash/Nav"
 
 private fun bottomNavSelectedLabel(route: String?): String =
@@ -152,7 +152,7 @@ private fun logNavState(
     currentRoute: String?,
     extra: String = "",
 ) {
-    if (!DEBUG_LOG_NAV_DESTINATIONS) return
+    if (!debugLogNavDestinations) return
     Log.d(
         TAG_NAV,
         "$event currentRoute=$currentRoute selectedTab=${bottomNavSelectedLabel(currentRoute)} $extra",
@@ -169,7 +169,7 @@ fun BuddyDashNav(
     val currentRoute = navBackStackEntry?.destination?.route
 
     LaunchedEffect(Unit) {
-        if (DEBUG_LOG_NAV_DESTINATIONS) {
+        if (debugLogNavDestinations) {
             Log.d(
                 TAG_NAV,
                 "bottomNavTabs=Printers(${Routes.HOME}), Spools(${Routes.SPOOLS}), " +

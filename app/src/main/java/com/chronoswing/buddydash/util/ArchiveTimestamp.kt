@@ -12,7 +12,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
 /** Temporary: stats date-field discovery. Set false before release. */
-const val DEBUG_LOG_ARCHIVE_STATS_DATE = true
+val DEBUG_LOG_ARCHIVE_STATS_DATE: Boolean get() = BuddyDashDebug.enabled
 
 const val TAG_ARCHIVE_STATS_DATE = "BuddyDash/ArchiveStatsDate"
 
