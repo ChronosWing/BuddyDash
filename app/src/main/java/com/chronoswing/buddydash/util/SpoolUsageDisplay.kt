@@ -107,9 +107,16 @@ fun buildSpoolUsageDisplayItems(
     entries: List<SpoolUsageEntry>,
     archives: List<PrintArchive>,
     printerNamesById: Map<Int, String>,
+    spoolMaterial: String? = null,
+    spoolColorName: String? = null,
 ): List<SpoolUsageDisplayItem> =
     entries.map { entry ->
-        val link = resolveSpoolUsageArchiveLink(entry, archives)
+        val link = resolveSpoolUsageArchiveLink(
+            entry = entry,
+            archives = archives,
+            spoolMaterial = spoolMaterial,
+            spoolColorName = spoolColorName,
+        )
         val archiveId = link.archiveId
         SpoolUsageDisplayItem(
             entry = entry,
@@ -135,7 +142,12 @@ fun matchArchiveForSpoolUsage(
     printerNamesById: Map<Int, String> = emptyMap(),
     spoolMaterial: String? = null,
     spoolColorName: String? = null,
-): Int? = resolveSpoolUsageArchiveLink(entry, archives).archiveId
+): Int? = resolveSpoolUsageArchiveLink(
+    entry = entry,
+    archives = archives,
+    spoolMaterial = spoolMaterial,
+    spoolColorName = spoolColorName,
+).archiveId
 
 fun formatSpoolUsagePrintName(entry: SpoolUsageEntry): String {
     val raw = entry.printName?.trim()?.takeIf { isMeaningfulSpoolField(it) }
