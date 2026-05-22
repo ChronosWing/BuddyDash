@@ -46,6 +46,8 @@ data class HomeUiState(
     val apiKey: String = "",
     val cameraToken: String = "",
     val hasCredentials: Boolean = false,
+    /** True after settings DataStore has emitted at least once. */
+    val settingsReady: Boolean = false,
     val lastUpdatedAtMillis: Long? = null,
 )
 
@@ -81,6 +83,7 @@ class HomeViewModel(
                         apiKey = key,
                         cameraToken = cameraToken,
                         hasCredentials = hasCredentials,
+                        settingsReady = true,
                     )
                 }
                 if (hasCredentials) {
@@ -97,6 +100,19 @@ class HomeViewModel(
                     }
                 } else {
                     lastNetworkLoadServerKey = null
+                    viewModelScope.launch {
+                        if (url.isNotBlank()) {
+                            hydrateFromDiskCache(url)
+                        }
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                isRefreshing = false,
+                                isEnriching = false,
+                                hasCompletedLoad = true,
+                            )
+                        }
+                    }
                 }
             }
         }
