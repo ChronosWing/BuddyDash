@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.activity.compose.BackHandler
@@ -32,7 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -225,45 +225,30 @@ private fun HomeScreenContent(
     }
 
     Scaffold(
+        // topBar height is only the branded header; content top padding matches that height.
         topBar = {
-            TopAppBar(
-                title = {
-                    HomeTopBarTitle(
-                        ambientPulseEnabled = hasAnyPrinterPrinting(printers) &&
-                            !preferOfflineInHeader,
-                        appNameContentDescription = appNameContentDescription,
-                        showHeaderMetadata = showHeaderMetadata,
-                        onlineCount = printerCounts.online,
-                        printingCount = printerCounts.printing,
-                        loadedSpoolCount = loadedSpoolCount ?: 0,
-                        lastUpdatedAtMillis = lastUpdatedAtMillis,
-                        showHeaderUpdating = showHeaderUpdating,
-                        hasCredentials = hasCredentials,
-                        isLoading = isLoading,
-                        onRefresh = onRefresh,
-                        showConnectionStaleInHeader = showConnectionStaleInHeader,
-                        preferOfflineInHeader = preferOfflineInHeader,
-                    )
-                },
-                actions = {
-                    if (showPrinterSearch) {
-                        IconButton(
-                            onClick = {
-                                searchExpanded = !searchExpanded
-                                if (!searchExpanded) {
-                                    searchQuery = ""
-                                    searchFilter = HomePrinterSearchFilter.All
-                                }
-                            },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = stringResource(R.string.search_printers),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                    alpha = if (searchExpanded) 0.95f else 0.65f,
-                                ),
-                            )
-                        }
+            HomeCompactTopBar(
+                ambientPulseEnabled = hasAnyPrinterPrinting(printers) &&
+                    !preferOfflineInHeader,
+                appNameContentDescription = appNameContentDescription,
+                showHeaderMetadata = showHeaderMetadata,
+                onlineCount = printerCounts.online,
+                printingCount = printerCounts.printing,
+                loadedSpoolCount = loadedSpoolCount ?: 0,
+                lastUpdatedAtMillis = lastUpdatedAtMillis,
+                showHeaderUpdating = showHeaderUpdating,
+                hasCredentials = hasCredentials,
+                isLoading = isLoading,
+                onRefresh = onRefresh,
+                showConnectionStaleInHeader = showConnectionStaleInHeader,
+                preferOfflineInHeader = preferOfflineInHeader,
+                showPrinterSearch = showPrinterSearch,
+                searchExpanded = searchExpanded,
+                onSearchToggle = {
+                    searchExpanded = !searchExpanded
+                    if (!searchExpanded) {
+                        searchQuery = ""
+                        searchFilter = HomePrinterSearchFilter.All
                     }
                 },
             )
@@ -519,11 +504,86 @@ private val HomeTitleLogoImageSize = 104.dp
 private val HomeTitleLogoSlotWidth = 84.dp
 private val HomeTitleTextPullLeft = 14.dp
 private val HomeTitleStatusStartPadding = 16.dp
+private val HomeTopBarHorizontalPadding = 16.dp
+private val HomeTopBarActionsEndPadding = 4.dp
+/** Below status bar; outer NavHost no longer applies top safe-area inset. */
+private val HomeTopBarContentTopPadding = 4.dp
+private val HomeTopBarContentBottomPadding = 6.dp
 
 private fun hasAnyPrinterPrinting(printers: List<Printer>): Boolean =
     printers.any { printer ->
         printer.liveStatus?.resolveActivityKind() == PrinterActivityKind.Printing
     }
+
+@Composable
+private fun HomeCompactTopBar(
+    ambientPulseEnabled: Boolean,
+    appNameContentDescription: String,
+    showHeaderMetadata: Boolean,
+    onlineCount: Int,
+    printingCount: Int,
+    loadedSpoolCount: Int,
+    lastUpdatedAtMillis: Long?,
+    showHeaderUpdating: Boolean,
+    hasCredentials: Boolean,
+    isLoading: Boolean,
+    onRefresh: () -> Unit,
+    showConnectionStaleInHeader: Boolean,
+    preferOfflineInHeader: Boolean,
+    showPrinterSearch: Boolean,
+    searchExpanded: Boolean,
+    onSearchToggle: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(
+                    start = HomeTopBarHorizontalPadding,
+                    end = HomeTopBarActionsEndPadding,
+                    top = HomeTopBarContentTopPadding,
+                    bottom = HomeTopBarContentBottomPadding,
+                ),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+            ) {
+                HomeTopBarTitle(
+                    ambientPulseEnabled = ambientPulseEnabled,
+                    appNameContentDescription = appNameContentDescription,
+                    showHeaderMetadata = showHeaderMetadata,
+                    onlineCount = onlineCount,
+                    printingCount = printingCount,
+                    loadedSpoolCount = loadedSpoolCount,
+                    lastUpdatedAtMillis = lastUpdatedAtMillis,
+                    showHeaderUpdating = showHeaderUpdating,
+                    hasCredentials = hasCredentials,
+                    isLoading = isLoading,
+                    onRefresh = onRefresh,
+                    showConnectionStaleInHeader = showConnectionStaleInHeader,
+                    preferOfflineInHeader = preferOfflineInHeader,
+                    modifier = Modifier.weight(1f),
+                )
+                if (showPrinterSearch) {
+                    IconButton(onClick = onSearchToggle) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = stringResource(R.string.search_printers),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                alpha = if (searchExpanded) 0.95f else 0.65f,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun HomeTopBarTitle(
@@ -540,16 +600,17 @@ private fun HomeTopBarTitle(
     onRefresh: () -> Unit,
     showConnectionStaleInHeader: Boolean,
     preferOfflineInHeader: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(HomeTitleLogoImageSize),
     ) {
         HomeTitleWordmark(
             ambientPulseEnabled = ambientPulseEnabled,
             modifier = Modifier
-                .align(Alignment.CenterStart)
+                .align(Alignment.TopStart)
                 .semantics {
                     contentDescription = appNameContentDescription
                 },
@@ -558,7 +619,7 @@ private fun HomeTopBarTitle(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier
-                .align(Alignment.CenterEnd)
+                .align(Alignment.TopEnd)
                 .wrapContentWidth(Alignment.End)
                 .padding(start = HomeTitleStatusStartPadding),
         ) {

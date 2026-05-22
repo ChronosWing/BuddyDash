@@ -1,7 +1,11 @@
 package com.chronoswing.buddydash.ui
 
 import android.util.Log
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -272,6 +276,11 @@ fun BuddyDashNav(
     }
 
     Scaffold(
+        // Tab screens own top safe area (Home header, TopAppBar, etc.). Applying top
+        // insets here as well doubled status-bar padding on Home.
+        contentWindowInsets = WindowInsets.safeDrawing.only(
+            WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
+        ),
         bottomBar = {
             BuddyDashBottomNav(
                 currentRoute = currentRoute,
