@@ -21,6 +21,7 @@ fun tokenAuthenticatedImageUrl(
     path: String,
     cameraToken: String,
     cacheBust: Long? = null,
+    cacheBustParam: String = "v",
 ): String? {
     val base = normalizeBambuddyBaseUrl(serverUrl) ?: return null
     val token = cameraToken.trim()
@@ -39,7 +40,7 @@ fun tokenAuthenticatedImageUrl(
         else -> "/$pathPart"
     }
     val query = buildList {
-        cacheBust?.let { add("v=$it") }
+        cacheBust?.let { add("$cacheBustParam=$it") }
         add("token=$encoded")
     }
     val separator = if (normalizedPath.contains('?')) "&" else "?"
@@ -47,8 +48,18 @@ fun tokenAuthenticatedImageUrl(
 }
 
 /** Cover image requires `?token=` query param; API key / Bearer auth are not accepted. */
-fun printerCoverUrl(serverUrl: String, printerId: Int, cameraToken: String): String? =
-    tokenAuthenticatedImageUrl(serverUrl, BambuddyApi.printerCoverPath(printerId), cameraToken)
+fun printerCoverUrl(
+    serverUrl: String,
+    printerId: Int,
+    cameraToken: String,
+    cacheBust: Long? = null,
+): String? =
+    tokenAuthenticatedImageUrl(
+        serverUrl,
+        BambuddyApi.printerCoverPath(printerId),
+        cameraToken,
+        cacheBust = cacheBust,
+    )
 
 /** Camera still frame (OpenAPI: GET …/camera/snapshot?token=). */
 fun printerCameraSnapshotUrl(
@@ -62,7 +73,12 @@ fun printerCameraSnapshotUrl(
         BambuddyApi.cameraSnapshotPath(printerId),
         cameraToken,
         cacheBust = cacheBust,
+        cacheBustParam = "ts",
     )
+
+/** Coil cache key for a single camera snapshot poll (must include refresh token). */
+fun cameraSnapshotImageCacheKey(printerId: Int, refreshTick: Long): String =
+    "camera-snapshot-$printerId-$refreshTick"
 
 /** Live MJPEG stream (OpenAPI: GET …/camera/stream?token=&fps=). */
 fun printerCameraStreamUrl(

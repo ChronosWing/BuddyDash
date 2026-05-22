@@ -23,10 +23,14 @@ import com.chronoswing.buddydash.util.logControlFailure
 import com.chronoswing.buddydash.util.PRINTER_STATUS_SETTLE_MS
 import com.chronoswing.buddydash.util.isTransientState
 import com.chronoswing.buddydash.util.BuddyDashDebug
-import com.chronoswing.buddydash.util.FilamentAction
+import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.util.FilamentSlotDisplay
 import com.chronoswing.buddydash.util.RefreshGuard
+import com.chronoswing.buddydash.util.SpoolInventoryFilter
+import com.chronoswing.buddydash.util.applySpoolInventorySearch
 import com.chronoswing.buddydash.util.buildFilamentSlotDisplays
+import com.chronoswing.buddydash.util.filterSpoolsForSlotAssignment
+import com.chronoswing.buddydash.util.formatSpoolCardTitle
 import com.chronoswing.buddydash.util.motionDebugLog
 import com.chronoswing.buddydash.util.toUserNetworkMessage
 import kotlinx.coroutines.Job
@@ -49,6 +53,7 @@ data class PrinterDetailUiState(
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val error: String? = null,
+    val refreshError: String? = null,
     val serverUrl: String = "",
     val apiKey: String = "",
     val cameraToken: String = "",
@@ -71,21 +76,28 @@ data class PrinterDetailUiState(
     val machineInfo: PrinterMachineInfo? = null,
     val bedJogStepMm: Float = BED_JOG_STEP_OPTIONS_MM[1],
     val filamentSlotDisplays: List<FilamentSlotDisplay> = emptyList(),
-    val isFilamentActionBusy: Boolean = false,
-    val filamentConfirm: FilamentConfirmRequest? = null,
-    val filamentSnackbar: FilamentActionSnackbar? = null,
+    val inventorySpools: List<SpoolInventoryItem> = emptyList(),
+    val filamentSlotSheet: FilamentSlotDisplay? = null,
+    val filamentSpoolPickerOpen: Boolean = false,
+    val spoolPickerSearchQuery: String = "",
+    val assignSpoolConfirm: AssignSpoolConfirm? = null,
+    val clearAssignmentConfirm: FilamentSlotDisplay? = null,
+    val isFilamentAssignBusy: Boolean = false,
+    val filamentAssignSnackbar: FilamentAssignSnackbar? = null,
+    /** Queue item id for status=printing (thumbnail cache identity). */
+    val printingQueueJobId: Int? = null,
 )
 
-data class FilamentConfirmRequest(
-    val action: FilamentAction,
+data class AssignSpoolConfirm(
     val slotDisplay: FilamentSlotDisplay,
+    val spool: SpoolInventoryItem,
 )
 
-enum class FilamentActionSnackbar {
-    LoadStarted,
-    UnloadStarted,
-    LoadFailed,
-    UnloadFailed,
+enum class FilamentAssignSnackbar {
+    Assigned,
+    AssignFailed,
+    Cleared,
+    ClearFailed,
 }
 
 enum class StartQueuedPrintSnackbar {
@@ -151,6 +163,10 @@ class PrinterDetailViewModel(
         loadStatus()
     }
 
+    fun onRefreshErrorShown() {
+        _uiState.update { it.copy(refreshError = null) }
+    }
+
     fun loadStatus(
         showLoading: Boolean = true,
         fromPull: Boolean = false,
@@ -164,6 +180,7 @@ class PrinterDetailViewModel(
                     isLoading = false,
                     isRefreshing = false,
                     error = null,
+                    refreshError = null,
                 )
             }
             return
@@ -171,10 +188,13 @@ class PrinterDetailViewModel(
         if (fromUser && !fromPull && manualRefreshGuard.shouldSkipManualRefresh()) return
         if (fromUser && fetchJob?.isActive == true) return
 
+        val hasCachedData = state.status != null
+        val isInitialLoad = !hasCachedData
+
         fetchJob?.cancel()
         fetchJob = viewModelScope.launch {
-            if (fromPull) {
-                _uiState.update { it.copy(isRefreshing = true, error = null) }
+            if (!isInitialLoad) {
+                _uiState.update { it.copy(isRefreshing = true, refreshError = null) }
             } else if (showLoading) {
                 _uiState.update { it.copy(isLoading = true, error = null) }
             }
@@ -214,7 +234,7 @@ class PrinterDetailViewModel(
                             current.copy(
                                 isLoading = false,
                                 isRefreshing = false,
-                                error = error.toUserNetworkMessage("Failed to load printer status"),
+                                refreshError = error.toUserNetworkMessage("Could not refresh"),
                             )
                         } else {
                             current.copy(
@@ -227,6 +247,7 @@ class PrinterDetailViewModel(
                                 startNextQueuedPrintReadiness =
                                     StartNextQueuedPrintReadiness(canStart = false),
                                 activePrintFilamentUsage = null,
+                                printingQueueJobId = null,
                                 error = error.toUserNetworkMessage("Failed to load printer status"),
                             )
                         }
@@ -255,7 +276,9 @@ class PrinterDetailViewModel(
                     queuedItemCount = upcoming.size,
                 ),
                 activePrintFilamentUsage = activeFilament,
+                printingQueueJobId = queueSnapshot.printing?.id,
                 error = null,
+                refreshError = null,
                 lastStatusUpdatedAtMillis = System.currentTimeMillis(),
             )
         }
@@ -292,62 +315,107 @@ class PrinterDetailViewModel(
                         "spools=${spools.size} matched=${displays.count { it.isTappable }}",
                 )
             }
-            _uiState.update { it.copy(filamentSlotDisplays = displays) }
+            _uiState.update {
+                it.copy(
+                    filamentSlotDisplays = displays,
+                    inventorySpools = spools,
+                )
+            }
         }
     }
 
-    fun requestFilamentLoad(slotDisplay: FilamentSlotDisplay) {
-        _uiState.update { it.copy(filamentConfirm = FilamentConfirmRequest(FilamentAction.Load, slotDisplay)) }
+    fun openFilamentSlotSheet(display: FilamentSlotDisplay) {
+        if (!display.canAssign) return
+        _uiState.update {
+            it.copy(
+                filamentSlotSheet = display,
+                filamentSpoolPickerOpen = false,
+                spoolPickerSearchQuery = "",
+            )
+        }
     }
 
-    fun requestFilamentUnload(slotDisplay: FilamentSlotDisplay) {
-        _uiState.update { it.copy(filamentConfirm = FilamentConfirmRequest(FilamentAction.Unload, slotDisplay)) }
+    fun dismissFilamentSlotSheet() {
+        _uiState.update {
+            it.copy(
+                filamentSlotSheet = null,
+                filamentSpoolPickerOpen = false,
+                spoolPickerSearchQuery = "",
+            )
+        }
     }
 
-    fun dismissFilamentConfirm() {
-        _uiState.update { it.copy(filamentConfirm = null) }
+    fun openFilamentSpoolPicker() {
+        _uiState.update {
+            it.copy(
+                filamentSpoolPickerOpen = true,
+                spoolPickerSearchQuery = "",
+            )
+        }
     }
 
-    fun confirmFilamentAction() {
-        val confirm = _uiState.value.filamentConfirm ?: return
-        _uiState.update { it.copy(filamentConfirm = null, isFilamentActionBusy = true) }
+    fun dismissFilamentSpoolPicker() {
+        _uiState.update { it.copy(filamentSpoolPickerOpen = false, spoolPickerSearchQuery = "") }
+    }
+
+    fun onSpoolPickerSearchChange(query: String) {
+        _uiState.update { it.copy(spoolPickerSearchQuery = query) }
+    }
+
+    fun spoolsForPicker(): List<SpoolInventoryItem> {
+        val state = _uiState.value
+        val slot = state.filamentSlotSheet?.slot ?: return emptyList()
+        val filtered = filterSpoolsForSlotAssignment(state.inventorySpools, slot)
+        return applySpoolInventorySearch(filtered, state.spoolPickerSearchQuery, SpoolInventoryFilter.All)
+    }
+
+    fun requestAssignSpool(spool: SpoolInventoryItem) {
+        val slotDisplay = _uiState.value.filamentSlotSheet ?: return
+        _uiState.update {
+            it.copy(
+                assignSpoolConfirm = AssignSpoolConfirm(slotDisplay, spool),
+                filamentSpoolPickerOpen = false,
+            )
+        }
+    }
+
+    fun dismissAssignSpoolConfirm() {
+        _uiState.update { it.copy(assignSpoolConfirm = null) }
+    }
+
+    fun confirmAssignSpool() {
+        val confirm = _uiState.value.assignSpoolConfirm ?: return
+        val key = confirm.slotDisplay.slot.inventoryKey ?: return
+        _uiState.update { it.copy(assignSpoolConfirm = null, isFilamentAssignBusy = true) }
         viewModelScope.launch {
             val state = _uiState.value
-            val result = when (confirm.action) {
-                FilamentAction.Load ->
-                    apiClient.amsLoadFilament(
-                        state.serverUrl,
-                        state.apiKey,
-                        printerId,
-                        confirm.slotDisplay.trayGlobalId,
-                    )
-                FilamentAction.Unload ->
-                    apiClient.amsUnloadFilament(state.serverUrl, state.apiKey, printerId)
-            }
+            val result = apiClient.assignSpoolToSlot(
+                serverUrl = state.serverUrl,
+                apiKey = state.apiKey,
+                printerId = printerId,
+                amsId = key.amsId,
+                trayId = key.trayId,
+                spoolId = confirm.spool.id,
+            )
             result.fold(
                 onSuccess = {
                     _uiState.update {
                         it.copy(
-                            isFilamentActionBusy = false,
-                            filamentSnackbar = when (confirm.action) {
-                                FilamentAction.Load -> FilamentActionSnackbar.LoadStarted
-                                FilamentAction.Unload -> FilamentActionSnackbar.UnloadStarted
-                            },
+                            isFilamentAssignBusy = false,
+                            filamentAssignSnackbar = FilamentAssignSnackbar.Assigned,
+                            filamentSlotSheet = null,
                         )
                     }
                     loadStatus(showLoading = false)
                 },
                 onFailure = { error ->
                     if (BuddyDashDebug.enabled) {
-                        android.util.Log.w("BuddyDash/FilamentTab", "filament action failed", error)
+                        android.util.Log.w("BuddyDash/FilamentTab", "assign spool failed", error)
                     }
                     _uiState.update {
                         it.copy(
-                            isFilamentActionBusy = false,
-                            filamentSnackbar = when (confirm.action) {
-                                FilamentAction.Load -> FilamentActionSnackbar.LoadFailed
-                                FilamentAction.Unload -> FilamentActionSnackbar.UnloadFailed
-                            },
+                            isFilamentAssignBusy = false,
+                            filamentAssignSnackbar = FilamentAssignSnackbar.AssignFailed,
                         )
                     }
                 },
@@ -355,8 +423,62 @@ class PrinterDetailViewModel(
         }
     }
 
-    fun onFilamentSnackbarShown() {
-        _uiState.update { it.copy(filamentSnackbar = null) }
+    fun requestClearSlotAssignment() {
+        val sheet = _uiState.value.filamentSlotSheet ?: return
+        if (sheet.assignedSpoolId == null) return
+        _uiState.update { it.copy(clearAssignmentConfirm = sheet) }
+    }
+
+    fun dismissClearAssignmentConfirm() {
+        _uiState.update { it.copy(clearAssignmentConfirm = null) }
+    }
+
+    fun confirmClearSlotAssignment() {
+        val slotDisplay = _uiState.value.clearAssignmentConfirm ?: return
+        val key = slotDisplay.slot.inventoryKey ?: return
+        _uiState.update { it.copy(clearAssignmentConfirm = null, isFilamentAssignBusy = true) }
+        viewModelScope.launch {
+            val state = _uiState.value
+            val result = apiClient.unassignSpoolFromSlot(
+                serverUrl = state.serverUrl,
+                apiKey = state.apiKey,
+                printerId = printerId,
+                amsId = key.amsId,
+                trayId = key.trayId,
+            )
+            result.fold(
+                onSuccess = {
+                    _uiState.update {
+                        it.copy(
+                            isFilamentAssignBusy = false,
+                            filamentAssignSnackbar = FilamentAssignSnackbar.Cleared,
+                            filamentSlotSheet = null,
+                        )
+                    }
+                    loadStatus(showLoading = false)
+                },
+                onFailure = { error ->
+                    if (BuddyDashDebug.enabled) {
+                        android.util.Log.w("BuddyDash/FilamentTab", "clear assignment failed", error)
+                    }
+                    _uiState.update {
+                        it.copy(
+                            isFilamentAssignBusy = false,
+                            filamentAssignSnackbar = FilamentAssignSnackbar.ClearFailed,
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    fun onFilamentAssignSnackbarShown() {
+        _uiState.update { it.copy(filamentAssignSnackbar = null) }
+    }
+
+    fun assignConfirmSpoolTitle(): String {
+        val confirm = _uiState.value.assignSpoolConfirm ?: return ""
+        return formatSpoolCardTitle(confirm.spool)
     }
 
     private suspend fun refreshStatusAfterControl() {

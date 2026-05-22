@@ -23,12 +23,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,6 +44,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chronoswing.buddydash.HomeViewModel
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.Printer
+import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.util.rememberCurrentPrintThumbnailIdentity
 import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
@@ -59,6 +64,7 @@ import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
 import com.chronoswing.buddydash.util.HOME_PRINTER_SEARCH_MIN_COUNT
+import com.chronoswing.buddydash.util.ListLoadUi
 import com.chronoswing.buddydash.util.PrinterCardLabels
 import com.chronoswing.buddydash.util.HomePrinterSearchFilter
 import com.chronoswing.buddydash.util.applyHomePrinterSearch
@@ -99,6 +105,7 @@ fun HomeScreen(
         onPullRefresh = {
             viewModel.loadPrinters(showLoading = false, fromPull = true)
         },
+        onRefreshErrorShown = viewModel::onRefreshErrorShown,
         lastUpdatedAtMillis = uiState.lastUpdatedAtMillis,
         onPrinterClick = onPrinterClick,
     )
@@ -118,9 +125,31 @@ private fun HomeScreenContent(
     cameraToken: String,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
+    onRefreshErrorShown: () -> Unit,
     lastUpdatedAtMillis: Long?,
     onPrinterClick: (Printer) -> Unit,
 ) {
+    val cachedCount = printers.size
+    val showInitialSkeleton = ListLoadUi.showInitialSkeleton(
+        hasCredentials = hasCredentials,
+        cachedItemCount = cachedCount,
+        isInitialLoading = isLoading,
+        hasCompletedLoad = hasCompletedLoad,
+    )
+    val showPullRefreshIndicator = ListLoadUi.showPullRefreshIndicator(
+        isRefreshing = isRefreshing,
+        cachedItemCount = cachedCount,
+    )
+    val snackbarHostState = remember { SnackbarHostState() }
+    val refreshFailedMessage = stringResource(R.string.refresh_failed)
+
+    LaunchedEffect(refreshError) {
+        if (refreshError != null) {
+            snackbarHostState.showSnackbar(refreshFailedMessage)
+            onRefreshErrorShown()
+        }
+    }
+
     val showPrinterSearch = printers.size >= HOME_PRINTER_SEARCH_MIN_COUNT
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -144,6 +173,7 @@ private fun HomeScreenContent(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -199,12 +229,12 @@ private fun HomeScreenContent(
                     modifier = Modifier.padding(innerPadding),
                 )
             }
-            !hasCompletedLoad && printers.isEmpty() -> {
+            showInitialSkeleton -> {
                 PrinterListSkeleton(Modifier.padding(innerPadding))
             }
             error != null && printers.isEmpty() && hasCompletedLoad -> {
                 PullToRefreshBox(
-                    isRefreshing = isRefreshing,
+                    isRefreshing = showPullRefreshIndicator,
                     onRefresh = onPullRefresh,
                     modifier = Modifier
                         .fillMaxSize()
@@ -246,7 +276,7 @@ private fun HomeScreenContent(
                         onFilterSelected = { searchFilter = it },
                     )
                     PullToRefreshBox(
-                        isRefreshing = isRefreshing,
+                        isRefreshing = showPullRefreshIndicator,
                         onRefresh = onPullRefresh,
                         modifier = Modifier.fillMaxSize(),
                     ) {
@@ -256,17 +286,6 @@ private fun HomeScreenContent(
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            val bannerMessage = refreshError ?: error
-                            if (bannerMessage != null) {
-                                item(key = "error_banner") {
-                                    Text(
-                                        text = bannerMessage,
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(bottom = 4.dp),
-                                    )
-                                }
-                            }
                             if (searchExpanded && filteredPrinters.isEmpty()) {
                                 item(key = "search_empty") {
                                     EmptyContent(
@@ -283,6 +302,7 @@ private fun HomeScreenContent(
                                 GlancePrinterCard(
                                     labels = printer.toCardLabels(),
                                     printerId = printer.id,
+                                    liveStatus = printer.liveStatus,
                                     serverUrl = serverUrl,
                                     cameraToken = cameraToken,
                                     onClick = { onPrinterClick(printer) },
@@ -300,10 +320,16 @@ private fun HomeScreenContent(
 private fun GlancePrinterCard(
     labels: PrinterCardLabels,
     printerId: Int,
+    liveStatus: PrinterStatus?,
     serverUrl: String,
     cameraToken: String,
     onClick: () -> Unit,
 ) {
+    val printThumbnailIdentity = rememberCurrentPrintThumbnailIdentity(
+        printerId = printerId,
+        status = liveStatus,
+        fileName = labels.fileLine,
+    )
     HomeCardMicroMotionFrame(
         animateIdleBreath = false,
         motion = labels.cardMicroMotion,
@@ -388,7 +414,7 @@ private fun GlancePrinterCard(
                         PrinterCoverImage(
                             serverUrl = serverUrl,
                             cameraToken = cameraToken,
-                            printerId = printerId,
+                            thumbnailIdentity = printThumbnailIdentity,
                             size = 64.dp,
                         )
                     }

@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,6 +88,7 @@ fun PrinterCameraFullscreenDialog(
             var snapshotRefreshTick by remember(printerId) {
                 mutableLongStateOf(System.currentTimeMillis())
             }
+            var snapshotRefreshTickNumber by remember(printerId) { mutableIntStateOf(0) }
             CameraOrientationWhileOpen()
             val configuration = LocalConfiguration.current
             val isLandscape =
@@ -104,6 +106,7 @@ fun PrinterCameraFullscreenDialog(
                     while (isActive) {
                         delay(5_000L)
                         snapshotRefreshTick = System.currentTimeMillis()
+                        snapshotRefreshTickNumber += 1
                     }
                 }
             }
@@ -136,6 +139,7 @@ fun PrinterCameraFullscreenDialog(
                             cameraToken = cameraToken,
                             printerId = printerId,
                             refreshTick = snapshotRefreshTick,
+                            refreshTickNumber = snapshotRefreshTickNumber,
                             onLoadingChanged = { loading ->
                                 if (!loading) showLoadingIndicator = false
                             },
@@ -245,6 +249,7 @@ private fun CameraSnapshotFallback(
     cameraToken: String,
     printerId: Int,
     refreshTick: Long,
+    refreshTickNumber: Int,
     onLoadingChanged: (Boolean) -> Unit,
 ) {
     val snapshotUrl = remember(serverUrl, printerId, cameraToken, refreshTick) {
@@ -271,6 +276,7 @@ private fun CameraSnapshotFallback(
             cameraToken = cameraToken,
             printerId = printerId,
             refreshTick = refreshTick,
+            refreshTickNumber = refreshTickNumber,
             modifier = Modifier.fillMaxSize(),
             fillMaxSize = true,
             contentScale = ContentScale.Fit,

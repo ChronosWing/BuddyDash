@@ -68,8 +68,10 @@ class FilamentSlotInventoryTest {
         assertEquals(FilamentSpoolMatchKind.Assignment, display.matchKind)
         assertEquals("KINGROON PETG Blue", display.primaryTitle)
         assertEquals("PETG · Basic", display.subtitle)
+        assertTrue(display.canAssign)
         assertTrue(display.isTappable)
         assertEquals(42, display.spoolId)
+        assertEquals(42, display.assignedSpoolId)
     }
 
     @Test
@@ -100,7 +102,8 @@ class FilamentSlotInventoryTest {
             spoolsAssignedToPrinter = listOf(blue, duplicateBlue),
         ).single()
         assertEquals(FilamentSpoolMatchKind.None, ambiguous.matchKind)
-        assertFalse(ambiguous.isTappable)
+        assertTrue(ambiguous.canAssign)
+        assertTrue(ambiguous.isTappable)
         assertNull(ambiguous.spoolId)
 
         val unique = buildFilamentSlotDisplays(
@@ -117,14 +120,14 @@ class FilamentSlotInventoryTest {
     }
 
     @Test
-    fun buildFilamentSlotDisplays_noMatch_fallsBackToFilamentType() {
+    fun buildFilamentSlotDisplays_emptySlot_showsEmpty() {
         val slot = FilamentSlot(
             label = "A3",
-            filamentType = "PETG",
+            filamentType = null,
             swatchColorHexes = emptyList(),
             amsId = 0,
             trayId = 2,
-            isLoaded = true,
+            isLoaded = false,
         )
         val display = buildFilamentSlotDisplays(
             slots = listOf(slot),
@@ -135,9 +138,9 @@ class FilamentSlotInventoryTest {
             spoolsAssignedToPrinter = emptyList(),
         ).single()
 
-        assertEquals("PETG", display.primaryTitle)
-        assertNull(display.subtitle)
-        assertFalse(display.isTappable)
+        assertEquals("", display.primaryTitle)
+        assertTrue(display.isEmpty)
+        assertTrue(display.canAssign)
     }
 
     private fun sampleSpool(

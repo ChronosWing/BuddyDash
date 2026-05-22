@@ -48,6 +48,7 @@ import com.chronoswing.buddydash.ui.components.SpoolInventoryRow
 import com.chronoswing.buddydash.ui.components.SpoolListSkeleton
 import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.util.ArchiveSpoolLookupFilter
+import com.chronoswing.buddydash.util.ListLoadUi
 import com.chronoswing.buddydash.util.SpoolInventoryFilter
 import com.chronoswing.buddydash.util.archiveLookupFilterSummary
 
@@ -60,11 +61,17 @@ fun SpoolsScreen(
     onSpoolClick: (Int) -> Unit,
     onClearArchiveLookup: () -> Unit = {},
 ) {
-    LaunchedEffect(initialArchiveLookupFilter) {
-        if (initialArchiveLookupFilter != null) {
-            viewModel.applyArchiveMaterialLookup(initialArchiveLookupFilter)
-        } else if (initialSearchQuery.isNotBlank()) {
-            viewModel.applyInitialSearchQuery(initialSearchQuery)
+    LaunchedEffect(initialArchiveLookupFilter, initialSearchQuery) {
+        when {
+            initialArchiveLookupFilter != null -> {
+                viewModel.applyArchiveMaterialLookup(initialArchiveLookupFilter)
+            }
+            initialSearchQuery.isNotBlank() -> {
+                viewModel.applyInitialSearchQuery(initialSearchQuery)
+            }
+            else -> {
+                viewModel.applySectionRootFromNavigation()
+            }
         }
     }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -130,7 +137,18 @@ private fun SpoolsScreenContent(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val noMatchMessage = stringResource(R.string.snackbar_no_matching_filament)
-    val refreshFailedMessage = stringResource(R.string.spools_refresh_failed)
+    val refreshFailedMessage = stringResource(R.string.refresh_failed)
+    val cachedCount = totalCount
+    val showInitialSkeleton = ListLoadUi.showInitialSkeleton(
+        hasCredentials = hasCredentials,
+        cachedItemCount = cachedCount,
+        isInitialLoading = isLoading,
+        hasCompletedLoad = hasCompletedLoad,
+    )
+    val showPullRefreshIndicator = ListLoadUi.showPullRefreshIndicator(
+        isRefreshing = isRefreshing,
+        cachedItemCount = cachedCount,
+    )
 
     LaunchedEffect(refreshError) {
         if (refreshError != null) {
@@ -188,7 +206,7 @@ private fun SpoolsScreenContent(
                     modifier = Modifier.padding(innerPadding),
                 )
             }
-            !hasCompletedLoad && totalCount == 0 -> {
+            showInitialSkeleton -> {
                 SpoolListSkeleton(Modifier.padding(innerPadding))
             }
             error != null && totalCount == 0 && hasCompletedLoad -> {
@@ -200,7 +218,7 @@ private fun SpoolsScreenContent(
             }
             else -> {
                 PullToRefreshBox(
-                    isRefreshing = isRefreshing,
+                    isRefreshing = showPullRefreshIndicator,
                     onRefresh = onPullRefresh,
                     modifier = Modifier
                         .fillMaxSize()

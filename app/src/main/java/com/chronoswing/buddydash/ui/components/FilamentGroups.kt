@@ -12,17 +12,10 @@ import androidx.compose.foundation.horizontalScroll
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.stringResource
 import com.chronoswing.buddydash.R
-import com.chronoswing.buddydash.data.model.PrinterStatus
-import com.chronoswing.buddydash.util.FilamentAction
-import com.chronoswing.buddydash.util.FilamentActionAvailability
 import com.chronoswing.buddydash.util.FilamentSlotDisplay
-import com.chronoswing.buddydash.util.evaluateFilamentLoadAvailability
-import com.chronoswing.buddydash.util.evaluateFilamentUnloadAvailability
-import com.chronoswing.buddydash.util.filamentActionBlockMessage
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -154,12 +147,8 @@ private fun FilamentHomeSourceSection(
 @Composable
 fun FilamentDetailGroups(
     slotDisplays: List<FilamentSlotDisplay>,
-    status: PrinterStatus?,
     cardMicroMotion: CardMicroMotion,
-    isFilamentActionBusy: Boolean,
-    onSlotClick: (spoolId: Int) -> Unit,
-    onRequestLoad: (FilamentSlotDisplay) -> Unit,
-    onRequestUnload: (FilamentSlotDisplay) -> Unit,
+    onSlotClick: (FilamentSlotDisplay) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (slotDisplays.isEmpty()) return
@@ -187,13 +176,9 @@ fun FilamentDetailGroups(
                     val display = displayBySlot[slot] ?: return@forEach
                     FilamentDetailSlotCard(
                         display = display,
-                        status = status,
                         isExternal = group.isExternal,
                         glowMotion = glowMotion,
-                        isFilamentActionBusy = isFilamentActionBusy,
                         onSlotClick = onSlotClick,
-                        onRequestLoad = onRequestLoad,
-                        onRequestUnload = onRequestUnload,
                     )
                 }
             }
@@ -263,31 +248,29 @@ fun FilamentSlotChip(
 @Composable
 fun FilamentDetailSlotCard(
     display: FilamentSlotDisplay,
-    status: PrinterStatus?,
     glowMotion: FilamentGlowMotion,
     isExternal: Boolean,
-    isFilamentActionBusy: Boolean,
-    onSlotClick: (spoolId: Int) -> Unit,
-    onRequestLoad: (FilamentSlotDisplay) -> Unit,
-    onRequestUnload: (FilamentSlotDisplay) -> Unit,
+    onSlotClick: (FilamentSlotDisplay) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val slot = display.slot
     val isActive = display.isActive
     val shape = RoundedCornerShape(12.dp)
-    val bgAlpha = if (slot.isLoaded) 1f else 0.72f
+    val bgAlpha = if (display.isEmpty) 0.72f else 1f
     val breath = rememberActiveFilamentBreath(isActive, glowMotion, ActiveEmphasis.Detail)
-    val loadAvailability = evaluateFilamentLoadAvailability(status, slot, display.trayGlobalId)
-    val unloadAvailability = evaluateFilamentUnloadAvailability(status, isActive)
-    val showLoad = BambuddyApi.hasAmsLoadEndpoint
-    val showUnload = BambuddyApi.hasAmsUnloadEndpoint && isActive && slot.isLoaded
+    val titleText = when {
+        display.isEmpty -> stringResource(R.string.filament_empty)
+        display.primaryTitle.isNotBlank() -> display.primaryTitle
+        else -> stringResource(R.string.filament_unknown)
+    }
+    val mutedTitle = display.isEmpty
 
     val rowModifier = modifier
         .alpha(bgAlpha)
         .fillMaxWidth()
         .then(
-            if (display.isTappable && display.spoolId != null) {
-                Modifier.buddyDashClickable { onSlotClick(display.spoolId!!) }
+            if (display.isTappable) {
+                Modifier.buddyDashClickable { onSlotClick(display) }
             } else {
                 Modifier
             },
@@ -312,7 +295,11 @@ fun FilamentDetailSlotCard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FilamentColorSwatch(slot = slot, size = 40.dp)
+                if (display.isEmpty) {
+                    EmptySlotSwatch(size = 40.dp)
+                } else {
+                    FilamentColorSwatch(slot = slot, size = 40.dp)
+                }
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -335,9 +322,14 @@ fun FilamentDetailSlotCard(
                         }
                     }
                     Text(
-                        text = display.primaryTitle,
+                        text = titleText,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
+                        color = if (mutedTitle) {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                         maxLines = 2,
                     )
                     display.subtitle?.let { subtitle ->
@@ -348,7 +340,7 @@ fun FilamentDetailSlotCard(
                             maxLines = 2,
                         )
                     }
-                    slot.remainPercent?.takeIf { slot.isLoaded }?.let { remain ->
+                    slot.remainPercent?.takeIf { !display.isEmpty }?.let { remain ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -367,7 +359,7 @@ fun FilamentDetailSlotCard(
                         }
                     }
                 }
-                if (display.isTappable) {
+                if (display.isTappable && BambuddyApi.hasInventoryAssignEndpoint) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = null,
@@ -376,55 +368,7 @@ fun FilamentDetailSlotCard(
                     )
                 }
             }
-            if (showLoad || showUnload) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (showLoad) {
-                        FilamentActionButton(
-                            label = stringResource(R.string.filament_action_load),
-                            enabled = loadAvailability.allowed && !isFilamentActionBusy,
-                            onClick = { onRequestLoad(display) },
-                        )
-                    }
-                    if (showUnload) {
-                        FilamentActionButton(
-                            label = stringResource(R.string.filament_action_unload),
-                            enabled = unloadAvailability.allowed && !isFilamentActionBusy,
-                            onClick = { onRequestUnload(display) },
-                        )
-                    }
-                }
-                val blockReason = when {
-                    showUnload && !unloadAvailability.allowed -> unloadAvailability.reason
-                    showLoad && !loadAvailability.allowed -> loadAvailability.reason
-                    else -> null
-                }
-                blockReason?.let { reason ->
-                    Text(
-                        text = filamentActionBlockMessage(reason),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                    )
-                }
-            }
         }
-    }
-}
-
-@Composable
-private fun FilamentActionButton(
-    label: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    TextButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.padding(0.dp),
-    ) {
-        Text(label, style = MaterialTheme.typography.labelMedium)
     }
 }
 

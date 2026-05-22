@@ -61,6 +61,14 @@ class BambuddyOpenApiTest {
     }
 
     @Test
+    fun inventoryAssignmentEndpoints_matchOpenApiSpec() {
+        val spec = findOpenApiSpec().readText()
+        assertTrue(spec.contains("\"${BambuddyApi.INVENTORY_ASSIGNMENTS_PATH}\""))
+        assertTrue(spec.contains("assign_spool_api_v1_inventory_assignments_post"))
+        assertTrue(spec.contains("unassign_spool_api_v1_inventory_assignments__printer_id___ams_id___tray_id__delete"))
+    }
+
+    @Test
     fun amsFilamentEndpoints_matchOpenApiSpec() {
         val spec = findOpenApiSpec().readText()
         assertTrue(spec.contains("\"${BambuddyApi.AMS_LOAD_PATH}\""))

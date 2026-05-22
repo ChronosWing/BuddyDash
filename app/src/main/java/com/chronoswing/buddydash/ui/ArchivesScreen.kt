@@ -25,10 +25,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -49,6 +53,7 @@ import com.chronoswing.buddydash.util.ArchiveResultFilter
 import com.chronoswing.buddydash.util.ArchiveStatsSnapshot
 import com.chronoswing.buddydash.util.ArchiveStatsTimeRange
 import com.chronoswing.buddydash.util.ArchivesSection
+import com.chronoswing.buddydash.util.ListLoadUi
 
 @Composable
 fun ArchivesScreen(
@@ -75,6 +80,7 @@ fun ArchivesScreen(
         isLoading = uiState.isLoading,
         isRefreshing = uiState.isRefreshing,
         error = uiState.error,
+        refreshError = uiState.refreshError,
         settingsReady = uiState.settingsReady,
         hasCredentials = uiState.hasCredentials,
         serverUrl = uiState.serverUrl,
@@ -96,6 +102,7 @@ fun ArchivesScreen(
             )
         },
         onPullRefresh = { viewModel.loadArchives(showLoading = false, fromPull = true) },
+        onRefreshErrorShown = viewModel::onRefreshErrorShown,
         onArchiveClick = onArchiveClick,
         onClearPrinterFilter = onClearPrinterFilter,
     )
@@ -109,6 +116,7 @@ private fun ArchivesScreenContent(
     isLoading: Boolean,
     isRefreshing: Boolean,
     error: String?,
+    refreshError: String?,
     settingsReady: Boolean,
     hasCredentials: Boolean,
     serverUrl: String,
@@ -125,15 +133,38 @@ private fun ArchivesScreenContent(
     onFilterChange: (ArchiveResultFilter) -> Unit,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
+    onRefreshErrorShown: () -> Unit,
     onArchiveClick: (PrintArchive) -> Unit,
     onClearPrinterFilter: () -> Unit,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val refreshFailedMessage = stringResource(R.string.refresh_failed)
+    val cachedCount = totalCount
+    val showInitialSkeleton = ListLoadUi.showInitialSkeleton(
+        hasCredentials = hasCredentials,
+        cachedItemCount = cachedCount,
+        isInitialLoading = isLoading,
+        hasCompletedLoad = true,
+    )
+    val showPullRefreshIndicator = ListLoadUi.showPullRefreshIndicator(
+        isRefreshing = isRefreshing,
+        cachedItemCount = cachedCount,
+    )
+
+    LaunchedEffect(refreshError) {
+        if (refreshError != null) {
+            snackbarHostState.showSnackbar(refreshFailedMessage)
+            onRefreshErrorShown()
+        }
+    }
+
     val selectedTabIndex = when (section) {
         ArchivesSection.History -> 0
         ArchivesSection.Stats -> 1
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -162,7 +193,7 @@ private fun ArchivesScreenContent(
                     modifier = Modifier.padding(innerPadding),
                 )
             }
-            isLoading && totalCount == 0 -> {
+            showInitialSkeleton -> {
                 ArchiveListSkeleton(Modifier.padding(innerPadding))
             }
             error != null && totalCount == 0 -> {
@@ -191,7 +222,7 @@ private fun ArchivesScreenContent(
                         )
                     }
                     PullToRefreshBox(
-                        isRefreshing = isRefreshing,
+                        isRefreshing = showPullRefreshIndicator,
                         onRefresh = onPullRefresh,
                         modifier = Modifier.fillMaxSize(),
                     ) {

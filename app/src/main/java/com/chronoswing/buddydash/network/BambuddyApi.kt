@@ -85,6 +85,10 @@ object BambuddyApi {
     val hasHomeAxesEndpoint: Boolean = true
     val hasAmsLoadEndpoint: Boolean = true
     val hasAmsUnloadEndpoint: Boolean = true
+    /** POST /api/v1/inventory/assignments — map spool to AMS/external tray. */
+    val hasInventoryAssignEndpoint: Boolean = true
+    /** DELETE /api/v1/inventory/assignments/{printer_id}/{ams_id}/{tray_id} */
+    val hasInventoryUnassignEndpoint: Boolean = true
     val hasPrinterDetailEndpoint: Boolean = true
     val hasCameraEndpoint: Boolean = true
     val hasFilesEndpoint: Boolean = true
@@ -155,6 +159,9 @@ object BambuddyApi {
 
     fun amsUnloadPath(printerId: Int): String =
         AMS_UNLOAD_PATH.replace("{printer_id}", printerId.toString())
+
+    fun inventoryUnassignPath(printerId: Int, amsId: Int, trayId: Int): String =
+        "$INVENTORY_ASSIGNMENTS_PATH/$printerId/$amsId/$trayId"
 
     fun printerDetailPath(printerId: Int): String =
         PRINTER_DETAIL_PATH.replace("{printer_id}", printerId.toString())

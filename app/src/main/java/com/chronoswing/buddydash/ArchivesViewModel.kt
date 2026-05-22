@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
@@ -13,6 +14,7 @@ import com.chronoswing.buddydash.util.ArchivesSection
 import com.chronoswing.buddydash.util.applyArchiveListFilters
 import com.chronoswing.buddydash.util.computeArchiveStats
 import com.chronoswing.buddydash.util.filterArchivesForStatsRange
+import com.chronoswing.buddydash.util.BuddyDashDebug
 import com.chronoswing.buddydash.util.logArchiveStatsDateFilterSummary
 import com.chronoswing.buddydash.util.RefreshGuard
 import com.chronoswing.buddydash.util.toUserNetworkMessage
@@ -24,11 +26,14 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+private const val TAG_ARCHIVES_VM = "BuddyDash/ArchivesVM"
+
 data class ArchivesUiState(
     val archives: List<PrintArchive> = emptyList(),
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val error: String? = null,
+    val refreshError: String? = null,
     val serverUrl: String = "",
     val apiKey: String = "",
     val cameraToken: String = "",
@@ -110,6 +115,29 @@ class ArchivesViewModel(
         _uiState.update { it.copy(searchQuery = query) }
     }
 
+    fun clearSearchQuery() {
+        if (_uiState.value.searchQuery.isEmpty()) return
+        _uiState.update { it.copy(searchQuery = "") }
+    }
+
+    fun onRefreshErrorShown() {
+        _uiState.update { it.copy(refreshError = null) }
+    }
+
+    fun refreshFromBottomNavReselect() {
+        if (BuddyDashDebug.enabled) {
+            Log.d(TAG_ARCHIVES_VM, "refreshFromBottomNavReselect")
+        }
+        _uiState.update {
+            it.copy(
+                searchQuery = "",
+                printerFilter = null,
+                refreshError = null,
+            )
+        }
+        loadArchives(showLoading = false, fromBottomNavReselect = true)
+    }
+
     fun applyPrinterFilter(printerId: Int, printerName: String) {
         val filter = ArchivePrinterFilter(printerId, printerName)
         val current = _uiState.value
@@ -145,6 +173,7 @@ class ArchivesViewModel(
         showLoading: Boolean = false,
         fromPull: Boolean = false,
         fromUser: Boolean = false,
+        fromBottomNavReselect: Boolean = false,
     ) {
         val state = _uiState.value
         if (!state.settingsReady) {
@@ -161,10 +190,26 @@ class ArchivesViewModel(
             }
             return
         }
-        if (fromUser && !fromPull && manualRefreshGuard.shouldSkipManualRefresh()) return
-        if (fromUser && fetchJob?.isActive == true) return
+        if (fromBottomNavReselect) {
+            fetchJob?.cancel()
+        } else {
+            if (fromUser && !fromPull && manualRefreshGuard.shouldSkipManualRefresh()) return
+            if (fromUser && fetchJob?.isActive == true) return
+        }
 
-        fetchJob?.cancel()
+        val hadArchives = state.archives.isNotEmpty()
+        val isInitialLoad = !hadArchives
+        if (BuddyDashDebug.enabled) {
+            Log.d(
+                TAG_ARCHIVES_VM,
+                "loadArchives showLoading=$showLoading fromPull=$fromPull fromUser=$fromUser " +
+                    "fromBottomNavReselect=$fromBottomNavReselect hadArchives=$hadArchives",
+            )
+        }
+
+        if (!fromBottomNavReselect) {
+            fetchJob?.cancel()
+        }
         fetchJob = viewModelScope.launch {
             val credentials = _uiState.value
             if (!credentials.hasCredentials ||
@@ -173,8 +218,8 @@ class ArchivesViewModel(
             ) {
                 return@launch
             }
-            if (fromPull) {
-                _uiState.update { it.copy(isRefreshing = true, error = null) }
+            if (!isInitialLoad) {
+                _uiState.update { it.copy(isRefreshing = true, refreshError = null) }
             } else if (showLoading) {
                 _uiState.update { it.copy(isLoading = true, error = null) }
             }
@@ -185,6 +230,9 @@ class ArchivesViewModel(
             )
             result.fold(
                 onSuccess = { archives ->
+                    if (fromBottomNavReselect && BuddyDashDebug.enabled) {
+                        Log.d(TAG_ARCHIVES_VM, "bottomNavReselect refresh success")
+                    }
                     logArchiveStatsDateFilterSummary(archives)
                     _uiState.update {
                         it.copy(
@@ -192,16 +240,35 @@ class ArchivesViewModel(
                             isRefreshing = false,
                             archives = archives,
                             error = null,
+                            refreshError = null,
                         )
                     }
                 },
                 onFailure = { error ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isRefreshing = false,
-                            error = error.toUserNetworkMessage("Failed to load archives"),
-                        )
+                    val fallback = if (hadArchives) {
+                        "Could not refresh"
+                    } else {
+                        "Failed to load archives"
+                    }
+                    val message = error.toUserNetworkMessage(fallback)
+                    if (fromBottomNavReselect && BuddyDashDebug.enabled) {
+                        Log.w(TAG_ARCHIVES_VM, "bottomNavReselect refresh failure", error)
+                    }
+                    _uiState.update { current ->
+                        if (current.archives.isNotEmpty()) {
+                            current.copy(
+                                isLoading = false,
+                                isRefreshing = false,
+                                refreshError = message,
+                            )
+                        } else {
+                            current.copy(
+                                isLoading = false,
+                                isRefreshing = false,
+                                error = message,
+                                refreshError = null,
+                            )
+                        }
                     }
                 },
             )
