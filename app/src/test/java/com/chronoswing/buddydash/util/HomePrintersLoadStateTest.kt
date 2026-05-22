@@ -9,6 +9,19 @@ import org.junit.Test
 class HomePrintersLoadStateTest {
 
     @Test
+    fun showInitialSkeleton_falseWhileSettingsLoading() {
+        assertFalse(
+            ListLoadUi.showInitialSkeleton(
+                settingsReady = false,
+                hasCredentials = false,
+                cachedItemCount = 0,
+                isInitialLoading = false,
+                hasCompletedLoad = false,
+            ),
+        )
+    }
+
+    @Test
     fun resolve_staleWithCachedData_whenRefreshFailsWithPrinters() {
         val state = resolveHomePrintersLoadState(
             printers = listOf(samplePrinter()),

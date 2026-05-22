@@ -8,12 +8,14 @@ object ListLoadUi {
     fun hasCachedData(cachedItemCount: Int): Boolean = cachedItemCount > 0
 
     fun showInitialSkeleton(
+        settingsReady: Boolean = true,
         hasCredentials: Boolean,
         cachedItemCount: Int,
         isInitialLoading: Boolean,
         hasCompletedLoad: Boolean,
     ): Boolean =
-        hasCredentials &&
+        settingsReady &&
+            hasCredentials &&
             cachedItemCount == 0 &&
             (isInitialLoading || !hasCompletedLoad)
 

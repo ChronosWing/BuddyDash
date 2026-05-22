@@ -95,7 +95,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LifecyclePollingEffect(
-        enabled = uiState.hasCredentials && uiState.hasCompletedLoad,
+        enabled = uiState.settingsReady && uiState.hasCredentials && uiState.hasCompletedLoad,
         intervalMs = 15_000L,
         initialDelayMs = 15_000L,
         pollImmediately = false,
@@ -112,6 +112,7 @@ fun HomeScreen(
         refreshError = uiState.refreshError,
         isStaleCachedData = uiState.isStaleCachedData,
         hasCredentials = uiState.hasCredentials,
+        settingsReady = uiState.settingsReady,
         serverUrl = uiState.serverUrl,
         cameraToken = uiState.cameraToken,
         onRefresh = { viewModel.refreshManual() },
@@ -133,6 +134,7 @@ private fun HomeScreenContent(
     refreshError: String?,
     isStaleCachedData: Boolean,
     hasCredentials: Boolean,
+    settingsReady: Boolean,
     serverUrl: String,
     cameraToken: String,
     onRefresh: () -> Unit,
@@ -142,6 +144,7 @@ private fun HomeScreenContent(
 ) {
     val cachedCount = printers.size
     val showInitialSkeleton = ListLoadUi.showInitialSkeleton(
+        settingsReady = settingsReady,
         hasCredentials = hasCredentials,
         cachedItemCount = cachedCount,
         isInitialLoading = isLoading,
@@ -262,7 +265,10 @@ private fun HomeScreenContent(
         },
     ) { innerPadding ->
         when {
-            !hasCredentials -> {
+            !settingsReady -> {
+                PrinterListSkeleton(Modifier.padding(innerPadding))
+            }
+            !hasCredentials && cachedCount == 0 -> {
                 EmptyContent(
                     message = stringResource(R.string.configure_settings_hint),
                     icon = BuddyDashEmptyIcon.Settings.asImageVector(),
