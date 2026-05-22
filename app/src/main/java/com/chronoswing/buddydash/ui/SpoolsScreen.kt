@@ -36,12 +36,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.SpoolsViewModel
+import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentColorSwatch
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
-import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.components.SpoolInventoryRow
+import com.chronoswing.buddydash.ui.components.SpoolListSkeleton
+import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.util.ArchiveSpoolLookupFilter
 import com.chronoswing.buddydash.util.SpoolInventoryFilter
 import com.chronoswing.buddydash.util.archiveLookupFilterSummary
@@ -145,11 +147,12 @@ private fun SpoolsScreenContent(
             !hasCredentials -> {
                 EmptyContent(
                     message = stringResource(R.string.configure_settings_hint),
+                    icon = BuddyDashEmptyIcon.Settings.asImageVector(),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
             isLoading && totalCount == 0 -> {
-                LoadingContent(Modifier.padding(innerPadding))
+                SpoolListSkeleton(Modifier.padding(innerPadding))
             }
             error != null && totalCount == 0 -> {
                 ErrorContent(
@@ -185,6 +188,16 @@ private fun SpoolsScreenContent(
                                         stringResource(R.string.spools_archive_no_matching_filament)
                                     totalCount == 0 -> stringResource(R.string.spools_empty)
                                     else -> stringResource(R.string.spools_no_match)
+                                },
+                                subtitle = when {
+                                    archiveLookupFilter != null || totalCount > 0 ->
+                                        stringResource(R.string.empty_hint_search)
+                                    else -> stringResource(R.string.empty_hint_spools)
+                                },
+                                icon = when {
+                                    archiveLookupFilter != null || totalCount > 0 ->
+                                        BuddyDashEmptyIcon.Search.asImageVector()
+                                    else -> BuddyDashEmptyIcon.Spools.asImageVector()
                                 },
                                 modifier = Modifier
                                     .fillMaxSize()

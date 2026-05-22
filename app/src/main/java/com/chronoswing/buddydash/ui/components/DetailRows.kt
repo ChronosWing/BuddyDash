@@ -13,7 +13,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import com.chronoswing.buddydash.ui.motion.AnimatedLinearProgressIndicator
+import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -252,7 +253,7 @@ fun StatusLastUpdatedIndicator(
             contentDescription = stringResource(R.string.cd_refresh_status),
             modifier = Modifier
                 .size(12.dp)
-                .clickable(enabled = enabled && !isRefreshing) { onRefresh() },
+                .buddyDashClickable(enabled = enabled && !isRefreshing, onClick = onRefresh),
             tint = iconTint,
         )
     }
@@ -316,8 +317,8 @@ fun InlineProgress(
             Text(text = label, style = MaterialTheme.typography.labelMedium)
             Text(text = value, style = MaterialTheme.typography.labelMedium)
         }
-        LinearProgressIndicator(
-            progress = { fraction.coerceIn(0f, 1f) },
+        AnimatedLinearProgressIndicator(
+            targetFraction = fraction.coerceIn(0f, 1f),
             modifier = Modifier.fillMaxWidth(),
         )
     }

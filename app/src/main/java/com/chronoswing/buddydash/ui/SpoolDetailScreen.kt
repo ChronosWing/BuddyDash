@@ -40,7 +40,7 @@ import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.FilamentColorSwatch
 import com.chronoswing.buddydash.ui.components.FilamentRemainingBar
 import com.chronoswing.buddydash.ui.components.FilamentUsageText
-import com.chronoswing.buddydash.ui.components.LoadingContent
+import com.chronoswing.buddydash.ui.components.PrinterDetailSkeleton
 import com.chronoswing.buddydash.ui.components.LowSpoolChip
 import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.util.formatSpoolCardTitle
@@ -113,7 +113,7 @@ private fun SpoolDetailScreenContent(
         },
     ) { innerPadding ->
         when {
-            isLoading && spool == null -> LoadingContent(Modifier.padding(innerPadding))
+            isLoading && spool == null -> PrinterDetailSkeleton(Modifier.padding(innerPadding))
             error != null && spool == null -> ErrorContent(
                 message = error,
                 onRetry = onRetry,

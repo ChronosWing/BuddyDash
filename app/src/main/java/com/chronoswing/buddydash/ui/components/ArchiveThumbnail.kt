@@ -36,6 +36,10 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.network.archiveThumbnailUrl
+import com.chronoswing.buddydash.ui.motion.BuddyDashMotion
+import com.chronoswing.buddydash.ui.motion.rememberPrefersReducedMotion
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 
 @Composable
 fun ArchiveThumbnail(
@@ -52,35 +56,12 @@ fun ArchiveThumbnail(
 
     if (!showImage || imageUrl == null) return
 
-    val context = LocalContext.current
-    val shape = RoundedCornerShape(8.dp)
-    var lastPainter by remember { mutableStateOf<Painter?>(null) }
-
-    val request = remember(imageUrl) {
-        ImageRequest.Builder(context)
-            .data(imageUrl)
-            .crossfade(200)
-            .listener(onError = { _, _ -> showImage = false })
-            .build()
-    }
-
-    SubcomposeAsyncImage(
-        model = request,
-        contentDescription = null,
-        modifier = modifier
-            .size(size)
-            .clip(shape),
-        contentScale = ContentScale.Crop,
-        loading = {
-            lastPainter?.let { painter ->
-                ArchiveThumbImage(painter = painter, shape = shape, size = size)
-            }
-        },
-        error = { Box(Modifier.size(size)) },
-        success = { state ->
-            lastPainter = state.painter
-            ArchiveThumbImage(painter = state.painter, shape = shape, size = size)
-        },
+    BuddyDashFadeInThumbnail(
+        imageUrl = imageUrl,
+        modifier = modifier,
+        size = size,
+        shape = RoundedCornerShape(8.dp),
+        onLoadFailed = { showImage = false },
     )
 }
 
@@ -118,11 +99,13 @@ fun ArchiveDetailHeroImage(
             if (!showImage || imageUrl == null) {
                 ArchiveThumbnailPlaceholder()
             } else {
+                val reduced = rememberPrefersReducedMotion()
+                val fadeMs = if (reduced) 0 else BuddyDashMotion.THUMBNAIL_FADE_MS
                 val context = LocalContext.current
                 val request = remember(imageUrl) {
                     ImageRequest.Builder(context)
                         .data(imageUrl)
-                        .crossfade(200)
+                        .crossfade(false)
                         .listener(onError = { _, _ -> showImage = false })
                         .build()
                 }
@@ -131,8 +114,33 @@ fun ArchiveDetailHeroImage(
                     contentDescription = stringResource(R.string.print_cover),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit,
-                    loading = { ArchiveThumbnailPlaceholder(showLabel = false) },
+                    loading = {
+                        ArchiveThumbnailPlaceholder(showLabel = false)
+                    },
                     error = { ArchiveThumbnailPlaceholder() },
+                    success = { state ->
+                        if (fadeMs <= 0) {
+                            Image(
+                                painter = state.painter,
+                                contentDescription = stringResource(R.string.print_cover),
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit,
+                            )
+                        } else {
+                            Crossfade(
+                                targetState = state.painter,
+                                animationSpec = tween(fadeMs),
+                                label = "archiveHeroFade",
+                            ) { painter ->
+                                Image(
+                                    painter = painter,
+                                    contentDescription = stringResource(R.string.print_cover),
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Fit,
+                                )
+                            }
+                        }
+                    },
                 )
             }
         }
@@ -167,20 +175,4 @@ private fun ArchiveThumbnailPlaceholder(
             }
         }
     }
-}
-
-@Composable
-private fun ArchiveThumbImage(
-    painter: Painter,
-    shape: RoundedCornerShape,
-    size: Dp,
-) {
-    Image(
-        painter = painter,
-        contentDescription = null,
-        modifier = Modifier
-            .size(size)
-            .clip(shape),
-        contentScale = ContentScale.Crop,
-    )
 }

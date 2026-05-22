@@ -22,7 +22,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.ui.components.ArchiveStatCard
+import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
 import com.chronoswing.buddydash.ui.components.EmptyContent
+import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.util.ARCHIVE_DISPLAY_NAME_FALLBACK
 import com.chronoswing.buddydash.util.ArchiveRecentFailure
 import com.chronoswing.buddydash.util.ArchiveStatsSnapshot
@@ -50,6 +52,8 @@ fun ArchiveStatsContent(
         if (stats.totalPrints == 0) {
             EmptyContent(
                 message = stringResource(R.string.archive_stats_empty_range),
+                subtitle = stringResource(R.string.empty_hint_archives),
+                icon = BuddyDashEmptyIcon.Archives.asImageVector(),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),

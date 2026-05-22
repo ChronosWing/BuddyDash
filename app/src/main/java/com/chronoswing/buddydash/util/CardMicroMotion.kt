@@ -1,17 +1,21 @@
 package com.chronoswing.buddydash.util
 
-/** Home printer card micro-animation mode. */
+/** Home/detail printer card micro-animation mode. */
 enum class CardMicroMotion {
-    /** Error, offline, failed — no motion. */
+    /** Idle — calm, static. */
     None,
-    /** Paused — visually frozen. */
+    /** Paused — soft amber pulse. */
     Frozen,
     /** Idle / busy — barely perceptible ambient tone. */
     IdleAmbient,
-    /** Actively printing — progress sheen, chip breath, thumbnail life. */
+    /** Printing — accent glow + progress sheen. */
     Printing,
-    /** Just finished — brief soft success glow, then static. */
+    /** Just finished — brief soft success glow. */
     CompletedFlash,
+    /** Error — slow red attention pulse. */
+    ErrorAttention,
+    /** Offline — muted/dimmed card. */
+    OfflineMuted,
 }
 
 fun resolveCardMicroMotion(
@@ -19,22 +23,15 @@ fun resolveCardMicroMotion(
     rawState: String? = null,
 ): CardMicroMotion {
     val raw = rawState?.uppercase()
-    if (raw == "FAILED" || activityKind == PrinterActivityKind.Error ||
-        activityKind == PrinterActivityKind.Offline
-    ) {
-        return CardMicroMotion.None
-    }
-    if (raw == "PAUSE" || activityKind == PrinterActivityKind.Paused) {
-        return CardMicroMotion.Frozen
-    }
     if (raw == "FINISH") {
         return CardMicroMotion.CompletedFlash
     }
     return when (activityKind) {
         PrinterActivityKind.Printing -> CardMicroMotion.Printing
-        PrinterActivityKind.Idle, PrinterActivityKind.Busy -> CardMicroMotion.IdleAmbient
         PrinterActivityKind.Paused -> CardMicroMotion.Frozen
-        PrinterActivityKind.Error, PrinterActivityKind.Offline -> CardMicroMotion.None
+        PrinterActivityKind.Error -> CardMicroMotion.ErrorAttention
+        PrinterActivityKind.Offline -> CardMicroMotion.OfflineMuted
+        PrinterActivityKind.Idle, PrinterActivityKind.Busy -> CardMicroMotion.IdleAmbient
     }
 }
 
@@ -43,5 +40,9 @@ fun CardMicroMotion.toFilamentGlowMotion(): FilamentGlowMotion = when (this) {
     CardMicroMotion.Printing -> FilamentGlowMotion.Breathing
     CardMicroMotion.Frozen -> FilamentGlowMotion.Frozen
     CardMicroMotion.IdleAmbient -> FilamentGlowMotion.SoftIdle
-    CardMicroMotion.None, CardMicroMotion.CompletedFlash -> FilamentGlowMotion.None
+    CardMicroMotion.ErrorAttention -> FilamentGlowMotion.Frozen
+    CardMicroMotion.None,
+    CardMicroMotion.CompletedFlash,
+    CardMicroMotion.OfflineMuted,
+    -> FilamentGlowMotion.None
 }

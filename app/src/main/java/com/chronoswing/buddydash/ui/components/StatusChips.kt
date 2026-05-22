@@ -1,7 +1,6 @@
 package com.chronoswing.buddydash.ui.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -34,7 +33,8 @@ import com.chronoswing.buddydash.ui.theme.CyanAccent
 import com.chronoswing.buddydash.ui.theme.OfflineRed
 import com.chronoswing.buddydash.ui.theme.OnlineGreen
 import com.chronoswing.buddydash.ui.theme.TextSecondary
-import com.chronoswing.buddydash.util.CardMicroMotion
+import com.chronoswing.buddydash.ui.motion.rememberAttentionPulse
+import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import com.chronoswing.buddydash.util.PlateIndicatorKind
 import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
 import com.chronoswing.buddydash.util.PrinterActivityKind
@@ -45,12 +45,10 @@ fun PrinterQuickStatusRow(
     progressCompact: String?,
     plateKind: PlateIndicatorKind?,
     modifier: Modifier = Modifier,
-    cardMicroMotion: CardMicroMotion = CardMicroMotion.None,
     maintenanceIndicator: MaintenanceHomeIndicator = MaintenanceHomeIndicator.None,
     pendingQueueCount: Int = 0,
     onErrorChipClick: (() -> Unit)? = null,
 ) {
-    val chipBreath = rememberPrintingChipBreath(cardMicroMotion == CardMicroMotion.Printing)
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -59,7 +57,6 @@ fun PrinterQuickStatusRow(
         ActivityStatusChip(
             kind = activityKind,
             progressCompact = progressCompact,
-            breathPhase = chipBreath,
             onClick = if (activityKind == PrinterActivityKind.Error && onErrorChipClick != null) {
                 onErrorChipClick
             } else {
@@ -127,18 +124,35 @@ fun ActivityStatusChip(
     kind: PrinterActivityKind,
     progressCompact: String?,
     modifier: Modifier = Modifier,
-    breathPhase: Float = 0f,
     onClick: (() -> Unit)? = null,
 ) {
     val style = activityChipStyle(kind = kind)
     val label = activityChipLabel(kind, progressCompact)
-    val breathe = kind == PrinterActivityKind.Printing
-    val containerAlpha = if (breathe) 0.12f + breathPhase * 0.05f else null
-    val borderAlpha = if (breathe) 0.48f + breathPhase * 0.12f else 0.55f
+    val printingPulse = rememberAttentionPulse(kind == PrinterActivityKind.Printing, periodMillis = 3_000)
+    val pausedPulse = rememberAttentionPulse(kind == PrinterActivityKind.Paused, periodMillis = 3_000)
+    val errorPulse = rememberAttentionPulse(kind == PrinterActivityKind.Error, periodMillis = 4_500)
+    val containerAlpha = when (kind) {
+        PrinterActivityKind.Printing -> 0.12f + printingPulse * 0.05f
+        PrinterActivityKind.Paused -> 0.14f + pausedPulse * 0.06f
+        PrinterActivityKind.Error -> 0.14f + errorPulse * 0.05f
+        else -> null
+    }
+    val borderAlpha = when (kind) {
+        PrinterActivityKind.Printing -> 0.48f + printingPulse * 0.12f
+        PrinterActivityKind.Paused -> 0.52f + pausedPulse * 0.14f
+        PrinterActivityKind.Error -> 0.5f + errorPulse * 0.16f
+        else -> 0.55f
+    }
+    val iconTintAlpha = when (kind) {
+        PrinterActivityKind.Printing -> 0.88f + printingPulse * 0.1f
+        PrinterActivityKind.Paused -> 0.9f + pausedPulse * 0.08f
+        PrinterActivityKind.Error -> 0.88f + errorPulse * 0.1f
+        else -> 1f
+    }
     StatusPill(
         label = label,
         icon = style.icon,
-        iconTint = style.accent.copy(alpha = if (breathe) 0.88f + breathPhase * 0.1f else 1f),
+        iconTint = style.accent.copy(alpha = iconTintAlpha),
         containerColor = style.container.copy(
             alpha = containerAlpha ?: style.container.alpha,
         ),
@@ -201,7 +215,7 @@ private fun StatusPill(
 ) {
     Surface(
         modifier = modifier.then(
-            if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
+            if (onClick != null) Modifier.buddyDashClickable(onClick = onClick) else Modifier,
         ),
         shape = RoundedCornerShape(8.dp),
         color = containerColor,

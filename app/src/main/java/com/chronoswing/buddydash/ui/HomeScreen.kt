@@ -1,6 +1,6 @@
 package com.chronoswing.buddydash.ui
 
-import androidx.compose.foundation.clickable
+import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -41,8 +41,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chronoswing.buddydash.HomeViewModel
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.Printer
+import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
+import com.chronoswing.buddydash.ui.components.PrinterListSkeleton
+import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.ui.components.FilamentHomeGroupsRow
 import com.chronoswing.buddydash.ui.components.HomePrinterSearchField
 import com.chronoswing.buddydash.ui.components.HomePrinterSearchFilterChips
@@ -54,7 +57,6 @@ import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterCoverImage
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
-import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
 import com.chronoswing.buddydash.util.HOME_PRINTER_SEARCH_MIN_COUNT
 import com.chronoswing.buddydash.util.PrinterCardLabels
@@ -187,11 +189,12 @@ private fun HomeScreenContent(
             !hasCredentials -> {
                 EmptyContent(
                     message = stringResource(R.string.configure_settings_hint),
+                    icon = BuddyDashEmptyIcon.Settings.asImageVector(),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
             isLoading && printers.isEmpty() -> {
-                LoadingContent(Modifier.padding(innerPadding))
+                PrinterListSkeleton(Modifier.padding(innerPadding))
             }
             error != null && printers.isEmpty() -> {
                 PullToRefreshBox(
@@ -210,6 +213,8 @@ private fun HomeScreenContent(
             printers.isEmpty() -> {
                 EmptyContent(
                     message = stringResource(R.string.no_printers),
+                    subtitle = stringResource(R.string.empty_hint_printers),
+                    icon = BuddyDashEmptyIcon.Printers.asImageVector(),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
@@ -256,12 +261,12 @@ private fun HomeScreenContent(
                             }
                             if (searchExpanded && filteredPrinters.isEmpty()) {
                                 item(key = "search_empty") {
-                                    Text(
-                                        text = stringResource(
+                                    EmptyContent(
+                                        message = stringResource(
                                             homeSearchEmptyMessageRes(searchQuery, searchFilter),
                                         ),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        subtitle = stringResource(R.string.empty_hint_search),
+                                        icon = BuddyDashEmptyIcon.Search.asImageVector(),
                                         modifier = Modifier.padding(vertical = 12.dp),
                                     )
                                 }
@@ -298,7 +303,7 @@ private fun GlancePrinterCard(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick),
+                .buddyDashClickable(onClick = onClick),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
@@ -330,7 +335,6 @@ private fun GlancePrinterCard(
                 activityKind = labels.activityKind,
                 progressCompact = labels.progressCompact,
                 plateKind = labels.plateKind,
-                cardMicroMotion = labels.cardMicroMotion,
                 maintenanceIndicator = labels.maintenanceIndicator,
                 pendingQueueCount = labels.pendingQueueCount,
             )

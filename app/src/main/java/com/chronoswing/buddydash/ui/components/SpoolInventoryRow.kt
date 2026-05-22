@@ -1,6 +1,6 @@
 package com.chronoswing.buddydash.ui.components
 
-import androidx.compose.foundation.clickable
+import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,7 +36,7 @@ fun SpoolInventoryRow(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .buddyDashClickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {

@@ -1,6 +1,6 @@
 package com.chronoswing.buddydash.ui
 
-import androidx.compose.foundation.clickable
+import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -38,10 +38,12 @@ import com.chronoswing.buddydash.ArchivesViewModel
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.ui.components.ArchiveListRow
+import com.chronoswing.buddydash.ui.components.ArchiveListSkeleton
+import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
 import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
-import com.chronoswing.buddydash.ui.components.LoadingContent
+import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.util.ArchivePrinterFilter
 import com.chronoswing.buddydash.util.ArchiveResultFilter
 import com.chronoswing.buddydash.util.ArchiveStatsSnapshot
@@ -144,16 +146,17 @@ private fun ArchivesScreenContent(
     ) { innerPadding ->
         when {
             !settingsReady -> {
-                LoadingContent(Modifier.padding(innerPadding))
+                ArchiveListSkeleton(Modifier.padding(innerPadding))
             }
             !hasCredentials -> {
                 EmptyContent(
                     message = stringResource(R.string.configure_settings_hint),
+                    icon = BuddyDashEmptyIcon.Settings.asImageVector(),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
             isLoading && totalCount == 0 -> {
-                LoadingContent(Modifier.padding(innerPadding))
+                ArchiveListSkeleton(Modifier.padding(innerPadding))
             }
             error != null && totalCount == 0 -> {
                 ErrorContent(
@@ -251,6 +254,15 @@ private fun ArchivesHistoryContent(
                     totalCount == 0 -> stringResource(R.string.archives_empty)
                     else -> stringResource(R.string.archives_no_match)
                 },
+                subtitle = when {
+                    totalCount == 0 -> stringResource(R.string.empty_hint_archives)
+                    else -> stringResource(R.string.empty_hint_search)
+                },
+                icon = if (totalCount == 0) {
+                    BuddyDashEmptyIcon.Archives.asImageVector()
+                } else {
+                    BuddyDashEmptyIcon.Search.asImageVector()
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
@@ -273,7 +285,7 @@ private fun ArchivesHistoryContent(
                         archive = archive,
                         serverUrl = serverUrl,
                         cameraToken = cameraToken,
-                        modifier = Modifier.clickable { onArchiveClick(archive) },
+                        modifier = Modifier.buddyDashClickable { onArchiveClick(archive) },
                     )
                 }
             }

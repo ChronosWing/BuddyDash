@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.chronoswing.buddydash.ui.motion.rememberAnimatedProgressFraction
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -42,7 +43,7 @@ fun FilamentRemainingBar(
     height: Dp = 3.dp,
     barWidth: Dp? = 44.dp,
 ) {
-    val fraction = remainPercent.coerceIn(0, 100) / 100f
+    val fraction = rememberAnimatedProgressFraction(remainPercent.coerceIn(0, 100) / 100f)
     val fillColor = remainingProgressColor(remainPercent)
     val trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
     val shape = RoundedCornerShape(height / 2)

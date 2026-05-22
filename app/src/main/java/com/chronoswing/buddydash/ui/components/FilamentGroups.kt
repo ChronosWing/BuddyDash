@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.data.model.FilamentSlot
+import com.chronoswing.buddydash.ui.motion.rememberPrefersReducedMotion
 import com.chronoswing.buddydash.util.CardMicroMotion
 import com.chronoswing.buddydash.util.FilamentGlowMotion
 import com.chronoswing.buddydash.util.FilamentSourceGroup
@@ -497,6 +498,13 @@ private fun rememberActiveFilamentBreath(
             drawGlow = true,
         )
         FilamentGlowMotion.SoftIdle, FilamentGlowMotion.Breathing -> {
+            if (rememberPrefersReducedMotion()) {
+                return ActiveFilamentBreath(
+                    glowAlpha = (config.minGlow + config.maxGlow) * 0.5f,
+                    backgroundLift = (config.minBgLift + config.maxBgLift) * 0.5f,
+                    drawGlow = motion == FilamentGlowMotion.Breathing,
+                )
+            }
             val transition = rememberInfiniteTransition(label = "filamentActiveGlow")
             val breath by transition.animateFloat(
                 initialValue = 0f,

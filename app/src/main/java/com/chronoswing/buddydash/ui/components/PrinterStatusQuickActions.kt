@@ -7,7 +7,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import com.chronoswing.buddydash.ui.motion.buddyDashButtonPress
+import com.chronoswing.buddydash.ui.motion.buddyDashClickable
+import com.chronoswing.buddydash.ui.motion.rememberBuddyDashInteractionSource
+import com.chronoswing.buddydash.ui.motion.rememberPrefersReducedMotion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -218,10 +221,14 @@ private fun StatusIconButton(
     modifier: Modifier = Modifier,
     icon: @Composable () -> Unit,
 ) {
+    val interactionSource = rememberBuddyDashInteractionSource()
     IconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.size(36.dp),
+        interactionSource = interactionSource,
+        modifier = modifier
+            .size(36.dp)
+            .buddyDashButtonPress(enabled, interactionSource),
     ) {
         if (tint == Color.Unspecified) {
             icon()
@@ -258,7 +265,7 @@ private fun StartNextQueueChip(
         modifier = modifier
             .height(28.dp)
             .semantics { contentDescription = actionLabel }
-            .clickable(enabled = enabled && !isSubmitting) { onClick() },
+            .buddyDashClickable(enabled = enabled && !isSubmitting, onClick = onClick),
         shape = shape,
         color = primary.copy(alpha = 0.14f * chipAlpha),
         border = BorderStroke(1.dp, primary.copy(alpha = 0.38f * chipAlpha)),
@@ -319,10 +326,14 @@ private fun ChamberLightIconButton(
     }
     val iconScale = if (isOn) 1f + glowBreath * 0.04f else 1f
 
+    val interactionSource = rememberBuddyDashInteractionSource()
     IconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.size(36.dp),
+        interactionSource = interactionSource,
+        modifier = modifier
+            .size(36.dp)
+            .buddyDashButtonPress(enabled, interactionSource),
     ) {
         Box(
             modifier = Modifier
@@ -386,7 +397,7 @@ private fun ChamberLightIconButton(
 
 @Composable
 private fun rememberChamberLightGlowBreath(active: Boolean): Float {
-    if (!active) return 0f
+    if (!active || rememberPrefersReducedMotion()) return 0f
     val transition = rememberInfiniteTransition(label = "chamberLightGlow")
     val breath by transition.animateFloat(
         initialValue = 0f,

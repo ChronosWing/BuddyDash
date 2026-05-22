@@ -19,6 +19,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.chronoswing.buddydash.ui.motion.buddyDashDetailEnter
+import com.chronoswing.buddydash.ui.motion.buddyDashDetailExit
+import com.chronoswing.buddydash.ui.motion.buddyDashDetailPopEnter
+import com.chronoswing.buddydash.ui.motion.buddyDashDetailPopExit
+import com.chronoswing.buddydash.ui.motion.buddyDashSectionEnter
+import com.chronoswing.buddydash.ui.motion.buddyDashSectionExit
 import com.chronoswing.buddydash.ArchiveDetailViewModel
 import com.chronoswing.buddydash.ArchivesViewModel
 import com.chronoswing.buddydash.HomeViewModel
@@ -199,10 +205,15 @@ fun BuddyDashNav(
             )
         },
     ) { innerPadding ->
+        val navContext = navController.context
         NavHost(
             navController = navController,
             startDestination = Routes.HOME,
             modifier = Modifier.padding(innerPadding),
+            enterTransition = { buddyDashSectionEnter(navContext) },
+            exitTransition = { buddyDashSectionExit(navContext) },
+            popEnterTransition = { buddyDashSectionEnter(navContext) },
+            popExitTransition = { buddyDashSectionExit(navContext) },
         ) {
             composable(Routes.HOME) {
                 val viewModel: HomeViewModel = viewModel(
@@ -355,6 +366,10 @@ fun BuddyDashNav(
             composable(
                 route = Routes.SPOOL_DETAIL,
                 arguments = listOf(navArgument("spoolId") { type = NavType.IntType }),
+                enterTransition = { buddyDashDetailEnter(navContext) },
+                exitTransition = { buddyDashDetailExit(navContext) },
+                popEnterTransition = { buddyDashDetailPopEnter(navContext) },
+                popExitTransition = { buddyDashDetailPopExit(navContext) },
             ) { backStackEntry ->
                 val spoolId = backStackEntry.arguments?.getInt("spoolId") ?: return@composable
                 val viewModel: SpoolDetailViewModel = viewModel(
@@ -384,6 +399,10 @@ fun BuddyDashNav(
             composable(
                 route = Routes.ARCHIVE_DETAIL,
                 arguments = listOf(navArgument("archiveId") { type = NavType.IntType }),
+                enterTransition = { buddyDashDetailEnter(navContext) },
+                exitTransition = { buddyDashDetailExit(navContext) },
+                popEnterTransition = { buddyDashDetailPopEnter(navContext) },
+                popExitTransition = { buddyDashDetailPopExit(navContext) },
             ) { backStackEntry ->
                 val archiveId = backStackEntry.arguments?.getInt("archiveId") ?: return@composable
                 val viewModel: ArchiveDetailViewModel = viewModel(
@@ -436,6 +455,10 @@ fun BuddyDashNav(
                         defaultValue = ""
                     },
                 ),
+                enterTransition = { buddyDashDetailEnter(navContext) },
+                exitTransition = { buddyDashDetailExit(navContext) },
+                popEnterTransition = { buddyDashDetailPopEnter(navContext) },
+                popExitTransition = { buddyDashDetailPopExit(navContext) },
             ) { backStackEntry ->
                 val printerId = backStackEntry.arguments?.getInt("printerId") ?: return@composable
                 val encodedName = backStackEntry.arguments?.getString("printerName").orEmpty()
@@ -464,7 +487,13 @@ fun BuddyDashNav(
                 )
             }
 
-            composable(Routes.PRINTER_QUEUE) {
+            composable(
+                route = Routes.PRINTER_QUEUE,
+                enterTransition = { buddyDashDetailEnter(navContext) },
+                exitTransition = { buddyDashDetailExit(navContext) },
+                popEnterTransition = { buddyDashDetailPopEnter(navContext) },
+                popExitTransition = { buddyDashDetailPopExit(navContext) },
+            ) {
                 val parentEntry = navController.previousBackStackEntry
                 if (parentEntry == null) {
                     navController.popBackStack()
