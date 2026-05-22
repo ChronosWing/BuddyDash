@@ -65,6 +65,7 @@ fun PrinterCameraFullscreenDialog(
     serverUrl: String,
     cameraToken: String,
     printerId: Int,
+    printerModel: String? = null,
     onDismiss: () -> Unit,
     onStopCameraStream: () -> Unit = {},
     chamberLightOn: Boolean? = null,
@@ -138,6 +139,7 @@ fun PrinterCameraFullscreenDialog(
                             serverUrl = serverUrl,
                             cameraToken = cameraToken,
                             printerId = printerId,
+                            printerModel = printerModel,
                             refreshTick = snapshotRefreshTick,
                             refreshTickNumber = snapshotRefreshTickNumber,
                             onLoadingChanged = { loading ->
@@ -199,7 +201,10 @@ fun PrinterCameraFullscreenDialog(
                         }
                         if (streamFailed) {
                             IconButton(
-                                onClick = { snapshotRefreshTick = System.currentTimeMillis() },
+                                onClick = {
+                                    snapshotRefreshTick = System.currentTimeMillis()
+                                    snapshotRefreshTickNumber += 1
+                                },
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
@@ -248,6 +253,7 @@ private fun CameraSnapshotFallback(
     serverUrl: String,
     cameraToken: String,
     printerId: Int,
+    printerModel: String?,
     refreshTick: Long,
     refreshTickNumber: Int,
     onLoadingChanged: (Boolean) -> Unit,
@@ -275,6 +281,7 @@ private fun CameraSnapshotFallback(
             serverUrl = serverUrl,
             cameraToken = cameraToken,
             printerId = printerId,
+            printerModel = printerModel,
             refreshTick = refreshTick,
             refreshTickNumber = refreshTickNumber,
             modifier = Modifier.fillMaxSize(),
@@ -282,7 +289,6 @@ private fun CameraSnapshotFallback(
             contentScale = ContentScale.Fit,
             applyHeroScrim = false,
             backgroundColor = Color.Black,
-            snapshotCrossfadeMs = 0,
             onLoadingChanged = onLoadingChanged,
         )
     }

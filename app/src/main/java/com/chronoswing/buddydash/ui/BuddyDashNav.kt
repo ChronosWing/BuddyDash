@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -101,9 +102,19 @@ object Routes {
         return "archives?search=${enc(search)}&printerId=$printerId&printerName=${enc(printerName)}"
     }
 
+    fun routeBase(route: String?): String? = route?.substringBefore('?')
+
+    fun isPrintersRoot(route: String?): Boolean = routeBase(route) == HOME
+
+    /** Printer Detail, full queue, or other stack above Home within the Printers tab. */
+    fun isPrinterSubScreen(route: String?): Boolean {
+        val base = routeBase(route) ?: return false
+        return base == PRINTER_QUEUE || base.startsWith("printer/")
+    }
+
     /** Which bottom-nav tab is highlighted for the current destination (including detail screens). */
     fun bottomNavTab(route: String?): BottomNavTab? {
-        val base = route?.substringBefore('?') ?: return null
+        val base = routeBase(route) ?: return null
         return when {
             base == HOME ||
                 base == PRINTER_QUEUE ||
@@ -201,6 +212,8 @@ fun BuddyDashNav(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     var printersReselectNonce by remember { mutableIntStateOf(0) }
+    var printersReturnRefreshNonce by remember { mutableIntStateOf(0) }
+    var previousRoute by remember { mutableStateOf<String?>(null) }
     var spoolsReselectNonce by remember { mutableIntStateOf(0) }
     var archivesReselectNonce by remember { mutableIntStateOf(0) }
 
@@ -276,9 +289,9 @@ fun BuddyDashNav(
                         HomeViewModel(settingsRepository, apiClient)
                     },
                 )
-                LaunchedEffect(printersReselectNonce) {
-                    if (printersReselectNonce > 0) {
-                        viewModel.refreshFromBottomNavReselect()
+                LaunchedEffect(printersReselectNonce, printersReturnRefreshNonce) {
+                    if (printersReselectNonce > 0 || printersReturnRefreshNonce > 0) {
+                        viewModel.refreshOnPrintersRootAppeared()
                     }
                 }
                 HomeScreen(

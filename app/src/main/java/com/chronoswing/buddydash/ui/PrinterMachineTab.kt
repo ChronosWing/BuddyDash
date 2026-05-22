@@ -69,6 +69,7 @@ fun MachineTab(
         serverUrl = serverUrl,
         cameraToken = cameraToken,
         printerId = printerId,
+        printerModel = printerModel,
         onDismiss = { showCameraFullscreen = false },
         onStopCameraStream = onStopCameraStream,
         chamberLightOn = labels.chamberLightOn,
