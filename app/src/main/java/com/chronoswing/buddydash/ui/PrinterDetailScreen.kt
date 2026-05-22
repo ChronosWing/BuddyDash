@@ -17,8 +17,10 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,9 +50,15 @@ import com.chronoswing.buddydash.util.ControlAction
 import com.chronoswing.buddydash.util.ControlFeedback
 import com.chronoswing.buddydash.MaintenanceResetSnackbar
 import com.chronoswing.buddydash.PlateClearSnackbar
+import com.chronoswing.buddydash.FilamentActionSnackbar
+import com.chronoswing.buddydash.FilamentConfirmRequest
 import com.chronoswing.buddydash.PrinterDetailViewModel
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.StartQueuedPrintSnackbar
+import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.util.FilamentAction
+import com.chronoswing.buddydash.util.FilamentSlotDisplay
+import com.chronoswing.buddydash.util.buildFilamentSlotDisplays
 import com.chronoswing.buddydash.network.BambuddyApi
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.PrintQueueJob
@@ -98,6 +106,7 @@ fun PrinterDetailScreen(
     onBack: () -> Unit,
     onViewFullQueue: () -> Unit,
     onOpenPrinterArchives: () -> Unit = {},
+    onOpenSpoolDetail: (Int) -> Unit = {},
 ) {
     LaunchedEffect(printerId, printerName, printerModel) {
         viewModel.init(printerId, printerName, printerModel)
@@ -164,6 +173,17 @@ fun PrinterDetailScreen(
         onStartQueuedPrintSnackbarShown = viewModel::onStartQueuedPrintSnackbarShown,
         onOpenPrinterArchives = onOpenPrinterArchives,
         onStopCameraStream = viewModel::stopCameraStream,
+        onOpenSpoolDetail = onOpenSpoolDetail,
+        filamentSlotDisplays = uiState.filamentSlotDisplays,
+        printerStatus = uiState.status,
+        isFilamentActionBusy = uiState.isFilamentActionBusy,
+        filamentConfirm = uiState.filamentConfirm,
+        filamentSnackbar = uiState.filamentSnackbar,
+        onRequestFilamentLoad = viewModel::requestFilamentLoad,
+        onRequestFilamentUnload = viewModel::requestFilamentUnload,
+        onConfirmFilamentAction = viewModel::confirmFilamentAction,
+        onDismissFilamentConfirm = viewModel::dismissFilamentConfirm,
+        onFilamentSnackbarShown = viewModel::onFilamentSnackbarShown,
     )
 }
 
@@ -193,7 +213,18 @@ private fun PrinterDetailScreenContent(
     onBack: () -> Unit,
     onViewFullQueue: () -> Unit,
     onOpenPrinterArchives: () -> Unit,
+    onOpenSpoolDetail: (Int) -> Unit,
     onStopCameraStream: () -> Unit,
+    filamentSlotDisplays: List<FilamentSlotDisplay>,
+    printerStatus: PrinterStatus?,
+    isFilamentActionBusy: Boolean,
+    filamentConfirm: FilamentConfirmRequest?,
+    filamentSnackbar: FilamentActionSnackbar?,
+    onRequestFilamentLoad: (FilamentSlotDisplay) -> Unit,
+    onRequestFilamentUnload: (FilamentSlotDisplay) -> Unit,
+    onConfirmFilamentAction: () -> Unit,
+    onDismissFilamentConfirm: () -> Unit,
+    onFilamentSnackbarShown: () -> Unit,
     onStartNextQueuedPrint: () -> Unit,
     onStartQueuedPrintSnackbarShown: () -> Unit,
     onRetry: () -> Unit,
@@ -305,6 +336,60 @@ private fun PrinterDetailScreenContent(
         }
         snackbarHostState.showSnackbar(message)
         onStartQueuedPrintSnackbarShown()
+    }
+
+    val filamentLoadStartedMessage = stringResource(R.string.filament_load_started)
+    val filamentUnloadStartedMessage = stringResource(R.string.filament_unload_started)
+    val filamentLoadFailedMessage = stringResource(R.string.filament_load_failed)
+    val filamentUnloadFailedMessage = stringResource(R.string.filament_unload_failed)
+
+    LaunchedEffect(filamentSnackbar) {
+        val message = when (filamentSnackbar) {
+            FilamentActionSnackbar.LoadStarted -> filamentLoadStartedMessage
+            FilamentActionSnackbar.UnloadStarted -> filamentUnloadStartedMessage
+            FilamentActionSnackbar.LoadFailed -> filamentLoadFailedMessage
+            FilamentActionSnackbar.UnloadFailed -> filamentUnloadFailedMessage
+            null -> return@LaunchedEffect
+        }
+        snackbarHostState.showSnackbar(message)
+        onFilamentSnackbarShown()
+    }
+
+    filamentConfirm?.let { confirm ->
+        val title = when (confirm.action) {
+            FilamentAction.Load -> stringResource(R.string.filament_confirm_load_title)
+            FilamentAction.Unload -> stringResource(R.string.filament_confirm_unload_title)
+        }
+        val body = stringResource(
+            when (confirm.action) {
+                FilamentAction.Load -> R.string.filament_confirm_load_message
+                FilamentAction.Unload -> R.string.filament_confirm_unload_message
+            },
+            confirm.slotDisplay.slot.label,
+            confirm.slotDisplay.primaryTitle,
+        )
+        val confirmLabel = when (confirm.action) {
+            FilamentAction.Load -> stringResource(R.string.filament_action_load)
+            FilamentAction.Unload -> stringResource(R.string.filament_action_unload)
+        }
+        AlertDialog(
+            onDismissRequest = onDismissFilamentConfirm,
+            title = { Text(title) },
+            text = { Text(body) },
+            confirmButton = {
+                TextButton(
+                    onClick = onConfirmFilamentAction,
+                    enabled = !isFilamentActionBusy,
+                ) {
+                    Text(confirmLabel)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissFilamentConfirm) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
     }
 
     Scaffold(
@@ -425,7 +510,16 @@ private fun PrinterDetailScreenContent(
                                     onResumePrint = onResumePrint,
                                     onStopPrint = onStopPrint,
                                 )
-                                1 -> FilamentTab(labels = labels)
+                                1 -> FilamentTab(
+                                    labels = labels,
+                                    printerId = printerId,
+                                    printerStatus = printerStatus,
+                                    filamentSlotDisplays = filamentSlotDisplays,
+                                    isFilamentActionBusy = isFilamentActionBusy,
+                                    onOpenSpoolDetail = onOpenSpoolDetail,
+                                    onRequestLoad = onRequestFilamentLoad,
+                                    onRequestUnload = onRequestFilamentUnload,
+                                )
                                 2 -> MachineTab(
                                     labels = labels,
                                     printerModel = printerModel,
@@ -822,7 +916,16 @@ private fun controlFeedbackMessage(
 }
 
 @Composable
-private fun FilamentTab(labels: PrinterDetailLabels) {
+private fun FilamentTab(
+    labels: PrinterDetailLabels,
+    printerId: Int,
+    printerStatus: PrinterStatus?,
+    filamentSlotDisplays: List<FilamentSlotDisplay>,
+    isFilamentActionBusy: Boolean,
+    onOpenSpoolDetail: (Int) -> Unit,
+    onRequestLoad: (FilamentSlotDisplay) -> Unit,
+    onRequestUnload: (FilamentSlotDisplay) -> Unit,
+) {
     val slots = labels.filamentSlots
     if (slots.isEmpty()) {
         Text(
@@ -832,11 +935,25 @@ private fun FilamentTab(labels: PrinterDetailLabels) {
         )
         return
     }
+    val displays = filamentSlotDisplays.ifEmpty {
+        buildFilamentSlotDisplays(
+            slots = slots,
+            activeKey = labels.activeFilamentSlot,
+            printerId = printerId,
+            inventoryBySlot = emptyMap(),
+            spoolsById = emptyMap(),
+            spoolsAssignedToPrinter = emptyList(),
+        )
+    }
     FilamentAmsEnvironmentSection(labels)
     FilamentDetailGroups(
-        slots = slots,
-        activeKey = labels.activeFilamentSlot,
+        slotDisplays = displays,
+        status = printerStatus,
         cardMicroMotion = labels.cardMicroMotion,
+        isFilamentActionBusy = isFilamentActionBusy,
+        onSlotClick = onOpenSpoolDetail,
+        onRequestLoad = onRequestLoad,
+        onRequestUnload = onRequestUnload,
         modifier = Modifier.fillMaxWidth(),
     )
 }

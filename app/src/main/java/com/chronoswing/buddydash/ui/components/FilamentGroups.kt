@@ -9,6 +9,20 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
+import com.chronoswing.buddydash.ui.motion.buddyDashClickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.stringResource
+import com.chronoswing.buddydash.R
+import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.util.FilamentAction
+import com.chronoswing.buddydash.util.FilamentActionAvailability
+import com.chronoswing.buddydash.util.FilamentSlotDisplay
+import com.chronoswing.buddydash.util.evaluateFilamentLoadAvailability
+import com.chronoswing.buddydash.util.evaluateFilamentUnloadAvailability
+import com.chronoswing.buddydash.util.filamentActionBlockMessage
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +62,7 @@ import com.chronoswing.buddydash.util.FilamentGlowMotion
 import com.chronoswing.buddydash.util.FilamentSourceGroup
 import com.chronoswing.buddydash.util.SlotInventoryKey
 import com.chronoswing.buddydash.util.groupByFilamentSource
+import com.chronoswing.buddydash.network.BambuddyApi
 import com.chronoswing.buddydash.util.isActiveSlot
 import com.chronoswing.buddydash.util.normalizeFilamentType
 import com.chronoswing.buddydash.util.toFilamentGlowMotion
@@ -138,13 +153,18 @@ private fun FilamentHomeSourceSection(
 /** Grouped filament layout for the detail Filament tab. */
 @Composable
 fun FilamentDetailGroups(
-    slots: List<FilamentSlot>,
-    activeKey: SlotInventoryKey?,
+    slotDisplays: List<FilamentSlotDisplay>,
+    status: PrinterStatus?,
     cardMicroMotion: CardMicroMotion,
+    isFilamentActionBusy: Boolean,
+    onSlotClick: (spoolId: Int) -> Unit,
+    onRequestLoad: (FilamentSlotDisplay) -> Unit,
+    onRequestUnload: (FilamentSlotDisplay) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (slots.isEmpty()) return
-    val groups = slots.groupByFilamentSource()
+    if (slotDisplays.isEmpty()) return
+    val groups = slotDisplays.map { it.slot }.groupByFilamentSource()
+    val displayBySlot = slotDisplays.associateBy { it.slot }
     val glowMotion = remember(cardMicroMotion) { cardMicroMotion.toFilamentGlowMotion() }
 
     Column(
@@ -152,11 +172,31 @@ fun FilamentDetailGroups(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         groups.forEach { group ->
-            FilamentSourceGroup(
-                group = group,
-                activeKey = activeKey,
-                glowMotion = glowMotion,
-            )
+            val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = if (group.isExternal) "External" else group.sourceLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = muted,
+                )
+                group.slots.forEach { slot ->
+                    val display = displayBySlot[slot] ?: return@forEach
+                    FilamentDetailSlotCard(
+                        display = display,
+                        status = status,
+                        isExternal = group.isExternal,
+                        glowMotion = glowMotion,
+                        isFilamentActionBusy = isFilamentActionBusy,
+                        onSlotClick = onSlotClick,
+                        onRequestLoad = onRequestLoad,
+                        onRequestUnload = onRequestUnload,
+                    )
+                }
+            }
         }
     }
 }
@@ -217,6 +257,174 @@ fun FilamentSlotChip(
             glowMotion = glowMotion,
             modifier = modifier,
         )
+    }
+}
+
+@Composable
+fun FilamentDetailSlotCard(
+    display: FilamentSlotDisplay,
+    status: PrinterStatus?,
+    glowMotion: FilamentGlowMotion,
+    isExternal: Boolean,
+    isFilamentActionBusy: Boolean,
+    onSlotClick: (spoolId: Int) -> Unit,
+    onRequestLoad: (FilamentSlotDisplay) -> Unit,
+    onRequestUnload: (FilamentSlotDisplay) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val slot = display.slot
+    val isActive = display.isActive
+    val shape = RoundedCornerShape(12.dp)
+    val bgAlpha = if (slot.isLoaded) 1f else 0.72f
+    val breath = rememberActiveFilamentBreath(isActive, glowMotion, ActiveEmphasis.Detail)
+    val loadAvailability = evaluateFilamentLoadAvailability(status, slot, display.trayGlobalId)
+    val unloadAvailability = evaluateFilamentUnloadAvailability(status, isActive)
+    val showLoad = BambuddyApi.hasAmsLoadEndpoint
+    val showUnload = BambuddyApi.hasAmsUnloadEndpoint && isActive && slot.isLoaded
+
+    val rowModifier = modifier
+        .alpha(bgAlpha)
+        .fillMaxWidth()
+        .then(
+            if (display.isTappable && display.spoolId != null) {
+                Modifier.buddyDashClickable { onSlotClick(display.spoolId!!) }
+            } else {
+                Modifier
+            },
+        )
+
+    FilamentChipSurface(
+        modifier = rowModifier,
+        shape = shape,
+        isActive = isActive,
+        isExternal = isExternal,
+        emphasis = ActiveEmphasis.Detail,
+        breath = breath,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FilamentColorSwatch(slot = slot, size = 40.dp)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = slot.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                        )
+                        if (isActive) {
+                            ActiveFilamentDot(
+                                size = 7.dp,
+                                glowAlpha = breath.glowAlpha,
+                            )
+                        }
+                    }
+                    Text(
+                        text = display.primaryTitle,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                    )
+                    display.subtitle?.let { subtitle ->
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                        )
+                    }
+                    slot.remainPercent?.takeIf { slot.isLoaded }?.let { remain ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            FilamentRemainingBar(
+                                remainPercent = remain,
+                                modifier = Modifier.weight(1f),
+                                height = 4.dp,
+                                barWidth = null,
+                            )
+                            Text(
+                                text = "$remain%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                            )
+                        }
+                    }
+                }
+                if (display.isTappable) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+            if (showLoad || showUnload) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (showLoad) {
+                        FilamentActionButton(
+                            label = stringResource(R.string.filament_action_load),
+                            enabled = loadAvailability.allowed && !isFilamentActionBusy,
+                            onClick = { onRequestLoad(display) },
+                        )
+                    }
+                    if (showUnload) {
+                        FilamentActionButton(
+                            label = stringResource(R.string.filament_action_unload),
+                            enabled = unloadAvailability.allowed && !isFilamentActionBusy,
+                            onClick = { onRequestUnload(display) },
+                        )
+                    }
+                }
+                val blockReason = when {
+                    showUnload && !unloadAvailability.allowed -> unloadAvailability.reason
+                    showLoad && !loadAvailability.allowed -> loadAvailability.reason
+                    else -> null
+                }
+                blockReason?.let { reason ->
+                    Text(
+                        text = filamentActionBlockMessage(reason),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilamentActionButton(
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.padding(0.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelMedium)
     }
 }
 

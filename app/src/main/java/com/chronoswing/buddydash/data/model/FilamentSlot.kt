@@ -18,6 +18,8 @@ data class FilamentSlot(
     val trayId: Int? = null,
     /** MQTT / Bambuddy tray id from status JSON `id` field, used to match `tray_now`. */
     val mqttTrayId: Int? = null,
+    /** Inventory spool id when assignments map this tray (from status enrichment). */
+    val inventorySpoolId: Int? = null,
 ) {
     val colorHex: String?
         get() = swatchColorHexes.firstOrNull()

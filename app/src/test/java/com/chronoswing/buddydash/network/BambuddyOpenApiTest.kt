@@ -61,6 +61,13 @@ class BambuddyOpenApiTest {
     }
 
     @Test
+    fun amsFilamentEndpoints_matchOpenApiSpec() {
+        val spec = findOpenApiSpec().readText()
+        assertTrue(spec.contains("\"${BambuddyApi.AMS_LOAD_PATH}\""))
+        assertTrue(spec.contains("\"${BambuddyApi.AMS_UNLOAD_PATH}\""))
+    }
+
+    @Test
     fun clearPlateEndpoint_matchesOpenApiSpec() {
         val spec = findOpenApiSpec().readText()
 
