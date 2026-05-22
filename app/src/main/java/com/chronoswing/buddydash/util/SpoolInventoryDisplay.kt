@@ -97,6 +97,8 @@ fun parseSpoolAssignments(body: String): Map<Int, SpoolSlotAssignment> {
             printerId = printerId,
             printerName = printerName,
             slotLabel = slotLabel,
+            amsId = amsId,
+            trayId = trayId,
         )
     }
     return bySpoolId

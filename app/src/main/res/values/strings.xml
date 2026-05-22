@@ -218,6 +218,12 @@
     <string name="filament_picker_empty">No matching spools</string>
     <string name="filament_confirm_assign_title">Assign spool?</string>
     <string name="filament_confirm_assign_message">Assign %1$s to %2$s?</string>
+    <string name="filament_confirm_assign_elsewhere_title">Spool already assigned</string>
+    <string name="filament_confirm_assign_elsewhere_message">%1$s is already assigned to:\n%2$s\n\nAssigning it to:\n%3$s\n\nmay make remaining filament tracking inaccurate.</string>
+    <string name="filament_action_assign_anyway">Assign anyway</string>
+    <string name="filament_picker_already_here">Already assigned here</string>
+    <string name="spool_in_use">In use</string>
+    <string name="spool_printing">Printing</string>
     <string name="filament_confirm_clear_title">Clear assignment?</string>
     <string name="filament_confirm_clear_message">Remove the spool assigned to %1$s?</string>
     <string name="filament_assign_success">Spool assigned</string>

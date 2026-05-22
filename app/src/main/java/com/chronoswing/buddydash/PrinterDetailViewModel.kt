@@ -25,7 +25,18 @@ import com.chronoswing.buddydash.util.isTransientState
 import com.chronoswing.buddydash.util.BuddyDashDebug
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.util.FilamentSlotDisplay
+import com.chronoswing.buddydash.util.PrinterFilamentActivity
+import com.chronoswing.buddydash.util.SpoolAssignmentTargetConflict
+import com.chronoswing.buddydash.util.SpoolInventoryCardUsage
+import com.chronoswing.buddydash.util.evaluateSpoolAssignmentConflict
+import com.chronoswing.buddydash.util.resolveActivityKind
+import com.chronoswing.buddydash.util.resolveSpoolInventoryCardUsage
 import com.chronoswing.buddydash.util.RefreshGuard
+import com.chronoswing.buddydash.util.RefreshIntervals
+import com.chronoswing.buddydash.util.RefreshSource
+import com.chronoswing.buddydash.util.isConnectionDisplayStale
+import com.chronoswing.buddydash.util.isDataStale
+import com.chronoswing.buddydash.util.logRefreshDecision
 import com.chronoswing.buddydash.util.SpoolInventoryFilter
 import com.chronoswing.buddydash.util.applySpoolInventorySearch
 import com.chronoswing.buddydash.util.buildFilamentSlotDisplays
@@ -86,11 +97,15 @@ data class PrinterDetailUiState(
     val filamentAssignSnackbar: FilamentAssignSnackbar? = null,
     /** Queue item id for status=printing (thumbnail cache identity). */
     val printingQueueJobId: Int? = null,
+    /** One-shot navigation to spool detail; consumed by UI before navigate. */
+    val pendingSpoolDetailNavigationId: Int? = null,
 )
 
 data class AssignSpoolConfirm(
     val slotDisplay: FilamentSlotDisplay,
     val spool: SpoolInventoryItem,
+    val conflict: com.chronoswing.buddydash.util.SpoolAssignmentTargetConflict =
+        com.chronoswing.buddydash.util.SpoolAssignmentTargetConflict.None,
 )
 
 enum class FilamentAssignSnackbar {
@@ -165,6 +180,25 @@ class PrinterDetailViewModel(
 
     fun onRefreshErrorShown() {
         _uiState.update { it.copy(refreshError = null) }
+    }
+
+    fun refreshOnAppResume(currentRoute: String? = null) {
+        val state = _uiState.value
+        if (printerId < 0 || !state.hasCredentials) return
+        val staleByAge = isDataStale(state.lastStatusUpdatedAtMillis, RefreshIntervals.HOME_MS)
+        val staleByConnection = isConnectionDisplayStale(state.lastStatusUpdatedAtMillis)
+        val stale = staleByAge || staleByConnection || state.status == null
+        logRefreshDecision(
+            screen = "PrinterDetail",
+            source = RefreshSource.APP_RESUME,
+            currentRoute = currentRoute,
+            lastUpdatedAtMillis = state.lastStatusUpdatedAtMillis,
+            intervalMs = RefreshIntervals.HOME_MS,
+            stale = stale,
+            refreshTriggered = true,
+        )
+        if (fetchJob?.isActive == true) return
+        loadStatus(showLoading = false)
     }
 
     fun loadStatus(
@@ -331,18 +365,71 @@ class PrinterDetailViewModel(
                 filamentSlotSheet = display,
                 filamentSpoolPickerOpen = false,
                 spoolPickerSearchQuery = "",
+                assignSpoolConfirm = null,
+                clearAssignmentConfirm = null,
             )
         }
+        logFilamentNavState("openFilamentSlotSheet")
     }
 
     fun dismissFilamentSlotSheet() {
+        dismissFilamentTransientUi()
+    }
+
+    fun dismissFilamentTransientUi() {
         _uiState.update {
             it.copy(
                 filamentSlotSheet = null,
                 filamentSpoolPickerOpen = false,
                 spoolPickerSearchQuery = "",
+                assignSpoolConfirm = null,
+                clearAssignmentConfirm = null,
+                pendingSpoolDetailNavigationId = null,
             )
         }
+        logFilamentNavState("dismissFilamentTransientUi")
+    }
+
+    fun viewSpoolFromSlot(spoolId: Int) {
+        logFilamentNavState("viewSpoolFromSlot before")
+        _uiState.update {
+            it.copy(
+                filamentSlotSheet = null,
+                filamentSpoolPickerOpen = false,
+                spoolPickerSearchQuery = "",
+                assignSpoolConfirm = null,
+                clearAssignmentConfirm = null,
+                pendingSpoolDetailNavigationId = spoolId,
+            )
+        }
+        logFilamentNavState("viewSpoolFromSlot after pendingNav=$spoolId")
+    }
+
+    fun consumePendingSpoolDetailNavigation(): Int? {
+        var consumed: Int? = null
+        _uiState.update {
+            consumed = it.pendingSpoolDetailNavigationId
+            it.copy(pendingSpoolDetailNavigationId = null)
+        }
+        if (BuddyDashDebug.enabled) {
+            Log.d(
+                "BuddyDash/FilamentNav",
+                "consumePendingSpoolDetailNavigation consumed=${consumed != null} spoolId=$consumed",
+            )
+        }
+        return consumed
+    }
+
+    private fun logFilamentNavState(tag: String) {
+        if (!BuddyDashDebug.enabled) return
+        val s = _uiState.value
+        Log.d(
+            "BuddyDash/FilamentNav",
+            "$tag selectedSlot=${s.filamentSlotSheet?.slot?.label} " +
+                "sheetVisible=${s.filamentSlotSheet != null} pickerOpen=${s.filamentSpoolPickerOpen} " +
+                "assignConfirm=${s.assignSpoolConfirm != null} clearConfirm=${s.clearAssignmentConfirm != null} " +
+                "pendingNav=${s.pendingSpoolDetailNavigationId}",
+        )
     }
 
     fun openFilamentSpoolPicker() {
@@ -371,12 +458,43 @@ class PrinterDetailViewModel(
 
     fun requestAssignSpool(spool: SpoolInventoryItem) {
         val slotDisplay = _uiState.value.filamentSlotSheet ?: return
+        val conflict = evaluateSpoolAssignmentConflict(
+            spool = spool,
+            targetPrinterId = printerId,
+            targetSlotLabel = slotDisplay.slot.label,
+            currentSlotAssignedSpoolId = slotDisplay.assignedSpoolId,
+        )
+        if (conflict is SpoolAssignmentTargetConflict.AlreadyOnTarget) {
+            if (BuddyDashDebug.enabled) {
+                Log.d("BuddyDash/FilamentTab", "requestAssignSpool skipped: already on target spool=${spool.id}")
+            }
+            return
+        }
         _uiState.update {
             it.copy(
-                assignSpoolConfirm = AssignSpoolConfirm(slotDisplay, spool),
+                assignSpoolConfirm = AssignSpoolConfirm(slotDisplay, spool, conflict),
                 filamentSpoolPickerOpen = false,
             )
         }
+    }
+
+    fun pickerAssignmentConflict(spool: SpoolInventoryItem): SpoolAssignmentTargetConflict {
+        val slotDisplay = _uiState.value.filamentSlotSheet ?: return SpoolAssignmentTargetConflict.None
+        return evaluateSpoolAssignmentConflict(
+            spool = spool,
+            targetPrinterId = printerId,
+            targetSlotLabel = slotDisplay.slot.label,
+            currentSlotAssignedSpoolId = slotDisplay.assignedSpoolId,
+        )
+    }
+
+    fun pickerCardUsageFor(spool: SpoolInventoryItem): SpoolInventoryCardUsage {
+        val status = _uiState.value.status ?: return resolveSpoolInventoryCardUsage(spool, emptyMap())
+        val activity = PrinterFilamentActivity(
+            activityKind = status.resolveActivityKind(),
+            activeFilamentSlot = status.activeFilamentSlot,
+        )
+        return resolveSpoolInventoryCardUsage(spool, mapOf(printerId to activity))
     }
 
     fun dismissAssignSpoolConfirm() {

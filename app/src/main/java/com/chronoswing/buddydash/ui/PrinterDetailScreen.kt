@@ -180,6 +180,10 @@ fun PrinterDetailScreen(
         onOpenPrinterArchives = onOpenPrinterArchives,
         onStopCameraStream = viewModel::stopCameraStream,
         onOpenSpoolDetail = onOpenSpoolDetail,
+        pendingSpoolDetailNavigationId = uiState.pendingSpoolDetailNavigationId,
+        onConsumePendingSpoolDetailNavigation = viewModel::consumePendingSpoolDetailNavigation,
+        onViewSpoolFromSlot = viewModel::viewSpoolFromSlot,
+        onDismissFilamentTransientUi = viewModel::dismissFilamentTransientUi,
         filamentSlotDisplays = uiState.filamentSlotDisplays,
         printerStatus = uiState.status,
         printingQueueJobId = uiState.printingQueueJobId,
@@ -204,6 +208,8 @@ fun PrinterDetailScreen(
         onDismissClearAssignmentConfirm = viewModel::dismissClearAssignmentConfirm,
         onConfirmClearAssignment = viewModel::confirmClearSlotAssignment,
         onFilamentAssignSnackbarShown = viewModel::onFilamentAssignSnackbarShown,
+        pickerAssignmentConflict = viewModel::pickerAssignmentConflict,
+        pickerCardUsageFor = viewModel::pickerCardUsageFor,
     )
 }
 
@@ -235,6 +241,10 @@ private fun PrinterDetailScreenContent(
     onViewFullQueue: () -> Unit,
     onOpenPrinterArchives: () -> Unit,
     onOpenSpoolDetail: (Int) -> Unit,
+    pendingSpoolDetailNavigationId: Int?,
+    onConsumePendingSpoolDetailNavigation: () -> Int?,
+    onViewSpoolFromSlot: (Int) -> Unit,
+    onDismissFilamentTransientUi: () -> Unit,
     onStopCameraStream: () -> Unit,
     filamentSlotDisplays: List<FilamentSlotDisplay>,
     printerStatus: PrinterStatus?,
@@ -260,6 +270,10 @@ private fun PrinterDetailScreenContent(
     onDismissClearAssignmentConfirm: () -> Unit,
     onConfirmClearAssignment: () -> Unit,
     onFilamentAssignSnackbarShown: () -> Unit,
+    pickerAssignmentConflict: (com.chronoswing.buddydash.data.model.SpoolInventoryItem) ->
+        com.chronoswing.buddydash.util.SpoolAssignmentTargetConflict,
+    pickerCardUsageFor: (com.chronoswing.buddydash.data.model.SpoolInventoryItem) ->
+        com.chronoswing.buddydash.util.SpoolInventoryCardUsage,
     onStartNextQueuedPrint: () -> Unit,
     onStartQueuedPrintSnackbarShown: () -> Unit,
     onRetry: () -> Unit,
@@ -406,6 +420,18 @@ private fun PrinterDetailScreenContent(
     }
 
     val assignAvailability = evaluateFilamentAssignAvailability(printerStatus)
+    val filamentTabIndex = 1
+
+    LaunchedEffect(pendingSpoolDetailNavigationId) {
+        val spoolId = onConsumePendingSpoolDetailNavigation() ?: return@LaunchedEffect
+        onOpenSpoolDetail(spoolId)
+    }
+
+    LaunchedEffect(selectedTab) {
+        if (selectedTab != filamentTabIndex) {
+            onDismissFilamentTransientUi()
+        }
+    }
 
     filamentSlotSheet?.let { sheet ->
         FilamentSlotDetailSheet(
@@ -415,7 +441,7 @@ private fun PrinterDetailScreenContent(
             onDismiss = onDismissFilamentSlotSheet,
             onChangeSpool = onOpenFilamentSpoolPicker,
             onClearAssignment = onRequestClearAssignment,
-            onViewSpool = onOpenSpoolDetail,
+            onViewSpool = onViewSpoolFromSlot,
         )
     }
 
@@ -428,6 +454,8 @@ private fun PrinterDetailScreenContent(
             onSearchQueryChange = onSpoolPickerSearchChange,
             onDismiss = onDismissFilamentSpoolPicker,
             onSpoolSelected = onRequestAssignSpool,
+            assignmentConflictForSpool = pickerAssignmentConflict,
+            cardUsageForSpool = pickerCardUsageFor,
         )
     }
 
@@ -435,6 +463,8 @@ private fun PrinterDetailScreenContent(
         FilamentAssignSpoolDialog(
             spoolTitle = assignConfirmSpoolTitle,
             slotLabel = confirm.slotDisplay.slot.label,
+            printerName = title,
+            conflict = confirm.conflict,
             isBusy = isFilamentAssignBusy,
             onConfirm = onConfirmAssignSpool,
             onDismiss = onDismissAssignSpoolConfirm,

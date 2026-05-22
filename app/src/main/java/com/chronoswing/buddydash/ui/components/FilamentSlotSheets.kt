@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Surface
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -24,15 +25,19 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.util.FilamentAssignAvailability
 import com.chronoswing.buddydash.util.FilamentSlotDisplay
-import com.chronoswing.buddydash.util.formatSpoolCardTitle
-import com.chronoswing.buddydash.util.formatSpoolMaterialSubtitle
+import com.chronoswing.buddydash.util.SpoolAssignmentTargetConflict
+import com.chronoswing.buddydash.util.SpoolInventoryCardUsage
+import com.chronoswing.buddydash.util.formatSpoolAssignmentLocationBrief
+import com.chronoswing.buddydash.util.formatSpoolInventoryCardLocationLine
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -156,6 +161,8 @@ fun FilamentSpoolPickerSheet(
     onSearchQueryChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onSpoolSelected: (SpoolInventoryItem) -> Unit,
+    assignmentConflictForSpool: (SpoolInventoryItem) -> SpoolAssignmentTargetConflict,
+    cardUsageForSpool: (SpoolInventoryItem) -> SpoolInventoryCardUsage,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -200,9 +207,16 @@ fun FilamentSpoolPickerSheet(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(spools, key = { it.id }) { spool ->
-                        SpoolInventoryRow(
+                        val conflict = assignmentConflictForSpool(spool)
+                        FilamentPickerSpoolRow(
                             spool = spool,
-                            onClick = { onSpoolSelected(spool) },
+                            conflict = conflict,
+                            cardUsage = cardUsageForSpool(spool),
+                            onClick = {
+                                if (conflict !is SpoolAssignmentTargetConflict.AlreadyOnTarget) {
+                                    onSpoolSelected(spool)
+                                }
+                            },
                         )
                     }
                 }
@@ -212,22 +226,92 @@ fun FilamentSpoolPickerSheet(
 }
 
 @Composable
+private fun FilamentPickerSpoolRow(
+    spool: SpoolInventoryItem,
+    conflict: SpoolAssignmentTargetConflict,
+    cardUsage: SpoolInventoryCardUsage,
+    onClick: () -> Unit,
+) {
+    val enabled = conflict !is SpoolAssignmentTargetConflict.AlreadyOnTarget
+    val locationLine = when (conflict) {
+        is SpoolAssignmentTargetConflict.AlreadyOnTarget ->
+            stringResource(R.string.filament_picker_already_here)
+        else -> formatSpoolInventoryCardLocationLine(spool)
+    }
+    val displayUsage = when {
+        conflict is SpoolAssignmentTargetConflict.AlreadyOnTarget -> SpoolInventoryCardUsage.Normal
+        else -> cardUsage
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.55f)
+            .then(
+                if (enabled) {
+                    Modifier.buddyDashClickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            ),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        SpoolInventoryCardContent(
+            spool = spool,
+            locationLine = locationLine,
+            cardUsage = displayUsage,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            locationMaxLines = 2,
+        )
+    }
+}
+
+@Composable
 fun FilamentAssignSpoolDialog(
     spoolTitle: String,
     slotLabel: String,
+    printerName: String,
+    conflict: SpoolAssignmentTargetConflict,
     isBusy: Boolean,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val elsewhere = conflict as? SpoolAssignmentTargetConflict.AssignedElsewhere
+    val titleRes = if (elsewhere != null) {
+        R.string.filament_confirm_assign_elsewhere_title
+    } else {
+        R.string.filament_confirm_assign_title
+    }
+    val targetLocation = "$printerName • $slotLabel"
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.filament_confirm_assign_title)) },
+        title = { Text(stringResource(titleRes)) },
         text = {
-            Text(stringResource(R.string.filament_confirm_assign_message, spoolTitle, slotLabel))
+            if (elsewhere != null) {
+                Text(
+                    stringResource(
+                        R.string.filament_confirm_assign_elsewhere_message,
+                        spoolTitle,
+                        formatSpoolAssignmentLocationBrief(elsewhere.assignment),
+                        targetLocation,
+                    ),
+                )
+            } else {
+                Text(stringResource(R.string.filament_confirm_assign_message, spoolTitle, slotLabel))
+            }
         },
         confirmButton = {
             TextButton(onClick = onConfirm, enabled = !isBusy) {
-                Text(stringResource(R.string.filament_action_assign))
+                Text(
+                    stringResource(
+                        if (elsewhere != null) {
+                            R.string.filament_action_assign_anyway
+                        } else {
+                            R.string.filament_action_assign
+                        },
+                    ),
+                )
             }
         },
         dismissButton = {

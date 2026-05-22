@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -49,6 +51,8 @@ import com.chronoswing.buddydash.ui.components.SpoolListSkeleton
 import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.util.ArchiveSpoolLookupFilter
 import com.chronoswing.buddydash.util.ListLoadUi
+import com.chronoswing.buddydash.data.model.SpoolInventoryItem
+import com.chronoswing.buddydash.util.SpoolInventoryCardUsage
 import com.chronoswing.buddydash.util.SpoolInventoryFilter
 import com.chronoswing.buddydash.util.archiveLookupFilterSummary
 
@@ -109,6 +113,7 @@ fun SpoolsScreen(
         onRefreshErrorShown = viewModel::onRefreshErrorShown,
         onSpoolClick = onSpoolClick,
         onBack = onBack,
+        cardUsageFor = uiState::cardUsageFor,
     )
 }
 
@@ -134,6 +139,7 @@ private fun SpoolsScreenContent(
     onRefreshErrorShown: () -> Unit,
     onSpoolClick: (Int) -> Unit,
     onBack: (() -> Unit)?,
+    cardUsageFor: (SpoolInventoryItem) -> SpoolInventoryCardUsage,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val noMatchMessage = stringResource(R.string.snackbar_no_matching_filament)
@@ -260,7 +266,18 @@ private fun SpoolsScreenContent(
                                     .padding(16.dp),
                             )
                         } else {
+                            val listState = rememberLazyListState()
+                            val visibleSpoolIds by remember {
+                                derivedStateOf {
+                                    listState.layoutInfo.visibleItemsInfo
+                                        .mapNotNull { item ->
+                                            (item.key as? Int) ?: (item.key as? String)?.toIntOrNull()
+                                        }
+                                        .toSet()
+                                }
+                            }
                             LazyColumn(
+                                state = listState,
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(
                                     start = 12.dp,
@@ -275,6 +292,8 @@ private fun SpoolsScreenContent(
                                 ) { spool ->
                                     SpoolInventoryRow(
                                         spool = spool,
+                                        cardUsage = cardUsageFor(spool),
+                                        glowAnimationEnabled = spool.id in visibleSpoolIds,
                                         onClick = { onSpoolClick(spool.id) },
                                     )
                                 }

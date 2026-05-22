@@ -10,8 +10,15 @@ import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.ArchiveSpoolLookupFilter
 import com.chronoswing.buddydash.util.BuddyDashDebug
 import com.chronoswing.buddydash.util.RefreshGuard
+import com.chronoswing.buddydash.util.RefreshIntervals
+import com.chronoswing.buddydash.util.RefreshSource
+import com.chronoswing.buddydash.util.isDataStale
+import com.chronoswing.buddydash.util.logRefreshDecision
+import com.chronoswing.buddydash.util.PrinterFilamentActivity
+import com.chronoswing.buddydash.util.SpoolInventoryCardUsage
 import com.chronoswing.buddydash.util.SpoolInventoryFilter
 import com.chronoswing.buddydash.util.applySpoolInventorySearch
+import com.chronoswing.buddydash.util.resolveSpoolInventoryCardUsage
 import com.chronoswing.buddydash.util.spoolMatchesArchiveLookupFilter
 import com.chronoswing.buddydash.util.toUserNetworkMessage
 import kotlinx.coroutines.CancellationException
@@ -36,14 +43,19 @@ data class SpoolsUiState(
     val refreshError: String? = null,
     /** True after the first fetch finishes (success or failure). */
     val hasCompletedLoad: Boolean = false,
+    val lastUpdatedAtMillis: Long? = null,
     val serverUrl: String = "",
     val apiKey: String = "",
     val hasCredentials: Boolean = false,
     val searchQuery: String = "",
     val filter: SpoolInventoryFilter = SpoolInventoryFilter.All,
     val archiveLookupFilter: ArchiveSpoolLookupFilter? = null,
+    val printerFilamentActivityById: Map<Int, PrinterFilamentActivity> = emptyMap(),
 ) {
     val showArchiveMatchHeader: Boolean get() = archiveLookupFilter != null
+
+    fun cardUsageFor(spool: SpoolInventoryItem): SpoolInventoryCardUsage =
+        resolveSpoolInventoryCardUsage(spool, printerFilamentActivityById)
 
     fun filteredSpools(): List<SpoolInventoryItem> {
         var pool = spools
@@ -135,11 +147,26 @@ class SpoolsViewModel(
     }
 
     fun refreshFromBottomNavReselect() {
-        if (BuddyDashDebug.enabled) {
-            Log.d(TAG_SPOOLS_VM, "refreshFromBottomNavReselect")
-        }
         applySectionRootFromNavigation()
         loadSpools(showLoading = false, fromBottomNavReselect = true)
+    }
+
+    fun refreshOnAppResume(currentRoute: String? = null) {
+        val state = _uiState.value
+        if (!state.hasCredentials || !state.hasCompletedLoad) return
+        val stale = isDataStale(state.lastUpdatedAtMillis, RefreshIntervals.SPOOLS_MS)
+        logRefreshDecision(
+            screen = "Spools",
+            source = RefreshSource.APP_RESUME,
+            currentRoute = currentRoute,
+            lastUpdatedAtMillis = state.lastUpdatedAtMillis,
+            intervalMs = RefreshIntervals.SPOOLS_MS,
+            stale = stale,
+            refreshTriggered = stale,
+        )
+        if (!stale) return
+        if (fetchJob?.isActive == true) return
+        loadSpools(showLoading = false)
     }
 
     fun loadSpools(
@@ -192,19 +219,29 @@ class SpoolsViewModel(
 
                 val credentials = _uiState.value
                 ensureActive()
-                val result = apiClient.fetchSpoolInventory(
+                val spoolsResult = apiClient.fetchSpoolInventory(
+                    credentials.serverUrl,
+                    credentials.apiKey,
+                )
+                val activityResult = apiClient.fetchPrinterFilamentActivityById(
                     credentials.serverUrl,
                     credentials.apiKey,
                 )
                 ensureActive()
 
-                result.fold(
+                spoolsResult.fold(
                     onSuccess = { spools ->
+                        val activityById = activityResult.getOrElse { emptyMap() }
                         if (BuddyDashDebug.enabled) {
+                            val printingCount = spools.count {
+                                resolveSpoolInventoryCardUsage(it, activityById) ==
+                                    SpoolInventoryCardUsage.Printing
+                            }
                             Log.d(
                                 TAG_SPOOLS_VM,
                                 "loadSpools success mappedCount=${spools.size} " +
-                                    "uiState=${_uiState.value.spools.size}->${spools.size}",
+                                    "uiState=${_uiState.value.spools.size}->${spools.size} " +
+                                    "printingSpools=$printingCount printers=${activityById.size}",
                             )
                             if (fromBottomNavReselect) {
                                 Log.d(TAG_SPOOLS_VM, "bottomNavReselect refresh success")
@@ -215,9 +252,11 @@ class SpoolsViewModel(
                                 isLoading = false,
                                 isRefreshing = false,
                                 spools = spools,
+                                printerFilamentActivityById = activityById,
                                 error = null,
                                 refreshError = null,
                                 hasCompletedLoad = true,
+                                lastUpdatedAtMillis = System.currentTimeMillis(),
                             )
                         }
                     },

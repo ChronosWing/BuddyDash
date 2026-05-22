@@ -96,15 +96,8 @@ fun HomeScreen(
         hasCredentials = uiState.hasCredentials,
         serverUrl = uiState.serverUrl,
         cameraToken = uiState.cameraToken,
-        onRefresh = {
-            viewModel.loadPrinters(
-                showLoading = uiState.printers.isEmpty(),
-                fromUser = true,
-            )
-        },
-        onPullRefresh = {
-            viewModel.loadPrinters(showLoading = false, fromPull = true)
-        },
+        onRefresh = { viewModel.refreshManual() },
+        onPullRefresh = { viewModel.refreshManual() },
         onRefreshErrorShown = viewModel::onRefreshErrorShown,
         lastUpdatedAtMillis = uiState.lastUpdatedAtMillis,
         onPrinterClick = onPrinterClick,
