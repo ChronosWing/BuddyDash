@@ -65,7 +65,7 @@ import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.ui.components.FilamentHomeGroupsRow
 import com.chronoswing.buddydash.ui.components.HomePrinterSearchField
 import com.chronoswing.buddydash.ui.components.HomePrinterSearchFilterChips
-import com.chronoswing.buddydash.ui.components.HomeHeaderMetadataRow
+import com.chronoswing.buddydash.ui.components.HomeActivityGhostPillsRow
 import com.chronoswing.buddydash.ui.components.HomeCardMicroMotionFrame
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
 import com.chronoswing.buddydash.ui.components.MicroMotionThumbnailFrame
@@ -231,10 +231,6 @@ private fun HomeScreenContent(
                 ambientPulseEnabled = hasAnyPrinterPrinting(printers) &&
                     !preferOfflineInHeader,
                 appNameContentDescription = appNameContentDescription,
-                showHeaderMetadata = showHeaderMetadata,
-                onlineCount = printerCounts.online,
-                printingCount = printerCounts.printing,
-                loadedSpoolCount = loadedSpoolCount ?: 0,
                 lastUpdatedAtMillis = lastUpdatedAtMillis,
                 showHeaderUpdating = showHeaderUpdating,
                 hasCredentials = hasCredentials,
@@ -284,12 +280,25 @@ private fun HomeScreenContent(
                 }
             }
             loadState == HomePrintersLoadState.EmptyLoadedSuccessfully -> {
-                EmptyContent(
-                    message = stringResource(R.string.no_printers),
-                    subtitle = stringResource(R.string.empty_hint_printers),
-                    icon = BuddyDashEmptyIcon.Printers.asImageVector(),
-                    modifier = Modifier.padding(innerPadding),
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                ) {
+                    if (showHeaderMetadata) {
+                        HomeActivityGhostPillsRow(
+                            onlineCount = printerCounts.online,
+                            printingCount = printerCounts.printing,
+                            loadedSpoolCount = loadedSpoolCount ?: 0,
+                        )
+                    }
+                    EmptyContent(
+                        message = stringResource(R.string.no_printers),
+                        subtitle = stringResource(R.string.empty_hint_printers),
+                        icon = BuddyDashEmptyIcon.Printers.asImageVector(),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
             else -> {
                 val filteredPrinters = if (searchExpanded) {
@@ -315,6 +324,13 @@ private fun HomeScreenContent(
                     if (showStaleBanner) {
                         OfflineStaleBanner(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        )
+                    }
+                    if (showHeaderMetadata) {
+                        HomeActivityGhostPillsRow(
+                            onlineCount = printerCounts.online,
+                            printingCount = printerCounts.printing,
+                            loadedSpoolCount = loadedSpoolCount ?: 0,
                         )
                     }
                     PullToRefreshBox(
@@ -519,10 +535,6 @@ private fun hasAnyPrinterPrinting(printers: List<Printer>): Boolean =
 private fun HomeCompactTopBar(
     ambientPulseEnabled: Boolean,
     appNameContentDescription: String,
-    showHeaderMetadata: Boolean,
-    onlineCount: Int,
-    printingCount: Int,
-    loadedSpoolCount: Int,
     lastUpdatedAtMillis: Long?,
     showHeaderUpdating: Boolean,
     hasCredentials: Boolean,
@@ -556,10 +568,6 @@ private fun HomeCompactTopBar(
                 HomeTopBarTitle(
                     ambientPulseEnabled = ambientPulseEnabled,
                     appNameContentDescription = appNameContentDescription,
-                    showHeaderMetadata = showHeaderMetadata,
-                    onlineCount = onlineCount,
-                    printingCount = printingCount,
-                    loadedSpoolCount = loadedSpoolCount,
                     lastUpdatedAtMillis = lastUpdatedAtMillis,
                     showHeaderUpdating = showHeaderUpdating,
                     hasCredentials = hasCredentials,
@@ -589,10 +597,6 @@ private fun HomeCompactTopBar(
 private fun HomeTopBarTitle(
     ambientPulseEnabled: Boolean,
     appNameContentDescription: String,
-    showHeaderMetadata: Boolean,
-    onlineCount: Int,
-    printingCount: Int,
-    loadedSpoolCount: Int,
     lastUpdatedAtMillis: Long?,
     showHeaderUpdating: Boolean,
     hasCredentials: Boolean,
@@ -615,30 +619,17 @@ private fun HomeTopBarTitle(
                     contentDescription = appNameContentDescription
                 },
         )
-        Column(
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+        StatusLastUpdatedIndicator(
+            lastUpdatedAtMillis = lastUpdatedAtMillis,
+            isRefreshing = showHeaderUpdating,
+            enabled = hasCredentials && !isLoading,
+            onRefresh = onRefresh,
+            preferConnectionStale = showConnectionStaleInHeader,
+            preferOffline = preferOfflineInHeader,
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .wrapContentWidth(Alignment.End)
+                .align(Alignment.CenterEnd)
                 .padding(start = HomeTitleStatusStartPadding),
-        ) {
-            StatusLastUpdatedIndicator(
-                lastUpdatedAtMillis = lastUpdatedAtMillis,
-                isRefreshing = showHeaderUpdating,
-                enabled = hasCredentials && !isLoading,
-                onRefresh = onRefresh,
-                preferConnectionStale = showConnectionStaleInHeader,
-                preferOffline = preferOfflineInHeader,
-            )
-            if (showHeaderMetadata) {
-                HomeHeaderMetadataRow(
-                    onlineCount = onlineCount,
-                    printingCount = printingCount,
-                    loadedSpoolCount = loadedSpoolCount,
-                )
-            }
-        }
+        )
     }
 }
 

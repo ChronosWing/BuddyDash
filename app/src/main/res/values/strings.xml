@@ -26,7 +26,6 @@
     <string name="home_header_meta_online">%1$d online</string>
     <string name="home_header_meta_printing">%1$d printing</string>
     <string name="home_header_meta_loaded">%1$d loaded</string>
-    <string name="home_header_meta_separator">•</string>
     <string name="search_printers">Search printers</string>
     <string name="search_printers_hint">Search printers…</string>
     <string name="close_search">Close search</string>
