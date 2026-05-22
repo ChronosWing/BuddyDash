@@ -39,7 +39,10 @@ import com.chronoswing.buddydash.util.toUserNetworkMessage
 import com.chronoswing.buddydash.util.logFullJsonPayload
 import com.chronoswing.buddydash.util.logSpoolUsageFetch
 import com.chronoswing.buddydash.util.TAG_SPOOL_USAGE_LINK
+import com.chronoswing.buddydash.util.PrinterFilamentActivity
+import com.chronoswing.buddydash.util.PrinterActivityKind
 import com.chronoswing.buddydash.util.parseSpoolInventoryList
+import com.chronoswing.buddydash.util.resolveActivityKind
 import com.chronoswing.buddydash.util.parseSpoolUsageHistoryList
 import com.chronoswing.buddydash.data.model.SpoolUsageEntry
 import com.chronoswing.buddydash.util.etaDebugLogLine
@@ -166,6 +169,36 @@ class BambuddyApiClient {
         withContext(Dispatchers.IO) {
             fetchPrinters(serverUrl, apiKey).mapCatching { printers ->
                 enrichPrintersForHome(serverUrl, apiKey, printers).getOrThrow()
+            }
+        }
+
+    /** Per-printer activity + active tray for spool inventory printing indicators. */
+    suspend fun fetchPrinterFilamentActivityById(
+        serverUrl: String,
+        apiKey: String,
+    ): Result<Map<Int, PrinterFilamentActivity>> =
+        withContext(Dispatchers.IO) {
+            fetchPrinters(serverUrl, apiKey).mapCatching { printers ->
+                if (printers.isEmpty()) return@mapCatching emptyMap()
+                coroutineScope {
+                    val semaphore = Semaphore(4)
+                    printers.map { printer ->
+                        async {
+                            semaphore.withPermit {
+                                val status = fetchPrinterStatus(
+                                    serverUrl = serverUrl,
+                                    apiKey = apiKey,
+                                    printerId = printer.id,
+                                ).getOrNull()
+                                printer.id to PrinterFilamentActivity(
+                                    activityKind = status?.resolveActivityKind()
+                                        ?: PrinterActivityKind.Offline,
+                                    activeFilamentSlot = status?.activeFilamentSlot,
+                                )
+                            }
+                        }
+                    }.awaitAll().toMap()
+                }
             }
         }
 

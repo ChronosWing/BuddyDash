@@ -3,6 +3,7 @@ package com.chronoswing.buddydash.util
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
+import com.chronoswing.buddydash.data.model.SpoolSlotAssignment
 import com.chronoswing.buddydash.network.BambuddyApi
 
 enum class FilamentAssignBlockReason {
@@ -51,6 +52,41 @@ fun filamentAssignBlockMessage(reason: FilamentAssignBlockReason): String = when
     FilamentAssignBlockReason.Busy -> "Printer busy"
     FilamentAssignBlockReason.Error -> "Unavailable while printer has an error"
     FilamentAssignBlockReason.SlotUnavailable -> "This slot cannot be assigned"
+}
+
+sealed class SpoolAssignmentTargetConflict {
+    data object None : SpoolAssignmentTargetConflict()
+    data object AlreadyOnTarget : SpoolAssignmentTargetConflict()
+    data class AssignedElsewhere(val assignment: SpoolSlotAssignment) : SpoolAssignmentTargetConflict()
+}
+
+/** Whether assigning [spool] to the target slot should warn (storage/unassigned → none). */
+fun evaluateSpoolAssignmentConflict(
+    spool: SpoolInventoryItem,
+    targetPrinterId: Int,
+    targetSlotLabel: String,
+    currentSlotAssignedSpoolId: Int?,
+): SpoolAssignmentTargetConflict {
+    if (currentSlotAssignedSpoolId != null && currentSlotAssignedSpoolId == spool.id) {
+        return SpoolAssignmentTargetConflict.AlreadyOnTarget
+    }
+    val assignment = spool.assignment ?: return SpoolAssignmentTargetConflict.None
+    val samePrinter = assignment.printerId == targetPrinterId
+    val sameSlot = assignment.slotLabel.equals(targetSlotLabel, ignoreCase = true)
+    if (samePrinter && sameSlot) {
+        return SpoolAssignmentTargetConflict.AlreadyOnTarget
+    }
+    return SpoolAssignmentTargetConflict.AssignedElsewhere(assignment)
+}
+
+/** Brief location for dialogs: Printer • Slot */
+fun formatSpoolAssignmentLocationBrief(assignment: SpoolSlotAssignment): String {
+    val slot = assignment.slotLabel.trim().takeIf { isMeaningfulSpoolField(it) }
+    return if (slot != null) {
+        "${assignment.printerName} • $slot"
+    } else {
+        assignment.printerName
+    }
 }
 
 /** Prefer spools matching the slot material when the slot reports a type. */

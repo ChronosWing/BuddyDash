@@ -9,6 +9,13 @@ import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.BuddyDashDebug
 import com.chronoswing.buddydash.util.HomeLoadTiming
 import com.chronoswing.buddydash.util.RefreshGuard
+import com.chronoswing.buddydash.util.RefreshIntervals
+import com.chronoswing.buddydash.util.RefreshSource
+import com.chronoswing.buddydash.util.cancelsInFlightRefresh
+import com.chronoswing.buddydash.util.forcesHomeRefresh
+import com.chronoswing.buddydash.util.isConnectionDisplayStale
+import com.chronoswing.buddydash.util.isDataStale
+import com.chronoswing.buddydash.util.logRefreshDecision
 import com.chronoswing.buddydash.util.toUserNetworkMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -50,6 +57,7 @@ class HomeViewModel(
     private var listFetchJob: Job? = null
     private var enrichJob: Job? = null
     private val manualRefreshGuard = RefreshGuard()
+    private var pendingRefreshSource: RefreshSource? = null
 
     init {
         viewModelScope.launch {
@@ -84,24 +92,83 @@ class HomeViewModel(
         _uiState.update { it.copy(refreshError = null) }
     }
 
-    /** Bottom-nav reselect on Printers: immediate refresh, no debounce. */
-    fun refreshFromBottomNavReselect() {
-        refreshOnPrintersRootAppeared(trigger = "bottomNavReselect")
+    fun refreshFromBottomNavReselect(currentRoute: String? = null) {
+        requestRefresh(RefreshSource.BOTTOM_NAV_RESELECT, force = true, currentRoute = currentRoute)
     }
 
-    /** Printers root became visible (back from detail/queue or tab reselect). */
-    fun refreshOnPrintersRootAppeared(trigger: String = "returnToRoot") {
-        if (BuddyDashDebug.enabled) {
-            Log.d(TAG_HOME_VM, "refreshOnPrintersRootAppeared trigger=$trigger")
+    fun refreshOnReturnFromDetail(currentRoute: String? = null) {
+        requestRefresh(RefreshSource.RETURN_FROM_DETAIL, force = true, currentRoute = currentRoute)
+    }
+
+    fun refreshOnAppResume(currentRoute: String? = null) {
+        requestRefresh(RefreshSource.APP_RESUME, force = true, currentRoute = currentRoute)
+    }
+
+    fun refreshManual() {
+        requestRefresh(RefreshSource.MANUAL, force = true)
+    }
+
+    fun requestRefresh(
+        source: RefreshSource,
+        force: Boolean = false,
+        currentRoute: String? = null,
+    ) {
+        val state = _uiState.value
+        if (!state.hasCredentials) return
+
+        val staleByAge = isDataStale(state.lastUpdatedAtMillis, RefreshIntervals.HOME_MS)
+        val staleByConnection = isConnectionDisplayStale(state.lastUpdatedAtMillis)
+        val stale = staleByAge || staleByConnection
+        val shouldRefresh = force || source.forcesHomeRefresh(force) || stale
+
+        logRefreshDecision(
+            screen = "Home",
+            source = source,
+            currentRoute = currentRoute,
+            lastUpdatedAtMillis = state.lastUpdatedAtMillis,
+            intervalMs = RefreshIntervals.HOME_MS,
+            stale = stale,
+            refreshTriggered = shouldRefresh,
+        )
+
+        if (!shouldRefresh) return
+
+        val refreshInFlight = listFetchJob?.isActive == true || enrichJob?.isActive == true
+        if (refreshInFlight) {
+            when (source) {
+                RefreshSource.RETURN_FROM_DETAIL,
+                RefreshSource.BOTTOM_NAV_RESELECT,
+                RefreshSource.MANUAL,
+                -> {
+                    listFetchJob?.cancel()
+                    enrichJob?.cancel()
+                }
+                RefreshSource.APP_RESUME -> {
+                    pendingRefreshSource = source
+                    if (BuddyDashDebug.enabled) {
+                        Log.d(TAG_HOME_VM, "refresh queued source=$source (in flight)")
+                    }
+                    return
+                }
+                RefreshSource.POLL -> return
+            }
         }
-        loadPrinters(showLoading = false, fromBottomNavReselect = true)
+
+        loadPrinters(
+            showLoading = false,
+            fromPull = source == RefreshSource.MANUAL,
+            fromUser = source == RefreshSource.MANUAL,
+            immediateRefresh = source.cancelsInFlightRefresh(),
+            refreshSource = source,
+        )
     }
 
     fun loadPrinters(
         showLoading: Boolean = false,
         fromPull: Boolean = false,
         fromUser: Boolean = false,
-        fromBottomNavReselect: Boolean = false,
+        immediateRefresh: Boolean = false,
+        refreshSource: RefreshSource = RefreshSource.POLL,
     ) {
         val state = _uiState.value
         if (!state.hasCredentials) {
@@ -116,12 +183,17 @@ class HomeViewModel(
             }
             return
         }
-        if (fromBottomNavReselect) {
+        if (immediateRefresh) {
             listFetchJob?.cancel()
             enrichJob?.cancel()
         } else {
             if (fromUser && !fromPull && manualRefreshGuard.shouldSkipManualRefresh()) return
             if (fromUser && (listFetchJob?.isActive == true || enrichJob?.isActive == true)) return
+            if (refreshSource == RefreshSource.POLL &&
+                (listFetchJob?.isActive == true || enrichJob?.isActive == true)
+            ) {
+                return
+            }
         }
 
         val hadPrinters = state.printers.isNotEmpty()
@@ -129,12 +201,12 @@ class HomeViewModel(
         if (BuddyDashDebug.enabled) {
             Log.d(
                 TAG_HOME_VM,
-                "loadPrinters showLoading=$showLoading fromPull=$fromPull fromUser=$fromUser " +
-                    "fromBottomNavReselect=$fromBottomNavReselect hadPrinters=$hadPrinters",
+                "loadPrinters source=$refreshSource showLoading=$showLoading fromPull=$fromPull " +
+                    "fromUser=$fromUser immediateRefresh=$immediateRefresh hadPrinters=$hadPrinters",
             )
         }
 
-        if (!fromBottomNavReselect) {
+        if (!immediateRefresh) {
             listFetchJob?.cancel()
             enrichJob?.cancel()
         }
@@ -157,16 +229,10 @@ class HomeViewModel(
 
                 listResult.fold(
                     onSuccess = { basePrinters ->
-                        if (fromBottomNavReselect && basePrinters.isNotEmpty() && BuddyDashDebug.enabled) {
-                            Log.d(TAG_HOME_VM, "bottomNavReselect list fetch success")
-                        }
                         HomeLoadTiming.log(
                             "printer list response (count=${basePrinters.size})",
                         )
                         if (basePrinters.isEmpty()) {
-                            if (fromBottomNavReselect && BuddyDashDebug.enabled) {
-                                Log.d(TAG_HOME_VM, "bottomNavReselect refresh success")
-                            }
                             _uiState.update {
                                 it.copy(
                                     printers = emptyList(),
@@ -179,6 +245,7 @@ class HomeViewModel(
                                     lastUpdatedAtMillis = System.currentTimeMillis(),
                                 )
                             }
+                            flushPendingRefresh()
                             return@launch
                         }
 
@@ -211,7 +278,7 @@ class HomeViewModel(
                                 credentials.serverUrl,
                                 credentials.apiKey,
                                 basePrinters,
-                                fromBottomNavReselect = fromBottomNavReselect,
+                                refreshSource = refreshSource,
                             )
                         }
                     },
@@ -219,9 +286,6 @@ class HomeViewModel(
                         val message = error.toUserNetworkMessage(
                             if (hadPrinters) "Could not refresh printers" else "Failed to load printers",
                         )
-                        if (fromBottomNavReselect && BuddyDashDebug.enabled) {
-                            Log.w(TAG_HOME_VM, "bottomNavReselect refresh failure: $message", error)
-                        }
                         _uiState.update { current ->
                             if (current.printers.isNotEmpty()) {
                                 current.copy(
@@ -241,6 +305,7 @@ class HomeViewModel(
                                 )
                             }
                         }
+                        flushPendingRefresh()
                     },
                 )
             } catch (e: CancellationException) {
@@ -253,7 +318,7 @@ class HomeViewModel(
         serverUrl: String,
         apiKey: String,
         basePrinters: List<Printer>,
-        fromBottomNavReselect: Boolean = false,
+        refreshSource: RefreshSource = RefreshSource.POLL,
     ) {
         try {
             currentCoroutineContext().ensureActive()
@@ -261,9 +326,6 @@ class HomeViewModel(
             currentCoroutineContext().ensureActive()
             result.fold(
                 onSuccess = { enriched ->
-                    if (fromBottomNavReselect && BuddyDashDebug.enabled) {
-                        Log.d(TAG_HOME_VM, "bottomNavReselect refresh success")
-                    }
                     _uiState.update {
                         it.copy(
                             printers = enriched,
@@ -274,13 +336,11 @@ class HomeViewModel(
                         )
                     }
                     HomeLoadTiming.log("secondary data applied to printer cards")
+                    flushPendingRefresh()
                 },
                 onFailure = { error ->
                     if (BuddyDashDebug.enabled) {
-                        Log.w(TAG_HOME_VM, "enrichPrinters failed", error)
-                        if (fromBottomNavReselect) {
-                            Log.w(TAG_HOME_VM, "bottomNavReselect refresh failure", error)
-                        }
+                        Log.w(TAG_HOME_VM, "enrichPrinters failed source=$refreshSource", error)
                     }
                     _uiState.update {
                         it.copy(
@@ -289,11 +349,21 @@ class HomeViewModel(
                             refreshError = error.toUserNetworkMessage("Could not refresh printers"),
                         )
                     }
+                    flushPendingRefresh()
                 },
             )
         } catch (e: CancellationException) {
             throw e
         }
+    }
+
+    private fun flushPendingRefresh() {
+        val pending = pendingRefreshSource ?: return
+        pendingRefreshSource = null
+        if (BuddyDashDebug.enabled) {
+            Log.d(TAG_HOME_VM, "running queued refresh source=$pending")
+        }
+        requestRefresh(pending, force = true)
     }
 
     override fun onCleared() {

@@ -42,7 +42,9 @@ import com.chronoswing.buddydash.util.ArchiveSpoolLookupFilter
 import com.chronoswing.buddydash.util.parseArchiveLookupColorHexesArg
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.network.BambuddyApiClient
+import com.chronoswing.buddydash.ui.components.AppForegroundResumeEffect
 import com.chronoswing.buddydash.ui.components.BuddyDashBottomNav
+import com.chronoswing.buddydash.util.RefreshSource
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -105,6 +107,10 @@ object Routes {
     fun routeBase(route: String?): String? = route?.substringBefore('?')
 
     fun isPrintersRoot(route: String?): Boolean = routeBase(route) == HOME
+
+    fun isSpoolsRoot(route: String?): Boolean = routeBase(route) == SPOOLS_BASE
+
+    fun isArchivesRoot(route: String?): Boolean = routeBase(route) == ARCHIVES_BASE
 
     /** Printer Detail, full queue, or other stack above Home within the Printers tab. */
     fun isPrinterSubScreen(route: String?): Boolean {
@@ -213,9 +219,20 @@ fun BuddyDashNav(
     val currentRoute = navBackStackEntry?.destination?.route
     var printersReselectNonce by remember { mutableIntStateOf(0) }
     var printersReturnRefreshNonce by remember { mutableIntStateOf(0) }
+    var appResumeNonce by remember { mutableIntStateOf(0) }
     var previousRoute by remember { mutableStateOf<String?>(null) }
     var spoolsReselectNonce by remember { mutableIntStateOf(0) }
     var archivesReselectNonce by remember { mutableIntStateOf(0) }
+    var spoolsAppResumeNonce by remember { mutableIntStateOf(0) }
+    var archivesAppResumeNonce by remember { mutableIntStateOf(0) }
+    var printerDetailAppResumeNonce by remember { mutableIntStateOf(0) }
+
+    AppForegroundResumeEffect {
+        appResumeNonce++
+        spoolsAppResumeNonce++
+        archivesAppResumeNonce++
+        printerDetailAppResumeNonce++
+    }
 
     LaunchedEffect(Unit) {
         if (debugLogNavDestinations) {
@@ -229,6 +246,19 @@ fun BuddyDashNav(
 
     LaunchedEffect(currentRoute) {
         logNavState("routeChanged", currentRoute)
+        val returnedFromPrinterSubScreen =
+            Routes.isPrintersRoot(currentRoute) && Routes.isPrinterSubScreen(previousRoute)
+        if (returnedFromPrinterSubScreen) {
+            if (BuddyDashDebug.enabled) {
+                Log.d(
+                    TAG_NAV,
+                    "returnToPrintersRoot from=$previousRoute refreshTriggered=true " +
+                        "source=${RefreshSource.RETURN_FROM_DETAIL}",
+                )
+            }
+            printersReturnRefreshNonce++
+        }
+        previousRoute = currentRoute
     }
 
     Scaffold(
@@ -289,9 +319,19 @@ fun BuddyDashNav(
                         HomeViewModel(settingsRepository, apiClient)
                     },
                 )
-                LaunchedEffect(printersReselectNonce, printersReturnRefreshNonce) {
-                    if (printersReselectNonce > 0 || printersReturnRefreshNonce > 0) {
-                        viewModel.refreshOnPrintersRootAppeared()
+                LaunchedEffect(printersReturnRefreshNonce) {
+                    if (printersReturnRefreshNonce > 0) {
+                        viewModel.refreshOnReturnFromDetail(currentRoute)
+                    }
+                }
+                LaunchedEffect(printersReselectNonce) {
+                    if (printersReselectNonce > 0) {
+                        viewModel.refreshFromBottomNavReselect(currentRoute)
+                    }
+                }
+                LaunchedEffect(appResumeNonce, currentRoute) {
+                    if (appResumeNonce > 0 && Routes.isPrintersRoot(currentRoute)) {
+                        viewModel.refreshOnAppResume(currentRoute)
                     }
                 }
                 HomeScreen(
@@ -351,6 +391,11 @@ fun BuddyDashNav(
                 LaunchedEffect(archivesReselectNonce) {
                     if (archivesReselectNonce > 0) {
                         viewModel.refreshFromBottomNavReselect()
+                    }
+                }
+                LaunchedEffect(archivesAppResumeNonce, currentRoute) {
+                    if (archivesAppResumeNonce > 0 && Routes.isArchivesRoot(currentRoute)) {
+                        viewModel.refreshOnAppResume(currentRoute)
                     }
                 }
                 ArchivesScreen(
@@ -420,6 +465,11 @@ fun BuddyDashNav(
                 LaunchedEffect(spoolsReselectNonce) {
                     if (spoolsReselectNonce > 0) {
                         viewModel.refreshFromBottomNavReselect()
+                    }
+                }
+                LaunchedEffect(spoolsAppResumeNonce, currentRoute) {
+                    if (spoolsAppResumeNonce > 0 && Routes.isSpoolsRoot(currentRoute)) {
+                        viewModel.refreshOnAppResume(currentRoute)
                     }
                 }
                 SpoolsScreen(
@@ -557,6 +607,11 @@ fun BuddyDashNav(
                         PrinterDetailViewModel(settingsRepository, apiClient)
                     },
                 )
+                LaunchedEffect(printerDetailAppResumeNonce, currentRoute) {
+                    if (printerDetailAppResumeNonce > 0 && Routes.isPrinterSubScreen(currentRoute)) {
+                        viewModel.refreshOnAppResume(currentRoute)
+                    }
+                }
                 PrinterDetailScreen(
                     printerId = printerId,
                     printerName = printerName,
@@ -570,7 +625,9 @@ fun BuddyDashNav(
                         )
                     },
                     onOpenSpoolDetail = { spoolId ->
-                        navController.navigate(Routes.spoolDetail(spoolId))
+                        navController.navigate(Routes.spoolDetail(spoolId)) {
+                            launchSingleTop = true
+                        }
                     },
                 )
             }
@@ -593,6 +650,11 @@ fun BuddyDashNav(
                         PrinterDetailViewModel(settingsRepository, apiClient)
                     },
                 )
+                LaunchedEffect(printerDetailAppResumeNonce, currentRoute) {
+                    if (printerDetailAppResumeNonce > 0 && Routes.isPrinterSubScreen(currentRoute)) {
+                        viewModel.refreshOnAppResume(currentRoute)
+                    }
+                }
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                 val isActivePrint = uiState.status?.rawState?.uppercase() in setOf("RUNNING", "PAUSE")
                 PrinterQueueScreen(

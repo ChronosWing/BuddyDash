@@ -29,4 +29,6 @@ data class SpoolSlotAssignment(
     val printerId: Int,
     val printerName: String,
     val slotLabel: String,
+    val amsId: Int? = null,
+    val trayId: Int? = null,
 )

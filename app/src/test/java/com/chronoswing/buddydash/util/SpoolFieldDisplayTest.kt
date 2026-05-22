@@ -40,6 +40,24 @@ class SpoolFieldDisplayTest {
     }
 
     @Test
+    fun formatSpoolInventoryCardLocationLine_compactAssignment() {
+        val spool = sampleSpool(
+            assignment = SpoolSlotAssignment(
+                printerId = 1,
+                printerName = "MECHABROBOT",
+                slotLabel = "AMS-A2",
+            ),
+        )
+        assertEquals("MECHABROBOT • AMS-A2", formatSpoolInventoryCardLocationLine(spool))
+    }
+
+    @Test
+    fun formatSpoolInventoryCardLocationLine_storageWhenUnassigned() {
+        val spool = sampleSpool(assignment = null)
+        assertEquals("Storage", formatSpoolInventoryCardLocationLine(spool))
+    }
+
+    @Test
     fun isMeaningfulSpoolField_rejectsNullLiteral() {
         assertFalse(isMeaningfulSpoolField("null"))
         assertFalse(isMeaningfulSpoolField("  "))

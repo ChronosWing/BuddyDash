@@ -41,6 +41,10 @@ fun formatSpoolMaterialSubtitle(spool: SpoolInventoryItem): String? {
 fun formatSpoolLocationLine(spool: SpoolInventoryItem): String =
     spool.assignment?.let { formatSpoolAssignmentLine(it) } ?: "Storage"
 
+/** Compact Printer • Slot (or Storage) for inventory list and assignment picker cards. */
+fun formatSpoolInventoryCardLocationLine(spool: SpoolInventoryItem): String =
+    spool.assignment?.let { formatSpoolAssignmentLocationBrief(it) } ?: "Storage"
+
 fun formatSpoolAssignmentLine(assignment: SpoolSlotAssignment): String {
     val slot = assignment.slotLabel.trim().takeIf { isMeaningfulSpoolField(it) }
     return if (slot != null) {

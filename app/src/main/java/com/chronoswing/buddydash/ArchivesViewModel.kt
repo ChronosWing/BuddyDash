@@ -17,6 +17,10 @@ import com.chronoswing.buddydash.util.filterArchivesForStatsRange
 import com.chronoswing.buddydash.util.BuddyDashDebug
 import com.chronoswing.buddydash.util.logArchiveStatsDateFilterSummary
 import com.chronoswing.buddydash.util.RefreshGuard
+import com.chronoswing.buddydash.util.RefreshIntervals
+import com.chronoswing.buddydash.util.RefreshSource
+import com.chronoswing.buddydash.util.isDataStale
+import com.chronoswing.buddydash.util.logRefreshDecision
 import com.chronoswing.buddydash.util.toUserNetworkMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +49,7 @@ data class ArchivesUiState(
     val section: ArchivesSection = ArchivesSection.History,
     val statsTimeRange: ArchiveStatsTimeRange = ArchiveStatsTimeRange.Last30Days,
     val printerFilter: ArchivePrinterFilter? = null,
+    val lastUpdatedAtMillis: Long? = null,
 ) {
     val filteredArchives: List<PrintArchive> =
         applyArchiveListFilters(
@@ -124,10 +129,26 @@ class ArchivesViewModel(
         _uiState.update { it.copy(refreshError = null) }
     }
 
+    fun refreshOnAppResume(currentRoute: String? = null) {
+        val state = _uiState.value
+        if (!state.settingsReady || !state.hasCredentials) return
+        if (state.lastUpdatedAtMillis == null && state.archives.isEmpty()) return
+        val stale = isDataStale(state.lastUpdatedAtMillis, RefreshIntervals.ARCHIVES_MS)
+        logRefreshDecision(
+            screen = "Archives",
+            source = RefreshSource.APP_RESUME,
+            currentRoute = currentRoute,
+            lastUpdatedAtMillis = state.lastUpdatedAtMillis,
+            intervalMs = RefreshIntervals.ARCHIVES_MS,
+            stale = stale,
+            refreshTriggered = stale,
+        )
+        if (!stale) return
+        if (fetchJob?.isActive == true) return
+        loadArchives(showLoading = false)
+    }
+
     fun refreshFromBottomNavReselect() {
-        if (BuddyDashDebug.enabled) {
-            Log.d(TAG_ARCHIVES_VM, "refreshFromBottomNavReselect")
-        }
         _uiState.update {
             it.copy(
                 searchQuery = "",
@@ -241,6 +262,7 @@ class ArchivesViewModel(
                             archives = archives,
                             error = null,
                             refreshError = null,
+                            lastUpdatedAtMillis = System.currentTimeMillis(),
                         )
                     }
                 },
