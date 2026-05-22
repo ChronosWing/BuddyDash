@@ -27,9 +27,8 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -74,7 +73,13 @@ import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
 import com.chronoswing.buddydash.util.HOME_PRINTER_SEARCH_MIN_COUNT
+import com.chronoswing.buddydash.util.HomePrintersLoadState
 import com.chronoswing.buddydash.util.ListLoadUi
+import com.chronoswing.buddydash.util.resolveHomePrintersLoadState
+import com.chronoswing.buddydash.util.showHomeConnectionStaleInHeader
+import com.chronoswing.buddydash.util.showHomeHeaderUpdating
+import com.chronoswing.buddydash.util.showHomeOfflineInHeader
+import com.chronoswing.buddydash.util.showHomeStaleDataBanner
 import com.chronoswing.buddydash.util.PrinterCardLabels
 import com.chronoswing.buddydash.util.HomePrinterSearchFilter
 import com.chronoswing.buddydash.util.applyHomePrinterSearch
@@ -99,16 +104,17 @@ fun HomeScreen(
     HomeScreenContent(
         printers = uiState.printers,
         isLoading = uiState.isLoading,
-        isRefreshing = uiState.isRefreshing || uiState.isEnriching,
+        isRefreshing = uiState.isRefreshing,
+        isEnriching = uiState.isEnriching,
         hasCompletedLoad = uiState.hasCompletedLoad,
         error = uiState.error,
         refreshError = uiState.refreshError,
+        isStaleCachedData = uiState.isStaleCachedData,
         hasCredentials = uiState.hasCredentials,
         serverUrl = uiState.serverUrl,
         cameraToken = uiState.cameraToken,
         onRefresh = { viewModel.refreshManual() },
         onPullRefresh = { viewModel.refreshManual() },
-        onRefreshErrorShown = viewModel::onRefreshErrorShown,
         lastUpdatedAtMillis = uiState.lastUpdatedAtMillis,
         onPrinterClick = onPrinterClick,
     )
@@ -120,15 +126,16 @@ private fun HomeScreenContent(
     printers: List<Printer>,
     isLoading: Boolean,
     isRefreshing: Boolean,
+    isEnriching: Boolean,
     hasCompletedLoad: Boolean,
     error: String?,
     refreshError: String?,
+    isStaleCachedData: Boolean,
     hasCredentials: Boolean,
     serverUrl: String,
     cameraToken: String,
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
-    onRefreshErrorShown: () -> Unit,
     lastUpdatedAtMillis: Long?,
     onPrinterClick: (Printer) -> Unit,
 ) {
@@ -139,20 +146,47 @@ private fun HomeScreenContent(
         isInitialLoading = isLoading,
         hasCompletedLoad = hasCompletedLoad,
     )
+    val isRefreshActive = isRefreshing || isEnriching
     val showPullRefreshIndicator = ListLoadUi.showPullRefreshIndicator(
-        isRefreshing = isRefreshing,
+        isRefreshing = isRefreshActive,
         cachedItemCount = cachedCount,
     )
-    val snackbarHostState = remember { SnackbarHostState() }
-    val refreshFailedMessage = stringResource(R.string.home_refresh_failed)
     val appNameContentDescription = stringResource(R.string.app_name)
-
-    LaunchedEffect(refreshError) {
-        if (refreshError != null) {
-            snackbarHostState.showSnackbar(refreshFailedMessage)
-            onRefreshErrorShown()
-        }
-    }
+    val loadState = resolveHomePrintersLoadState(
+        printers = printers,
+        isLoading = isLoading,
+        isRefreshing = isRefreshing,
+        isEnriching = isEnriching,
+        hasCompletedLoad = hasCompletedLoad,
+        error = error,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+        lastUpdatedAtMillis = lastUpdatedAtMillis,
+    )
+    val showStaleBanner = showHomeStaleDataBanner(
+        printers = printers,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+        lastUpdatedAtMillis = lastUpdatedAtMillis,
+    )
+    val preferOfflineInHeader = showHomeOfflineInHeader(
+        printers = printers,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+    )
+    val showConnectionStaleInHeader = showHomeConnectionStaleInHeader(
+        printers = printers,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+        lastUpdatedAtMillis = lastUpdatedAtMillis,
+    )
+    val showHeaderUpdating = showHomeHeaderUpdating(
+        isRefreshActive = isRefreshActive,
+        printers = printers,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+        lastUpdatedAtMillis = lastUpdatedAtMillis,
+    )
 
     val showPrinterSearch = printers.size >= HOME_PRINTER_SEARCH_MIN_COUNT
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
@@ -177,7 +211,6 @@ private fun HomeScreenContent(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -194,9 +227,11 @@ private fun HomeScreenContent(
                         )
                         StatusLastUpdatedIndicator(
                             lastUpdatedAtMillis = lastUpdatedAtMillis,
-                            isRefreshing = isRefreshing,
+                            isRefreshing = showHeaderUpdating,
                             enabled = hasCredentials && !isLoading,
                             onRefresh = onRefresh,
+                            preferConnectionStale = showConnectionStaleInHeader,
+                            preferOffline = preferOfflineInHeader,
                             modifier = Modifier.padding(start = 8.dp),
                         )
                     }
@@ -236,7 +271,7 @@ private fun HomeScreenContent(
             showInitialSkeleton -> {
                 PrinterListSkeleton(Modifier.padding(innerPadding))
             }
-            error != null && printers.isEmpty() && hasCompletedLoad -> {
+            loadState == HomePrintersLoadState.ErrorNoCachedData -> {
                 PullToRefreshBox(
                     isRefreshing = showPullRefreshIndicator,
                     onRefresh = onPullRefresh,
@@ -245,12 +280,13 @@ private fun HomeScreenContent(
                         .padding(innerPadding),
                 ) {
                     ErrorContent(
-                        message = error,
+                        message = stringResource(R.string.home_error_no_connection),
+                        subtitle = stringResource(R.string.home_error_no_connection_hint),
                         onRetry = onRefresh,
                     )
                 }
             }
-            printers.isEmpty() && hasCompletedLoad -> {
+            loadState == HomePrintersLoadState.EmptyLoadedSuccessfully -> {
                 EmptyContent(
                     message = stringResource(R.string.no_printers),
                     subtitle = stringResource(R.string.empty_hint_printers),
@@ -279,6 +315,11 @@ private fun HomeScreenContent(
                         selectedFilter = searchFilter,
                         onFilterSelected = { searchFilter = it },
                     )
+                    if (showStaleBanner) {
+                        HomePrintersStaleBanner(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        )
+                    }
                     PullToRefreshBox(
                         isRefreshing = showPullRefreshIndicator,
                         onRefresh = onPullRefresh,
@@ -459,6 +500,22 @@ private fun GlancePrinterCard(
             )
             }
         }
+    }
+}
+
+@Composable
+private fun HomePrintersStaleBanner(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+    ) {
+        Text(
+            text = stringResource(R.string.home_stale_banner),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
+        )
     }
 }
 

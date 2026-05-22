@@ -3,6 +3,7 @@ package com.chronoswing.buddydash
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chronoswing.buddydash.data.HomePrintersCacheRepository
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.network.BambuddyApiClient
@@ -38,6 +39,8 @@ data class HomeUiState(
     val isEnriching: Boolean = false,
     val error: String? = null,
     val refreshError: String? = null,
+    /** True while Home shows last-known printer cards after a failed refresh or disk hydrate. */
+    val isStaleCachedData: Boolean = false,
     val hasCompletedLoad: Boolean = false,
     val serverUrl: String = "",
     val apiKey: String = "",
@@ -49,6 +52,7 @@ data class HomeUiState(
 class HomeViewModel(
     private val settingsRepository: SettingsRepository,
     private val apiClient: BambuddyApiClient,
+    private val homePrintersCacheRepository: HomePrintersCacheRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -58,6 +62,7 @@ class HomeViewModel(
     private var enrichJob: Job? = null
     private val manualRefreshGuard = RefreshGuard()
     private var pendingRefreshSource: RefreshSource? = null
+    private var lastNetworkLoadServerKey: String? = null
 
     init {
         viewModelScope.launch {
@@ -80,16 +85,54 @@ class HomeViewModel(
                 }
                 if (hasCredentials) {
                     HomeLoadTiming.log("settings loaded")
-                    if (!hadCredentials || !_uiState.value.hasCompletedLoad) {
-                        loadPrinters(showLoading = _uiState.value.printers.isEmpty())
+                    val serverKey = HomePrintersCacheRepository.cacheServerKey(url)
+                    val shouldNetworkLoad =
+                        !hadCredentials || lastNetworkLoadServerKey != serverKey
+                    viewModelScope.launch {
+                        hydrateFromDiskCache(url)
+                        if (shouldNetworkLoad && serverKey != null) {
+                            lastNetworkLoadServerKey = serverKey
+                            loadPrinters(showLoading = _uiState.value.printers.isEmpty())
+                        }
                     }
+                } else {
+                    lastNetworkLoadServerKey = null
                 }
             }
         }
     }
 
-    fun onRefreshErrorShown() {
-        _uiState.update { it.copy(refreshError = null) }
+    private suspend fun hydrateFromDiskCache(serverUrl: String) {
+        val snapshot = homePrintersCacheRepository.load(serverUrl)
+        val newKey = HomePrintersCacheRepository.cacheServerKey(serverUrl)
+        val currentKey = HomePrintersCacheRepository.cacheServerKey(_uiState.value.serverUrl)
+        _uiState.update { state ->
+            when {
+                snapshot != null -> {
+                    HomeLoadTiming.log("disk printer cache hydrated (count=${snapshot.printers.size})")
+                    state.copy(
+                        printers = snapshot.printers,
+                        lastUpdatedAtMillis = snapshot.lastUpdatedAtMillis,
+                        hasCompletedLoad = true,
+                        isLoading = false,
+                        error = null,
+                        refreshError = null,
+                        isStaleCachedData = true,
+                    )
+                }
+                newKey != null && currentKey != null && newKey != currentKey -> {
+                    state.copy(
+                        printers = emptyList(),
+                        lastUpdatedAtMillis = null,
+                        hasCompletedLoad = false,
+                        error = null,
+                        refreshError = null,
+                        isStaleCachedData = false,
+                    )
+                }
+                else -> state
+            }
+        }
     }
 
     fun refreshFromBottomNavReselect(currentRoute: String? = null) {
@@ -213,9 +256,19 @@ class HomeViewModel(
         listFetchJob = viewModelScope.launch {
             try {
                 if (!isInitialLoad) {
-                    _uiState.update { it.copy(isRefreshing = true, refreshError = null) }
+                    _uiState.update {
+                        it.copy(
+                            isRefreshing = true,
+                            error = null,
+                        )
+                    }
                 } else if (showLoading) {
-                    _uiState.update { it.copy(isLoading = true, error = null) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = true,
+                            error = null,
+                        )
+                    }
                 }
 
                 val credentials = _uiState.value
@@ -233,6 +286,7 @@ class HomeViewModel(
                             "printer list response (count=${basePrinters.size})",
                         )
                         if (basePrinters.isEmpty()) {
+                            homePrintersCacheRepository.clear(credentials.serverUrl)
                             _uiState.update {
                                 it.copy(
                                     printers = emptyList(),
@@ -242,6 +296,7 @@ class HomeViewModel(
                                     hasCompletedLoad = true,
                                     error = null,
                                     refreshError = null,
+                                    isStaleCachedData = false,
                                     lastUpdatedAtMillis = System.currentTimeMillis(),
                                 )
                             }
@@ -255,7 +310,6 @@ class HomeViewModel(
                                     isLoading = false,
                                     isRefreshing = true,
                                     isEnriching = true,
-                                    refreshError = null,
                                 )
                             }
                         } else {
@@ -265,7 +319,6 @@ class HomeViewModel(
                                     isLoading = false,
                                     hasCompletedLoad = true,
                                     error = null,
-                                    refreshError = null,
                                     isEnriching = true,
                                     isRefreshing = true,
                                 )
@@ -292,7 +345,9 @@ class HomeViewModel(
                                     isLoading = false,
                                     isRefreshing = false,
                                     isEnriching = false,
+                                    error = null,
                                     refreshError = message,
+                                    isStaleCachedData = true,
                                     hasCompletedLoad = true,
                                 )
                             } else {
@@ -301,6 +356,7 @@ class HomeViewModel(
                                     isRefreshing = false,
                                     isEnriching = false,
                                     error = message,
+                                    refreshError = null,
                                     hasCompletedLoad = true,
                                 )
                             }
@@ -326,13 +382,17 @@ class HomeViewModel(
             currentCoroutineContext().ensureActive()
             result.fold(
                 onSuccess = { enriched ->
+                    val updatedAt = System.currentTimeMillis()
+                    homePrintersCacheRepository.save(serverUrl, enriched, updatedAt)
                     _uiState.update {
                         it.copy(
                             printers = enriched,
                             isEnriching = false,
                             isRefreshing = false,
-                            lastUpdatedAtMillis = System.currentTimeMillis(),
+                            lastUpdatedAtMillis = updatedAt,
+                            error = null,
                             refreshError = null,
+                            isStaleCachedData = false,
                         )
                     }
                     HomeLoadTiming.log("secondary data applied to printer cards")
@@ -342,12 +402,23 @@ class HomeViewModel(
                     if (BuddyDashDebug.enabled) {
                         Log.w(TAG_HOME_VM, "enrichPrinters failed source=$refreshSource", error)
                     }
-                    _uiState.update {
-                        it.copy(
-                            isEnriching = false,
-                            isRefreshing = false,
-                            refreshError = error.toUserNetworkMessage("Could not refresh printers"),
-                        )
+                    _uiState.update { current ->
+                        val message = error.toUserNetworkMessage("Could not refresh printers")
+                        if (current.printers.isNotEmpty()) {
+                            current.copy(
+                                isEnriching = false,
+                                isRefreshing = false,
+                                error = null,
+                                refreshError = message,
+                                isStaleCachedData = true,
+                            )
+                        } else {
+                            current.copy(
+                                isEnriching = false,
+                                isRefreshing = false,
+                                refreshError = message,
+                            )
+                        }
                     }
                     flushPendingRefresh()
                 },
