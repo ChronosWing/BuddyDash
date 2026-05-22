@@ -30,6 +30,8 @@ data class ArchivesUiState(
     val serverUrl: String = "",
     val apiKey: String = "",
     val cameraToken: String = "",
+    /** True after settings DataStore has emitted at least once. */
+    val settingsReady: Boolean = false,
     val hasCredentials: Boolean = false,
     val searchQuery: String = "",
     val filter: ArchiveResultFilter = ArchiveResultFilter.All,
@@ -77,13 +79,20 @@ class ArchivesViewModel(
             ) { url, key, cameraToken ->
                 Triple(url, key, cameraToken)
             }.collect { (url, key, cameraToken) ->
+                val hasCredentials = url.isNotBlank() && key.isNotBlank()
+                val wasReady = _uiState.value.settingsReady
                 _uiState.update {
                     it.copy(
                         serverUrl = url,
                         apiKey = key,
                         cameraToken = cameraToken,
-                        hasCredentials = url.isNotBlank() && key.isNotBlank(),
+                        hasCredentials = hasCredentials,
+                        settingsReady = true,
+                        error = if (!wasReady) null else it.error,
                     )
+                }
+                if (!wasReady && hasCredentials) {
+                    loadArchives(showLoading = _uiState.value.archives.isEmpty())
                 }
             }
         }
@@ -131,22 +140,39 @@ class ArchivesViewModel(
 
     fun loadArchives(showLoading: Boolean = false, fromPull: Boolean = false) {
         val state = _uiState.value
+        if (!state.settingsReady) {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            return
+        }
         if (!state.hasCredentials) {
-            _uiState.update { it.copy(error = "Configure server URL and API key in Settings") }
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    error = "Configure server URL and API key in Settings",
+                )
+            }
             return
         }
 
         fetchJob?.cancel()
         fetchJob = viewModelScope.launch {
+            val credentials = _uiState.value
+            if (!credentials.hasCredentials ||
+                credentials.serverUrl.isBlank() ||
+                credentials.apiKey.isBlank()
+            ) {
+                return@launch
+            }
             if (fromPull) {
                 _uiState.update { it.copy(isRefreshing = true, error = null) }
             } else if (showLoading) {
                 _uiState.update { it.copy(isLoading = true, error = null) }
             }
             val result = apiClient.fetchArchives(
-                state.serverUrl,
-                state.apiKey,
-                printerId = state.printerFilter?.printerId,
+                credentials.serverUrl,
+                credentials.apiKey,
+                printerId = credentials.printerFilter?.printerId,
             )
             result.fold(
                 onSuccess = { archives ->
