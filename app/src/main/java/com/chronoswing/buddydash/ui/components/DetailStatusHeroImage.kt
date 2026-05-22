@@ -40,6 +40,7 @@ import com.chronoswing.buddydash.network.BambuddyApi
 import com.chronoswing.buddydash.network.normalizeBambuddyBaseUrl
 import com.chronoswing.buddydash.network.printerCameraSnapshotUrl
 import com.chronoswing.buddydash.network.printerCoverUrl
+import com.chronoswing.buddydash.ui.motion.BuddyDashMotion
 import com.chronoswing.buddydash.util.CardMicroMotion
 
 private const val DEBUG_LOG_CAMERA = true
@@ -48,7 +49,7 @@ private const val TAG_CAMERA = "BuddyDash/Camera"
 /** Refresh interval while detail Status tab is visible (RESUMED). */
 private const val SNAPSHOT_REFRESH_MS = 7_000L
 
-private const val SNAPSHOT_CROSSFADE_MS = 200
+private const val SNAPSHOT_CROSSFADE_MS = BuddyDashMotion.CAMERA_CROSSFADE_MS
 
 private val HeroScrimGradient = Brush.verticalGradient(
     0f to Color.Transparent,

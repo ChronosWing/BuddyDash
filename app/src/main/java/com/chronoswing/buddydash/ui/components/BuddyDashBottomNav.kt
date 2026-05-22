@@ -12,6 +12,8 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.chronoswing.buddydash.ui.motion.buddyDashButtonPress
+import com.chronoswing.buddydash.ui.motion.rememberBuddyDashInteractionSource
 import androidx.compose.ui.res.stringResource
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.ui.BottomNavTab
@@ -31,9 +33,12 @@ fun BuddyDashBottomNav(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
+        val printersInteraction = rememberBuddyDashInteractionSource()
         NavigationBarItem(
             selected = selectedTab == BottomNavTab.PRINTERS,
             onClick = onPrinters,
+            interactionSource = printersInteraction,
+            modifier = Modifier.buddyDashButtonPress(enabled = true, interactionSource = printersInteraction),
             icon = {
                 Icon(
                     imageVector = Icons.Default.Print,
@@ -42,9 +47,12 @@ fun BuddyDashBottomNav(
             },
             label = { Text(stringResource(R.string.nav_printers)) },
         )
+        val spoolsInteraction = rememberBuddyDashInteractionSource()
         NavigationBarItem(
             selected = selectedTab == BottomNavTab.SPOOLS,
             onClick = onSpools,
+            interactionSource = spoolsInteraction,
+            modifier = Modifier.buddyDashButtonPress(enabled = true, interactionSource = spoolsInteraction),
             icon = {
                 Icon(
                     imageVector = Icons.Default.Palette,
@@ -53,9 +61,12 @@ fun BuddyDashBottomNav(
             },
             label = { Text(stringResource(R.string.nav_spools)) },
         )
+        val archivesInteraction = rememberBuddyDashInteractionSource()
         NavigationBarItem(
             selected = selectedTab == BottomNavTab.ARCHIVES,
             onClick = onArchives,
+            interactionSource = archivesInteraction,
+            modifier = Modifier.buddyDashButtonPress(enabled = true, interactionSource = archivesInteraction),
             icon = {
                 Icon(
                     imageVector = Icons.Default.History,
@@ -64,9 +75,12 @@ fun BuddyDashBottomNav(
             },
             label = { Text(stringResource(R.string.nav_archives)) },
         )
+        val settingsInteraction = rememberBuddyDashInteractionSource()
         NavigationBarItem(
             selected = selectedTab == BottomNavTab.SETTINGS,
             onClick = onSettings,
+            interactionSource = settingsInteraction,
+            modifier = Modifier.buddyDashButtonPress(enabled = true, interactionSource = settingsInteraction),
             icon = {
                 Icon(
                     imageVector = Icons.Default.Settings,

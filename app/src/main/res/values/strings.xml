@@ -13,6 +13,11 @@
     <string name="refresh">Refresh</string>
     <string name="configure_settings_hint">Open Settings to enter your Bambuddy server URL and API key.</string>
     <string name="no_printers">No printers found on this server.</string>
+    <string name="empty_hint_printers">Check your server URL and API key in Settings.</string>
+    <string name="empty_hint_search">Try a different search or filter.</string>
+    <string name="empty_hint_archives">Finished prints from your server show up here.</string>
+    <string name="empty_hint_spools">Spools from Bambuddy inventory will list here.</string>
+    <string name="empty_hint_queue">Queue a print from an archive or Bambuddy.</string>
     <string name="search_printers">Search printers</string>
     <string name="search_printers_hint">Search printers…</string>
     <string name="close_search">Close search</string>

@@ -31,8 +31,11 @@ import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.StartQueuedPrintSnackbar
 import com.chronoswing.buddydash.data.model.PrintQueueJob
+import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
+import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.PrintQueueItemRow
 import com.chronoswing.buddydash.ui.components.StartNextPrintAction
+import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -96,13 +99,13 @@ fun PrinterQueueScreen(
         },
     ) { innerPadding ->
         if (jobs.isEmpty()) {
-            Text(
-                text = stringResource(R.string.queue_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            EmptyContent(
+                message = stringResource(R.string.queue_empty),
+                subtitle = stringResource(R.string.empty_hint_queue),
+                icon = BuddyDashEmptyIcon.Queue.asImageVector(),
                 modifier = Modifier
                     .padding(innerPadding)
-                    .padding(16.dp),
+                    .fillMaxSize(),
             )
         } else {
             LazyColumn(

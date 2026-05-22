@@ -10,10 +10,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,13 +26,18 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.chronoswing.buddydash.ui.motion.AnimatedLinearProgressIndicator
+import com.chronoswing.buddydash.ui.motion.rememberAttentionPulse
+import com.chronoswing.buddydash.ui.motion.rememberPrefersReducedMotion
 import com.chronoswing.buddydash.ui.theme.CyanAccent
+import com.chronoswing.buddydash.ui.theme.OfflineRed
 import com.chronoswing.buddydash.ui.theme.OnlineGreen
 import com.chronoswing.buddydash.util.CardMicroMotion
 
 private const val COMPLETED_GLOW_MS = 2_600
+private val CardCorner = 12.dp
 
-/** Optional aura behind the home card (idle ambient + finish flash). */
+/** Optional aura behind the home card (state-aware ambient motion). */
 @Composable
 fun HomeCardMicroMotionFrame(
     motion: CardMicroMotion,
@@ -43,9 +46,10 @@ fun HomeCardMicroMotionFrame(
 ) {
     val scheme = MaterialTheme.colorScheme
     val finishGlow = remember { Animatable(0f) }
+    val reduced = rememberPrefersReducedMotion()
 
     LaunchedEffect(motion) {
-        if (motion == CardMicroMotion.CompletedFlash) {
+        if (motion == CardMicroMotion.CompletedFlash && !reduced) {
             finishGlow.snapTo(0f)
             finishGlow.animateTo(0.42f, tween(700, easing = FastOutSlowInEasing))
             finishGlow.animateTo(0f, tween(COMPLETED_GLOW_MS - 700, easing = FastOutSlowInEasing))
@@ -55,8 +59,24 @@ fun HomeCardMicroMotionFrame(
     }
 
     val idleBreath = rememberIdleBreathPhase(enabled = motion == CardMicroMotion.IdleAmbient)
+    val printingGlow = rememberAttentionPulse(motion == CardMicroMotion.Printing, periodMillis = 3_200)
+    val pausedPulse = rememberAttentionPulse(motion == CardMicroMotion.Frozen, periodMillis = 3_000)
+    val errorPulse = rememberAttentionPulse(motion == CardMicroMotion.ErrorAttention, periodMillis = 4_500)
 
     Box(modifier = modifier) {
+        if (motion == CardMicroMotion.OfflineMuted) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .drawBehind {
+                        drawRoundRect(
+                            color = Color.Black.copy(alpha = 0.28f),
+                            size = size,
+                            cornerRadius = CornerRadius(CardCorner.toPx()),
+                        )
+                    },
+            )
+        }
         if (motion == CardMicroMotion.IdleAmbient) {
             Box(
                 Modifier
@@ -66,7 +86,50 @@ fun HomeCardMicroMotionFrame(
                         drawRoundRect(
                             color = scheme.onSurface.copy(alpha = alpha),
                             size = size,
-                            cornerRadius = CornerRadius(12.dp.toPx()),
+                            cornerRadius = CornerRadius(CardCorner.toPx()),
+                        )
+                    },
+            )
+        }
+        if (motion == CardMicroMotion.Printing) {
+            val glowAlpha = 0.05f + printingGlow * 0.07f
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .drawBehind {
+                        drawRoundRect(
+                            color = CyanAccent.copy(alpha = glowAlpha),
+                            size = size,
+                            cornerRadius = CornerRadius(CardCorner.toPx()),
+                        )
+                    },
+            )
+        }
+        if (motion == CardMicroMotion.Frozen) {
+            val amber = Color(0xFFFBBF24)
+            val glowAlpha = 0.06f + pausedPulse * 0.08f
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .drawBehind {
+                        drawRoundRect(
+                            color = amber.copy(alpha = glowAlpha),
+                            size = size,
+                            cornerRadius = CornerRadius(CardCorner.toPx()),
+                        )
+                    },
+            )
+        }
+        if (motion == CardMicroMotion.ErrorAttention) {
+            val glowAlpha = 0.05f + errorPulse * 0.09f
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .drawBehind {
+                        drawRoundRect(
+                            color = OfflineRed.copy(alpha = glowAlpha),
+                            size = size,
+                            cornerRadius = CornerRadius(CardCorner.toPx()),
                         )
                     },
             )
@@ -80,7 +143,7 @@ fun HomeCardMicroMotionFrame(
                         drawRoundRect(
                             color = OnlineGreen.copy(alpha = alpha),
                             size = size,
-                            cornerRadius = CornerRadius(12.dp.toPx()),
+                            cornerRadius = CornerRadius(CardCorner.toPx()),
                         )
                     },
             )
@@ -96,16 +159,18 @@ fun MicroMotionProgressBar(
     modifier: Modifier = Modifier,
 ) {
     val trackShape = RoundedCornerShape(2.dp)
-    val sheenEnabled = motion == CardMicroMotion.Printing
+    val sheenEnabled = motion == CardMicroMotion.Printing && !rememberPrefersReducedMotion()
+    val target = progress().coerceIn(0f, 1f)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(trackShape),
     ) {
-        LinearProgressIndicator(
-            progress = progress,
+        AnimatedLinearProgressIndicator(
+            targetFraction = target,
             modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.primary,
             trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
         )
         if (sheenEnabled) {
@@ -148,7 +213,7 @@ fun MicroMotionThumbnailFrame(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val sheenEnabled = motion == CardMicroMotion.Printing
+    val sheenEnabled = motion == CardMicroMotion.Printing && !rememberPrefersReducedMotion()
     val cornerPx = 10.dp
 
     Box(modifier = modifier) {
@@ -212,24 +277,12 @@ fun MicroMotionThumbnailFrame(
 }
 
 @Composable
-fun rememberPrintingChipBreath(enabled: Boolean): Float {
-    if (!enabled) return 0f
-    val transition = rememberInfiniteTransition(label = "printingChipBreath")
-    val breath by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3_000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "printingChipBreathPhase",
-    )
-    return breath
-}
+fun rememberPrintingChipBreath(enabled: Boolean): Float =
+    rememberAttentionPulse(enabled, periodMillis = 3_000)
 
 @Composable
 private fun rememberIdleBreathPhase(enabled: Boolean): Float {
-    if (!enabled) return 0f
+    if (!enabled || rememberPrefersReducedMotion()) return 0f
     val transition = rememberInfiniteTransition(label = "idleCardBreath")
     val breath by transition.animateFloat(
         initialValue = 0f,

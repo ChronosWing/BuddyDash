@@ -36,7 +36,9 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.LinearProgressIndicator
+import com.chronoswing.buddydash.ui.motion.AnimatedLinearProgressIndicator
+import com.chronoswing.buddydash.ui.motion.buddyDashButtonPress
+import com.chronoswing.buddydash.ui.motion.rememberBuddyDashInteractionSource
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -275,8 +277,8 @@ private fun MaintenanceStatusRow(
             }
         }
         line.progressFraction?.let { fraction ->
-            LinearProgressIndicator(
-                progress = { fraction.coerceIn(0f, 1f) },
+            AnimatedLinearProgressIndicator(
+                targetFraction = fraction.coerceIn(0f, 1f),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 22.dp)
@@ -396,11 +398,14 @@ fun MachineUtilityButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val interactionSource = rememberBuddyDashInteractionSource()
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
+        interactionSource = interactionSource,
         modifier = modifier
             .fillMaxWidth()
+            .buddyDashButtonPress(enabled, interactionSource)
             .machineActionShadow(enabled),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
         colors = machineActionButtonColors(enabled),
@@ -503,11 +508,14 @@ private fun MotionJogButton(
     modifier: Modifier = Modifier,
 ) {
     val accent = MaterialTheme.colorScheme.primary
+    val interactionSource = rememberBuddyDashInteractionSource()
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
+        interactionSource = interactionSource,
         modifier = modifier
             .heightIn(min = if (compact) 48.dp else 56.dp)
+            .buddyDashButtonPress(enabled, interactionSource)
             .machineActionShadow(enabled),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
         colors = machineActionButtonColors(enabled),

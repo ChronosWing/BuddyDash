@@ -1,6 +1,6 @@
 package com.chronoswing.buddydash.ui.components
 
-import androidx.compose.foundation.clickable
+import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,7 +31,7 @@ fun DetailPrintQueueSection(
     val moreCount = totalCount - visibleJobs.size
 
     DetailInfoCard(
-        modifier = modifier.clickable(onClick = onViewFullQueue),
+        modifier = modifier.buddyDashClickable(onClick = onViewFullQueue),
     ) {
         SectionHeader(stringResource(R.string.queue_section_title, totalCount))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

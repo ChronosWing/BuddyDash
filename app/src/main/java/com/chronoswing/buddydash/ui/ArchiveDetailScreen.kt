@@ -45,7 +45,11 @@ import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.ArchiveMaterialRow
 import com.chronoswing.buddydash.ui.components.FilamentUsageText
-import com.chronoswing.buddydash.ui.components.LoadingContent
+import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
+import com.chronoswing.buddydash.ui.components.PrinterDetailSkeleton
+import com.chronoswing.buddydash.ui.components.asImageVector
+import com.chronoswing.buddydash.ui.motion.buddyDashButtonPress
+import com.chronoswing.buddydash.ui.motion.rememberBuddyDashInteractionSource
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.util.ARCHIVE_DISPLAY_NAME_FALLBACK
 import com.chronoswing.buddydash.util.ArchiveMaterialNavigation
@@ -181,12 +185,16 @@ private fun ArchiveDetailScreenContent(
         },
         bottomBar = {
             if (archive != null && hasCredentials) {
+                val queueAgainInteraction = rememberBuddyDashInteractionSource()
+                val queueAgainEnabled = !isLoading && !reprintSheet.isSubmitting
                 Button(
                     onClick = onQueueAgain,
-                    enabled = !isLoading && !reprintSheet.isSubmitting,
+                    enabled = queueAgainEnabled,
+                    interactionSource = queueAgainInteraction,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .buddyDashButtonPress(queueAgainEnabled, queueAgainInteraction),
                 ) {
                     Text(stringResource(R.string.archive_reprint_queue_again))
                 }
@@ -195,11 +203,12 @@ private fun ArchiveDetailScreenContent(
     ) { innerPadding ->
         when {
             !settingsReady || (isLoading && archive == null) -> {
-                LoadingContent(Modifier.padding(innerPadding))
+                PrinterDetailSkeleton(Modifier.padding(innerPadding))
             }
             settingsReady && !hasCredentials && archive == null -> {
                 EmptyContent(
                     message = stringResource(R.string.configure_settings_hint),
+                    icon = BuddyDashEmptyIcon.Settings.asImageVector(),
                     modifier = Modifier.padding(innerPadding),
                 )
             }

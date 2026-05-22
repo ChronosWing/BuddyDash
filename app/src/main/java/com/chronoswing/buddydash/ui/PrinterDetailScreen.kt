@@ -77,7 +77,7 @@ import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.network.printerCoverUrl
-import com.chronoswing.buddydash.ui.components.LoadingContent
+import com.chronoswing.buddydash.ui.components.PrinterDetailSkeleton
 import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
@@ -332,7 +332,7 @@ private fun PrinterDetailScreenContent(
         },
     ) { innerPadding ->
         when {
-            isLoading -> LoadingContent(Modifier.padding(innerPadding))
+            isLoading -> PrinterDetailSkeleton(Modifier.padding(innerPadding))
             error != null -> ErrorContent(
                 message = error,
                 onRetry = onRetry,
@@ -474,50 +474,55 @@ private fun StatusTab(
             onStartNextQueuedPrint = onStartNextQueuedPrint,
         )
     }
-    if (labels.isActivePrint) {
-        ActivePrintStatusTab(
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (labels.isActivePrint) {
+            ActivePrintStatusTab(
+                labels = labels,
+                printerId = printerId,
+                serverUrl = serverUrl,
+                cameraToken = cameraToken,
+                isClearingPlate = isClearingPlate,
+                onMarkPlateClear = onMarkPlateClear,
+                headerTrailing = quickActions,
+                errorDetailsExpanded = errorDetailsExpanded,
+                onExpandErrorDetails = onExpandErrorDetails,
+                onErrorChipClick = onErrorChipClick,
+                errorCardScrollOffset = errorCardScrollOffset,
+                density = density,
+            )
+        } else {
+            IdleStatusTab(
+                labels = labels,
+                printerId = printerId,
+                serverUrl = serverUrl,
+                cameraToken = cameraToken,
+                isClearingPlate = isClearingPlate,
+                onMarkPlateClear = onMarkPlateClear,
+                headerTrailing = quickActions,
+                errorDetailsExpanded = errorDetailsExpanded,
+                onExpandErrorDetails = onExpandErrorDetails,
+                onErrorChipClick = onErrorChipClick,
+                errorCardScrollOffset = errorCardScrollOffset,
+                density = density,
+            )
+        }
+        if (queueUpcoming.isNotEmpty()) {
+            DetailPrintQueueSection(
+                jobs = queueUpcoming,
+                serverUrl = serverUrl,
+                cameraToken = cameraToken,
+                onViewFullQueue = onViewFullQueue,
+            )
+        }
+        DetailOperationalStats(
             labels = labels,
-            printerId = printerId,
-            serverUrl = serverUrl,
-            cameraToken = cameraToken,
-            isClearingPlate = isClearingPlate,
-            onMarkPlateClear = onMarkPlateClear,
-            headerTrailing = quickActions,
-            errorDetailsExpanded = errorDetailsExpanded,
-            onExpandErrorDetails = onExpandErrorDetails,
-            onErrorChipClick = onErrorChipClick,
-            errorCardScrollOffset = errorCardScrollOffset,
-            density = density,
-        )
-    } else {
-        IdleStatusTab(
-            labels = labels,
-            printerId = printerId,
-            serverUrl = serverUrl,
-            cameraToken = cameraToken,
-            isClearingPlate = isClearingPlate,
-            onMarkPlateClear = onMarkPlateClear,
-            headerTrailing = quickActions,
-            errorDetailsExpanded = errorDetailsExpanded,
-            onExpandErrorDetails = onExpandErrorDetails,
-            onErrorChipClick = onErrorChipClick,
-            errorCardScrollOffset = errorCardScrollOffset,
-            density = density,
+            isMaintenanceResetBusy = isMaintenanceResetBusy,
+            onPerformMaintenanceReset = onPerformMaintenanceReset,
         )
     }
-    if (queueUpcoming.isNotEmpty()) {
-        DetailPrintQueueSection(
-            jobs = queueUpcoming,
-            serverUrl = serverUrl,
-            cameraToken = cameraToken,
-            onViewFullQueue = onViewFullQueue,
-        )
-    }
-    DetailOperationalStats(
-        labels = labels,
-        isMaintenanceResetBusy = isMaintenanceResetBusy,
-        onPerformMaintenanceReset = onPerformMaintenanceReset,
-    )
 }
 
 @Composable
@@ -568,7 +573,6 @@ private fun ActivePrintStatusTab(
             activityKind = labels.activityKind,
             progressCompact = labels.progressCompact,
             plateKind = labels.plateKind,
-            cardMicroMotion = labels.cardMicroMotion,
             onErrorChipClick = onErrorChipClick.takeIf {
                 labels.printerErrorDisplay.showCard
             },
