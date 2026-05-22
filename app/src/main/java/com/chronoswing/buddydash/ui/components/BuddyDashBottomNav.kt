@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.chronoswing.buddydash.R
+import com.chronoswing.buddydash.ui.BottomNavTab
 import com.chronoswing.buddydash.ui.Routes
 
 @Composable
@@ -25,12 +26,13 @@ fun BuddyDashBottomNav(
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val selectedTab = Routes.bottomNavTab(currentRoute)
     NavigationBar(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
         NavigationBarItem(
-            selected = currentRoute == Routes.HOME,
+            selected = selectedTab == BottomNavTab.PRINTERS,
             onClick = onPrinters,
             icon = {
                 Icon(
@@ -41,7 +43,7 @@ fun BuddyDashBottomNav(
             label = { Text(stringResource(R.string.nav_printers)) },
         )
         NavigationBarItem(
-            selected = currentRoute?.substringBefore('?') == Routes.SPOOLS_BASE,
+            selected = selectedTab == BottomNavTab.SPOOLS,
             onClick = onSpools,
             icon = {
                 Icon(
@@ -52,7 +54,7 @@ fun BuddyDashBottomNav(
             label = { Text(stringResource(R.string.nav_spools)) },
         )
         NavigationBarItem(
-            selected = currentRoute?.substringBefore('?') == Routes.ARCHIVES_BASE,
+            selected = selectedTab == BottomNavTab.ARCHIVES,
             onClick = onArchives,
             icon = {
                 Icon(
@@ -63,7 +65,7 @@ fun BuddyDashBottomNav(
             label = { Text(stringResource(R.string.nav_archives)) },
         )
         NavigationBarItem(
-            selected = currentRoute == Routes.SETTINGS,
+            selected = selectedTab == BottomNavTab.SETTINGS,
             onClick = onSettings,
             icon = {
                 Icon(

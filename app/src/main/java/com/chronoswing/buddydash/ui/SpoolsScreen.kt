@@ -11,7 +11,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -19,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -48,7 +51,9 @@ fun SpoolsScreen(
     viewModel: SpoolsViewModel,
     initialSearchQuery: String = "",
     initialArchiveLookupFilter: ArchiveSpoolLookupFilter? = null,
+    onBack: (() -> Unit)? = null,
     onSpoolClick: (Int) -> Unit,
+    onClearArchiveLookup: () -> Unit = {},
 ) {
     LaunchedEffect(initialArchiveLookupFilter) {
         if (initialArchiveLookupFilter != null) {
@@ -80,10 +85,11 @@ fun SpoolsScreen(
         archiveLookupFilter = uiState.archiveLookupFilter,
         onSearchQueryChange = viewModel::onSearchQueryChange,
         onFilterChange = viewModel::onFilterChange,
-        onClearArchiveLookup = viewModel::clearArchiveLookupFilter,
+        onClearArchiveLookup = onClearArchiveLookup,
         onRefresh = { viewModel.loadSpools(showLoading = uiState.spools.isEmpty()) },
         onPullRefresh = { viewModel.loadSpools(showLoading = false, fromPull = true) },
         onSpoolClick = onSpoolClick,
+        onBack = onBack,
     )
 }
 
@@ -105,6 +111,7 @@ private fun SpoolsScreenContent(
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
     onSpoolClick: (Int) -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     Scaffold(
         topBar = {
@@ -117,6 +124,16 @@ private fun SpoolsScreenContent(
                                 text = stringResource(R.string.spools_count, totalCount),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                            )
+                        }
+                    }
+                },
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
                             )
                         }
                     }
