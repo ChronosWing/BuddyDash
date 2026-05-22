@@ -40,6 +40,7 @@ import com.chronoswing.buddydash.SpoolsViewModel
 import com.chronoswing.buddydash.util.ArchiveMaterialNavigation
 import com.chronoswing.buddydash.util.ArchiveSpoolLookupFilter
 import com.chronoswing.buddydash.util.parseArchiveLookupColorHexesArg
+import com.chronoswing.buddydash.data.HomePrintersCacheRepository
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.ui.components.AppForegroundResumeEffect
@@ -212,6 +213,7 @@ private fun NavHostController.onBottomNavTabSelected(
 @Composable
 fun BuddyDashNav(
     settingsRepository: SettingsRepository,
+    homePrintersCacheRepository: HomePrintersCacheRepository,
     apiClient: BambuddyApiClient,
 ) {
     val navController = rememberNavController()
@@ -316,7 +318,11 @@ fun BuddyDashNav(
             composable(Routes.HOME) {
                 val viewModel: HomeViewModel = viewModel(
                     factory = viewModelFactory {
-                        HomeViewModel(settingsRepository, apiClient)
+                        HomeViewModel(
+                            settingsRepository,
+                            apiClient,
+                            homePrintersCacheRepository,
+                        )
                     },
                 )
                 LaunchedEffect(printersReturnRefreshNonce) {

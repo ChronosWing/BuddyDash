@@ -41,6 +41,7 @@ fun ErrorContent(
     message: String,
     onRetry: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    subtitle: String? = null,
 ) {
     Column(
         modifier = modifier
@@ -51,10 +52,19 @@ fun ErrorContent(
     ) {
         Text(
             text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
+        subtitle?.let { hint ->
+            Text(
+                text = hint,
+                modifier = Modifier.padding(top = 8.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                textAlign = TextAlign.Center,
+            )
+        }
         if (onRetry != null) {
             Button(
                 onClick = onRetry,

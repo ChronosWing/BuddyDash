@@ -40,3 +40,10 @@ fun Throwable.toUserNetworkMessage(fallback: String): String {
         else -> fallback
     }
 }
+
+/** True when a Home refresh failure is likely offline / unreachable (not auth or server errors). */
+fun isHomeRefreshOfflineError(message: String?): Boolean {
+    if (message.isNullOrBlank()) return false
+    return message.startsWith("Can't reach server", ignoreCase = true) ||
+        message.startsWith("Request timed out", ignoreCase = true)
+}

@@ -201,6 +201,8 @@ fun StatusLastUpdatedIndicator(
     enabled: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    preferConnectionStale: Boolean = false,
+    preferOffline: Boolean = false,
 ) {
     var tick by remember { mutableLongStateOf(0L) }
     LaunchedEffect(lastUpdatedAtMillis) {
@@ -214,7 +216,8 @@ fun StatusLastUpdatedIndicator(
     val ago = formatStatusUpdatedAgo(lastUpdatedAtMillis, now)
     val label = when {
         isRefreshing -> stringResource(R.string.status_updating)
-        freshness == StatusRefreshFreshness.ConnectionStale ->
+        preferOffline -> stringResource(R.string.status_offline)
+        preferConnectionStale || freshness == StatusRefreshFreshness.ConnectionStale ->
             stringResource(R.string.status_connection_stale)
         ago != null -> stringResource(R.string.status_updated_ago, ago)
         else -> return
@@ -226,6 +229,9 @@ fun StatusLastUpdatedIndicator(
             val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
             muted to muted
         }
+        preferOffline || preferConnectionStale ->
+            MaterialTheme.colorScheme.error.copy(alpha = 0.88f) to
+                MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
         freshness == StatusRefreshFreshness.Live ->
             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f) to
                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.52f)
