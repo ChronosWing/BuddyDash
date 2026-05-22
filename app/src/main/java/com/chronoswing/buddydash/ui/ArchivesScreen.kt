@@ -57,7 +57,7 @@ fun ArchivesScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LifecyclePollingEffect(
-        enabled = uiState.hasCredentials,
+        enabled = uiState.settingsReady && uiState.hasCredentials,
         intervalMs = 60_000L,
         onPoll = {
             val showLoading = uiState.archives.isEmpty() && uiState.error == null
@@ -71,6 +71,7 @@ fun ArchivesScreen(
         isLoading = uiState.isLoading,
         isRefreshing = uiState.isRefreshing,
         error = uiState.error,
+        settingsReady = uiState.settingsReady,
         hasCredentials = uiState.hasCredentials,
         serverUrl = uiState.serverUrl,
         cameraToken = uiState.cameraToken,
@@ -99,6 +100,7 @@ private fun ArchivesScreenContent(
     isLoading: Boolean,
     isRefreshing: Boolean,
     error: String?,
+    settingsReady: Boolean,
     hasCredentials: Boolean,
     serverUrl: String,
     cameraToken: String,
@@ -141,6 +143,9 @@ private fun ArchivesScreenContent(
         },
     ) { innerPadding ->
         when {
+            !settingsReady -> {
+                LoadingContent(Modifier.padding(innerPadding))
+            }
             !hasCredentials -> {
                 EmptyContent(
                     message = stringResource(R.string.configure_settings_hint),
