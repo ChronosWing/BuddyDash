@@ -525,6 +525,7 @@ private fun PrinterDetailScreenContent(
                             when (selectedTab) {
                                 0 -> StatusTab(
                                     labels = labels,
+                                    printerModel = printerModel,
                                     printerStatus = printerStatus,
                                     printingQueueJobId = printingQueueJobId,
                                     errorDetailsExpanded = errorDetailsExpanded,
@@ -601,6 +602,7 @@ private fun PrinterDetailScreenContent(
 @Composable
 private fun StatusTab(
     labels: PrinterDetailLabels,
+    printerModel: String?,
     printerStatus: PrinterStatus?,
     printingQueueJobId: Int?,
     printerName: String,
@@ -651,6 +653,7 @@ private fun StatusTab(
         if (labels.isActivePrint) {
             ActivePrintStatusTab(
                 labels = labels,
+                printerModel = printerModel,
                 printerStatus = printerStatus,
                 printingQueueJobId = printingQueueJobId,
                 printerId = printerId,
@@ -668,6 +671,7 @@ private fun StatusTab(
         } else {
             IdleStatusTab(
                 labels = labels,
+                printerModel = printerModel,
                 printerStatus = printerStatus,
                 printingQueueJobId = printingQueueJobId,
                 printerId = printerId,
@@ -718,6 +722,7 @@ private fun DetailOperationalStats(
 @Composable
 private fun ActivePrintStatusTab(
     labels: PrinterDetailLabels,
+    printerModel: String?,
     printerStatus: PrinterStatus?,
     printingQueueJobId: Int?,
     printerId: Int,
@@ -737,6 +742,7 @@ private fun ActivePrintStatusTab(
         serverUrl = serverUrl,
         cameraToken = cameraToken,
         printerId = printerId,
+        printerModel = printerModel,
         status = printerStatus,
         printingQueueJobId = printingQueueJobId,
         motion = labels.cardMicroMotion,
@@ -825,6 +831,7 @@ private fun ActivePrintStatusTab(
 @Composable
 private fun IdleStatusTab(
     labels: PrinterDetailLabels,
+    printerModel: String?,
     printerStatus: PrinterStatus?,
     printingQueueJobId: Int?,
     printerId: Int,
@@ -844,6 +851,7 @@ private fun IdleStatusTab(
         serverUrl = serverUrl,
         cameraToken = cameraToken,
         printerId = printerId,
+        printerModel = printerModel,
         status = printerStatus,
         printingQueueJobId = printingQueueJobId,
         onCameraHeroActive = { cameraHeroActive = it },

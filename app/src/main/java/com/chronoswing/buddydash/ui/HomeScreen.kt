@@ -141,7 +141,7 @@ private fun HomeScreenContent(
         cachedItemCount = cachedCount,
     )
     val snackbarHostState = remember { SnackbarHostState() }
-    val refreshFailedMessage = stringResource(R.string.refresh_failed)
+    val refreshFailedMessage = stringResource(R.string.home_refresh_failed)
 
     LaunchedEffect(refreshError) {
         if (refreshError != null) {

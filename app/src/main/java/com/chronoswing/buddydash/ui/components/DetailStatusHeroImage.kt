@@ -45,10 +45,11 @@ import com.chronoswing.buddydash.network.printerCameraSnapshotUrl
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.printerCoverUrl
 import com.chronoswing.buddydash.ui.motion.BuddyDashMotion
+import com.chronoswing.buddydash.ui.motion.rememberPrefersReducedMotion
+import com.chronoswing.buddydash.util.BuddyDashDebug
 import com.chronoswing.buddydash.util.CardMicroMotion
 import com.chronoswing.buddydash.util.rememberCurrentPrintThumbnailIdentity
 
-import com.chronoswing.buddydash.util.BuddyDashDebug
 private const val TAG_CAMERA = "BuddyDash/Camera"
 
 /** Refresh interval while detail Status tab is visible (RESUMED). */
@@ -71,6 +72,7 @@ fun DetailStatusHeroImage(
     serverUrl: String,
     cameraToken: String,
     printerId: Int,
+    printerModel: String? = null,
     status: PrinterStatus? = null,
     printingQueueJobId: Int? = null,
     motion: CardMicroMotion = CardMicroMotion.None,
@@ -124,6 +126,7 @@ fun DetailStatusHeroImage(
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
                     printerId = printerId,
+                    printerModel = printerModel,
                     refreshTick = refreshTick,
                     refreshTickNumber = refreshTickNumber,
                     height = height,
@@ -162,6 +165,7 @@ fun PrinterLiveCameraSnapshot(
     serverUrl: String,
     cameraToken: String,
     printerId: Int,
+    printerModel: String? = null,
     refreshTick: Long,
     refreshTickNumber: Int = 0,
     modifier: Modifier = Modifier,
@@ -178,6 +182,7 @@ fun PrinterLiveCameraSnapshot(
         serverUrl = serverUrl,
         cameraToken = cameraToken,
         printerId = printerId,
+        printerModel = printerModel,
         refreshTick = refreshTick,
         refreshTickNumber = refreshTickNumber,
         height = height,
@@ -193,10 +198,11 @@ fun PrinterLiveCameraSnapshot(
 }
 
 @Composable
-private fun PrinterCameraSnapshotImage(
+fun PrinterCameraSnapshotImage(
     serverUrl: String,
     cameraToken: String,
     printerId: Int,
+    printerModel: String? = null,
     refreshTick: Long,
     refreshTickNumber: Int,
     height: Dp,
@@ -220,17 +226,22 @@ private fun PrinterCameraSnapshotImage(
         return
     }
 
-    LaunchedEffect(refreshTickNumber, refreshTick, imageUrl, imageCacheKey) {
+    val reducedMotion = rememberPrefersReducedMotion()
+    val fadeMs = if (reducedMotion || snapshotCrossfadeMs <= 0) 0 else snapshotCrossfadeMs
+
+    var lastPainter by remember(printerId) { mutableStateOf<Painter?>(null) }
+    var loadedForKey by remember(printerId) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(refreshTickNumber, refreshTick, imageUrl, imageCacheKey, printerModel) {
         if (!BuddyDashDebug.enabled) return@LaunchedEffect
         Log.d(
             TAG_CAMERA,
-            "Snapshot refresh tickNumber=$refreshTickNumber cacheBust=$refreshTick " +
-                "cacheKey=$imageCacheKey url=${redactImageToken(imageUrl)}",
+            "Snapshot refresh model=${printerModel.orEmpty().ifEmpty { "(unknown)" }} " +
+                "tickNumber=$refreshTickNumber cacheBust=$refreshTick cacheKey=$imageCacheKey " +
+                "previousImageExists=${lastPainter != null} url=${redactImageToken(imageUrl)}",
         )
     }
 
-    var displayedPainter by remember(printerId) { mutableStateOf<Painter?>(null) }
-    var displayedRefreshTick by remember(printerId) { mutableLongStateOf(-1L) }
     val context = LocalContext.current
     val request = remember(imageUrl, imageCacheKey) {
         ImageRequest.Builder(context)
@@ -243,8 +254,8 @@ private fun PrinterCameraSnapshotImage(
                     if (BuddyDashDebug.enabled) {
                         Log.d(
                             TAG_CAMERA,
-                            "Snapshot load start tickNumber=$refreshTickNumber " +
-                                "cacheBust=$refreshTick cacheKey=$imageCacheKey",
+                            "Snapshot load start model=${printerModel.orEmpty().ifEmpty { "(unknown)" }} " +
+                                "tickNumber=$refreshTickNumber cacheKey=$imageCacheKey",
                         )
                     }
                 },
@@ -252,8 +263,8 @@ private fun PrinterCameraSnapshotImage(
                     if (BuddyDashDebug.enabled) {
                         Log.d(
                             TAG_CAMERA,
-                            "Snapshot load ok tickNumber=$refreshTickNumber " +
-                                "cacheBust=$refreshTick cacheKey=$imageCacheKey",
+                            "Snapshot load ok model=${printerModel.orEmpty().ifEmpty { "(unknown)" }} " +
+                                "tickNumber=$refreshTickNumber cacheKey=$imageCacheKey",
                         )
                     }
                 },
@@ -261,8 +272,8 @@ private fun PrinterCameraSnapshotImage(
                     if (BuddyDashDebug.enabled) {
                         Log.d(
                             TAG_CAMERA,
-                            "Snapshot load failed tickNumber=$refreshTickNumber " +
-                                "cacheBust=$refreshTick cacheKey=$imageCacheKey " +
+                            "Snapshot load failed model=${printerModel.orEmpty().ifEmpty { "(unknown)" }} " +
+                                "tickNumber=$refreshTickNumber cacheKey=$imageCacheKey " +
                                 "error=${result.throwable.message}",
                         )
                     }
@@ -283,6 +294,8 @@ private fun PrinterCameraSnapshotImage(
             .background(backgroundColor)
     }
 
+    val canRetainPreviousFrame = lastPainter != null && loadedForKey != imageCacheKey
+
     Box(
         modifier = resolvedFrame,
         contentAlignment = Alignment.Center,
@@ -292,12 +305,22 @@ private fun PrinterCameraSnapshotImage(
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             loading = {
-                if (displayedPainter == null) {
-                    LaunchedEffect(Unit) { onLoadingChanged(true) }
-                }
-                displayedPainter?.let { painter ->
+                if (canRetainPreviousFrame) {
+                    LaunchedEffect(imageCacheKey) { onLoadingChanged(true) }
                     CameraSnapshotFrame(
-                        painter = painter,
+                        painter = lastPainter!!,
+                        contentScale = contentScale,
+                        applyHeroScrim = applyHeroScrim,
+                    )
+                } else if (lastPainter != null && loadedForKey == imageCacheKey) {
+                    CameraSnapshotFrame(
+                        painter = lastPainter!!,
+                        contentScale = contentScale,
+                        applyHeroScrim = applyHeroScrim,
+                    )
+                } else {
+                    LaunchedEffect(imageCacheKey) { onLoadingChanged(true) }
+                    CameraSnapshotPlaceholder(
                         contentScale = contentScale,
                         applyHeroScrim = applyHeroScrim,
                     )
@@ -305,59 +328,95 @@ private fun PrinterCameraSnapshotImage(
             },
             error = {
                 LaunchedEffect(Unit) { onLoadingChanged(false) }
-                if (displayedPainter == null) {
-                    LaunchedEffect(imageUrl) { onLoadFailed() }
+                if (lastPainter != null) {
+                    CameraSnapshotFrame(
+                        painter = lastPainter!!,
+                        contentScale = contentScale,
+                        applyHeroScrim = applyHeroScrim,
+                    )
                 } else {
-                    displayedPainter?.let { painter ->
-                        CameraSnapshotFrame(
-                            painter = painter,
-                            contentScale = contentScale,
-                            applyHeroScrim = applyHeroScrim,
-                        )
-                    }
+                    LaunchedEffect(imageUrl) { onLoadFailed() }
+                    CameraSnapshotPlaceholder(
+                        contentScale = contentScale,
+                        applyHeroScrim = applyHeroScrim,
+                    )
                 }
             },
             success = { state ->
                 LaunchedEffect(Unit) { onLoadingChanged(false) }
                 val newPainter = state.painter
-                if (refreshTick == displayedRefreshTick) {
+                val priorPainter = lastPainter
+                val priorKey = loadedForKey
+                val isNewFrame = priorKey != imageCacheKey
+                val animationPath = when {
+                    fadeMs <= 0 -> "staticNoFade"
+                    !isNewFrame -> "staticSameKey"
+                    priorPainter != null -> "crossfadeFromPrevious"
+                    else -> "crossfadeFirstLoad"
+                }
+                if (BuddyDashDebug.enabled) {
+                    Log.d(
+                        TAG_CAMERA,
+                        "Snapshot success model=${printerModel.orEmpty().ifEmpty { "(unknown)" }} " +
+                            "cacheKey=$imageCacheKey previousImageExists=${priorPainter != null} " +
+                            "animationPath=$animationPath",
+                    )
+                }
+                if (fadeMs > 0 && isNewFrame) {
+                    Crossfade(
+                        targetState = imageCacheKey,
+                        animationSpec = tween(fadeMs),
+                        label = "cameraSnapshot",
+                    ) { key ->
+                        when {
+                            key == imageCacheKey -> CameraSnapshotFrame(
+                                painter = newPainter,
+                                contentScale = contentScale,
+                                applyHeroScrim = applyHeroScrim,
+                            )
+                            priorPainter != null -> CameraSnapshotFrame(
+                                painter = priorPainter,
+                                contentScale = contentScale,
+                                applyHeroScrim = applyHeroScrim,
+                            )
+                            else -> CameraSnapshotPlaceholder(
+                                contentScale = contentScale,
+                                applyHeroScrim = applyHeroScrim,
+                            )
+                        }
+                    }
+                } else {
                     CameraSnapshotFrame(
                         painter = newPainter,
                         contentScale = contentScale,
                         applyHeroScrim = applyHeroScrim,
                     )
-                } else {
-                    val priorPainter = displayedPainter
-                    if (snapshotCrossfadeMs > 0 && priorPainter != null) {
-                        Crossfade(
-                            targetState = refreshTick,
-                            animationSpec = tween(snapshotCrossfadeMs),
-                            label = "cameraSnapshot",
-                        ) { tick ->
-                            val painter = if (tick == refreshTick) newPainter else priorPainter
-                            CameraSnapshotFrame(
-                                painter = painter,
-                                contentScale = contentScale,
-                                applyHeroScrim = applyHeroScrim,
-                            )
-                        }
-                        LaunchedEffect(refreshTick) {
-                            delay(snapshotCrossfadeMs.toLong())
-                            displayedPainter = newPainter
-                            displayedRefreshTick = refreshTick
-                        }
-                    } else {
-                        displayedPainter = newPainter
-                        displayedRefreshTick = refreshTick
-                        CameraSnapshotFrame(
-                            painter = newPainter,
-                            contentScale = contentScale,
-                            applyHeroScrim = applyHeroScrim,
-                        )
-                    }
                 }
+                lastPainter = newPainter
+                loadedForKey = imageCacheKey
             },
         )
+    }
+}
+
+@Composable
+private fun CameraSnapshotPlaceholder(
+    contentScale: ContentScale,
+    applyHeroScrim: Boolean,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (applyHeroScrim) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(HeroScrimGradient),
+            )
+        }
     }
 }
 

@@ -86,8 +86,13 @@ class HomeViewModel(
 
     /** Bottom-nav reselect on Printers: immediate refresh, no debounce. */
     fun refreshFromBottomNavReselect() {
+        refreshOnPrintersRootAppeared(trigger = "bottomNavReselect")
+    }
+
+    /** Printers root became visible (back from detail/queue or tab reselect). */
+    fun refreshOnPrintersRootAppeared(trigger: String = "returnToRoot") {
         if (BuddyDashDebug.enabled) {
-            Log.d(TAG_HOME_VM, "refreshFromBottomNavReselect")
+            Log.d(TAG_HOME_VM, "refreshOnPrintersRootAppeared trigger=$trigger")
         }
         loadPrinters(showLoading = false, fromBottomNavReselect = true)
     }
@@ -212,7 +217,7 @@ class HomeViewModel(
                     },
                     onFailure = { error ->
                         val message = error.toUserNetworkMessage(
-                            if (hadPrinters) "Could not refresh" else "Failed to load printers",
+                            if (hadPrinters) "Could not refresh printers" else "Failed to load printers",
                         )
                         if (fromBottomNavReselect && BuddyDashDebug.enabled) {
                             Log.w(TAG_HOME_VM, "bottomNavReselect refresh failure: $message", error)
@@ -281,7 +286,7 @@ class HomeViewModel(
                         it.copy(
                             isEnriching = false,
                             isRefreshing = false,
-                            refreshError = error.toUserNetworkMessage("Could not refresh"),
+                            refreshError = error.toUserNetworkMessage("Could not refresh printers"),
                         )
                     }
                 },
