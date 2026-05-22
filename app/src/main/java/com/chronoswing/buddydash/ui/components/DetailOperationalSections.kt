@@ -3,6 +3,7 @@ package com.chronoswing.buddydash.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -388,6 +389,39 @@ fun FilamentAmsEnvironmentSection(labels: PrinterDetailLabels) {
 }
 
 @Composable
+fun MachineUtilityButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
 fun MotionControlsSection(
     layout: PrinterMotionLayout,
     canUseMotion: Boolean,
@@ -395,6 +429,7 @@ fun MotionControlsSection(
     stepMm: Float,
     onJogUp: () -> Unit,
     onJogDown: () -> Unit,
+    compactButtons: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     if (layout == PrinterMotionLayout.Hidden) return
@@ -418,6 +453,7 @@ fun MotionControlsSection(
                 icon = Icons.Default.KeyboardArrowUp,
                 enabled = controlsEnabled,
                 onClick = onJogUp,
+                compact = compactButtons,
                 modifier = Modifier.weight(1f),
             )
             MotionJogButton(
@@ -425,14 +461,17 @@ fun MotionControlsSection(
                 icon = Icons.Default.KeyboardArrowDown,
                 enabled = controlsEnabled,
                 onClick = onJogDown,
+                compact = compactButtons,
                 modifier = Modifier.weight(1f),
             )
         }
-        Text(
-            text = stringResource(R.string.motion_step_hint, stepLabel),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (!compactButtons) {
+            Text(
+                text = stringResource(R.string.motion_step_hint, stepLabel),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (!canUseMotion) {
             Text(
                 text = stringResource(R.string.motion_controls_unavailable),
@@ -449,13 +488,14 @@ private fun MotionJogButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     enabled: Boolean,
     onClick: () -> Unit,
+    compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val accent = MaterialTheme.colorScheme.primary
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.heightIn(min = 56.dp),
+        modifier = modifier.heightIn(min = if (compact) 48.dp else 56.dp),
         colors = ButtonDefaults.outlinedButtonColors(
             contentColor = MaterialTheme.colorScheme.onSurface,
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),

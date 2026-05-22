@@ -37,6 +37,8 @@ object BambuddyApi {
     /** POST — mark maintenance performed (operationId: perform_maintenance_…). */
     const val MAINTENANCE_PERFORM_PATH = "/api/v1/maintenance/items/{item_id}/perform"
     const val BED_JOG_PATH = "/api/v1/printers/{printer_id}/bed-jog"
+    const val HOME_AXES_PATH = "/api/v1/printers/{printer_id}/home-axes"
+    const val PRINTER_DETAIL_PATH = "/api/v1/printers/{printer_id}"
 
     /** GET — list print queue (OpenAPI: list_queue_api_v1_queue__get). */
     const val QUEUE_PATH = "/api/v1/queue/"
@@ -74,6 +76,8 @@ object BambuddyApi {
     val hasMaintenanceEndpoint: Boolean = true
     val hasMaintenancePerformEndpoint: Boolean = true
     val hasBedJogEndpoint: Boolean = true
+    val hasHomeAxesEndpoint: Boolean = true
+    val hasPrinterDetailEndpoint: Boolean = true
     val hasCameraEndpoint: Boolean = true
     val hasFilesEndpoint: Boolean = true
     val hasSpoolInventoryEndpoint: Boolean = true
@@ -128,6 +132,12 @@ object BambuddyApi {
         val forceQuery = if (force) "&force=true" else ""
         return "$base?distance=$distanceMm$forceQuery"
     }
+
+    fun homeAxesPath(printerId: Int): String =
+        HOME_AXES_PATH.replace("{printer_id}", printerId.toString())
+
+    fun printerDetailPath(printerId: Int): String =
+        PRINTER_DETAIL_PATH.replace("{printer_id}", printerId.toString())
 
     fun queuePath(printerId: Int): String = "$QUEUE_PATH?printer_id=$printerId"
 

@@ -5,6 +5,7 @@ import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.PrintArchive
+import com.chronoswing.buddydash.data.model.PrinterMachineInfo
 import com.chronoswing.buddydash.data.model.PrintQueueJob
 import com.chronoswing.buddydash.data.model.PrinterQueueSnapshot
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
@@ -267,6 +268,15 @@ class BambuddyApiClient {
         name = json.optString("name", "Printer ${json.getInt("id")}"),
         model = json.optString("model").takeIf { it.isNotBlank() },
     )
+
+    private fun parsePrinterMachineInfo(json: JSONObject): PrinterMachineInfo =
+        PrinterMachineInfo(
+            serialNumber = json.optString("serial_number").takeIf { it.isNotBlank() },
+            ipAddress = json.optString("ip_address").takeIf { it.isNotBlank() },
+            model = json.optString("model").takeIf { it.isNotBlank() },
+            location = json.optString("location").takeIf { it.isNotBlank() },
+            updatedAtIso = json.optString("updated_at").takeIf { it.isNotBlank() },
+        )
 
     suspend fun clearPlate(serverUrl: String, apiKey: String, printerId: Int): Result<String> =
         withContext(Dispatchers.IO) {
@@ -605,6 +615,35 @@ class BambuddyApiClient {
         printerId: Int,
         on: Boolean,
     ): Result<Unit> = postPrinterAction(serverUrl, apiKey, BambuddyApi.chamberLightPath(printerId, on))
+
+    suspend fun fetchPrinterMachineInfo(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+    ): Result<PrinterMachineInfo> =
+        withContext(Dispatchers.IO) {
+            if (!BambuddyApi.hasPrinterDetailEndpoint) {
+                return@withContext Result.failure(
+                    UnsupportedOperationException("Printer detail endpoint not found"),
+                )
+            }
+            runApiCall(serverUrl, apiKey, BambuddyApi.printerDetailPath(printerId)) { body ->
+                parsePrinterMachineInfo(JSONObject(body))
+            }
+        }
+
+    suspend fun homeAxes(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasHomeAxesEndpoint) {
+            return@withContext Result.failure(
+                UnsupportedOperationException("Home axes endpoint not found"),
+            )
+        }
+        postPrinterAction(serverUrl, apiKey, BambuddyApi.homeAxesPath(printerId))
+    }
 
     suspend fun bedJog(
         serverUrl: String,
