@@ -32,18 +32,13 @@ import com.chronoswing.buddydash.network.archiveThumbnailUrl
 @Composable
 fun SpoolUsageThumbnail(
     archiveId: Int?,
-    usageImageUrl: String?,
     serverUrl: String,
     cameraToken: String,
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
 ) {
-    val imageUrl = remember(serverUrl, cameraToken, archiveId, usageImageUrl) {
-        when {
-            archiveId != null -> archiveThumbnailUrl(serverUrl, archiveId, cameraToken)
-            !usageImageUrl.isNullOrBlank() -> usageImageUrl
-            else -> null
-        }
+    val imageUrl = remember(serverUrl, cameraToken, archiveId) {
+        archiveId?.let { archiveThumbnailUrl(serverUrl, it, cameraToken) }
     }
     val shape = RoundedCornerShape(8.dp)
     val frameModifier = modifier
@@ -51,7 +46,7 @@ fun SpoolUsageThumbnail(
         .clip(shape)
         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
 
-    var showImage by remember(archiveId, usageImageUrl, imageUrl) { mutableStateOf(imageUrl != null) }
+    var showImage by remember(archiveId, imageUrl) { mutableStateOf(imageUrl != null) }
 
     if (!showImage || imageUrl == null) {
         Box(frameModifier, contentAlignment = Alignment.Center) {

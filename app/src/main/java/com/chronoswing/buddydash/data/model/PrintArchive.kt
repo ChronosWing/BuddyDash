@@ -4,6 +4,8 @@ package com.chronoswing.buddydash.data.model
 data class PrintArchive(
     val id: Int,
     val displayName: String,
+    /** API [filename] — used for deterministic usage matching. */
+    val filename: String? = null,
     val printerId: Int?,
     val printerName: String?,
     val printerModel: String?,
@@ -24,6 +26,8 @@ data class PrintArchive(
     val filamentColor: String?,
     /** From archive JSON or [extra_data] when present at runtime (not in OpenAPI schema). */
     val spoolId: Int? = null,
+    val plateNumber: Int? = null,
+    val contentHash: String? = null,
     val failureReason: String?,
     val totalLayers: Int?,
     val quantity: Int?,

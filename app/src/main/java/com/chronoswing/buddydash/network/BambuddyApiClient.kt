@@ -32,7 +32,10 @@ import com.chronoswing.buddydash.util.mergeSpoolsWithAssignments
 import com.chronoswing.buddydash.util.parseInventoryByPrinter
 import com.chronoswing.buddydash.util.parseLowStockThreshold
 import com.chronoswing.buddydash.util.parseSpoolAssignments
+import com.chronoswing.buddydash.util.DEBUG_LOG_SPOOL_USAGE
+import com.chronoswing.buddydash.util.logFullJsonPayload
 import com.chronoswing.buddydash.util.logSpoolUsageFetch
+import com.chronoswing.buddydash.util.TAG_SPOOL_USAGE_LINK
 import com.chronoswing.buddydash.util.parseSpoolInventoryList
 import com.chronoswing.buddydash.util.parseSpoolUsageHistoryList
 import com.chronoswing.buddydash.data.model.SpoolUsageEntry
@@ -403,13 +406,13 @@ class BambuddyApiClient {
             val path = BambuddyApi.spoolUsagePath(spoolId, limit)
             runApiCall(serverUrl, apiKey, path) { body ->
                 val entries = parseSpoolUsageHistoryList(body)
-                logSpoolUsageFetch(spoolId, path, rawBodyPreview = body.take(200), entries = entries)
+                logSpoolUsageFetch(spoolId, path, rawBody = body, entries = entries)
                 entries
             }.recover { error ->
                 logSpoolUsageFetch(
                     spoolId = spoolId,
                     path = path,
-                    rawBodyPreview = null,
+                    rawBody = null,
                     entries = emptyList(),
                     error = error,
                 )
@@ -435,6 +438,9 @@ class BambuddyApiClient {
                 val modelsById = printers.mapNotNull { p -> p.model?.let { p.id to it } }.toMap()
                 val path = BambuddyApi.archivesPath(limit = limit, offset = offset)
                 val archives = runApiCall(serverUrl, apiKey, path) { body ->
+                    if (DEBUG_LOG_SPOOL_USAGE) {
+                        logFullJsonPayload(TAG_SPOOL_USAGE_LINK, "archivesListRaw", body)
+                    }
                     parseArchivesList(body, namesById, modelsById)
                 }.getOrThrow()
                 if (DEBUG_LOG_ARCHIVES) {
