@@ -44,7 +44,8 @@ object Routes {
             "&lookupMaterial={lookupMaterial}&lookupMaterialKey={lookupMaterialKey}" +
             "&lookupColorLabel={lookupColorLabel}&lookupColorHexes={lookupColorHexes}"
     const val ARCHIVES_BASE = "archives"
-    const val ARCHIVES = "archives?search={search}"
+    const val NO_PRINTER_FILTER = -1
+    const val ARCHIVES = "archives?search={search}&printerId={printerId}&printerName={printerName}"
     const val SPOOL_DETAIL = "spool/{spoolId}"
     const val SETTINGS = "settings"
     const val PRINTER_DETAIL = "printer/{printerId}/{printerName}/{printerModel}"
@@ -79,9 +80,15 @@ object Routes {
 
     fun spoolDetail(spoolId: Int): String = "spool/$spoolId"
 
-    fun archives(search: String = ""): String {
-        val encoded = URLEncoder.encode(search, StandardCharsets.UTF_8.toString())
-        return "archives?search=$encoded"
+    fun archives(
+        search: String = "",
+        printerId: Int = NO_PRINTER_FILTER,
+        printerName: String = "",
+    ): String {
+        val enc = { value: String ->
+            URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
+        }
+        return "archives?search=${enc(search)}&printerId=$printerId&printerName=${enc(printerName)}"
     }
 
     /** Which bottom-nav tab is highlighted for the current destination (including detail screens). */
@@ -220,16 +227,37 @@ fun BuddyDashNav(
                         type = NavType.StringType
                         defaultValue = ""
                     },
+                    navArgument("printerId") {
+                        type = NavType.IntType
+                        defaultValue = Routes.NO_PRINTER_FILTER
+                    },
+                    navArgument("printerName") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
                 ),
             ) { backStackEntry ->
-                val encodedSearch = backStackEntry.arguments?.getString("search").orEmpty()
-                val initialSearch = URLDecoder.decode(encodedSearch, StandardCharsets.UTF_8.toString())
+                val decode = { key: String ->
+                    URLDecoder.decode(
+                        backStackEntry.arguments?.getString(key).orEmpty(),
+                        StandardCharsets.UTF_8.toString(),
+                    )
+                }
+                val initialSearch = decode("search")
+                val initialPrinterId = backStackEntry.arguments?.getInt("printerId")
+                    ?: Routes.NO_PRINTER_FILTER
+                val initialPrinterName = decode("printerName")
                 val viewModel: ArchivesViewModel = viewModel(
                     factory = viewModelFactory {
                         ArchivesViewModel(settingsRepository, apiClient)
                     },
                 )
-                LaunchedEffect(initialSearch) {
+                LaunchedEffect(initialSearch, initialPrinterId, initialPrinterName) {
+                    if (initialPrinterId >= 0 && initialPrinterName.isNotBlank()) {
+                        viewModel.applyPrinterFilter(initialPrinterId, initialPrinterName)
+                    } else {
+                        viewModel.clearPrinterFilter()
+                    }
                     if (initialSearch.isNotBlank()) {
                         viewModel.applyInitialSearchQuery(initialSearch)
                     }
@@ -238,6 +266,9 @@ fun BuddyDashNav(
                     viewModel = viewModel,
                     onArchiveClick = { archive ->
                         navController.navigate(Routes.archiveDetail(archive.id))
+                    },
+                    onClearPrinterFilter = {
+                        navController.navigateToSectionRoot(Routes.archives())
                     },
                 )
             }
@@ -425,6 +456,11 @@ fun BuddyDashNav(
                     viewModel = viewModel,
                     onBack = { navController.popBackStack() },
                     onViewFullQueue = { navController.navigate(Routes.PRINTER_QUEUE) },
+                    onOpenPrinterArchives = {
+                        navController.navigateToSectionRoot(
+                            Routes.archives(printerId = printerId, printerName = printerName),
+                        )
+                    },
                 )
             }
 

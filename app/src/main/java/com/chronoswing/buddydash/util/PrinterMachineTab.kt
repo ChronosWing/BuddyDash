@@ -13,6 +13,8 @@ data class MachineTabCapabilities(
     val cameraEnabled: Boolean,
     val showHome: Boolean,
     val homeEnabled: Boolean,
+    val showFiles: Boolean,
+    val filesEnabled: Boolean,
     val showUtilitiesSection: Boolean,
     val utilitiesEnabled: Boolean,
     val utilitiesDisabledReason: String?,
@@ -38,7 +40,8 @@ fun PrinterDetailLabels.machineTabCapabilities(
     }
     val showCamera = BambuddyApi.hasCameraEndpoint && cameraTokenConfigured
     val showHome = BambuddyApi.hasHomeAxesEndpoint && showMotionControls
-    val showUtilities = showCamera || showHome
+    val showFiles = BambuddyApi.hasArchivesEndpoint
+    val showUtilities = showCamera || showHome || showFiles
     return MachineTabCapabilities(
         showMotionSection = showMotionControls,
         motionEnabled = canUseMotionControls && connected && idle,
@@ -47,6 +50,8 @@ fun PrinterDetailLabels.machineTabCapabilities(
         cameraEnabled = showCamera && connected,
         showHome = showHome,
         homeEnabled = showHome && connected && idle,
+        showFiles = showFiles,
+        filesEnabled = showFiles,
         showUtilitiesSection = showUtilities,
         utilitiesEnabled = showUtilities && !utilityBlocked,
         utilitiesDisabledReason = utilityReason,

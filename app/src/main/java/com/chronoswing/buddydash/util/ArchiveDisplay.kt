@@ -209,6 +209,25 @@ enum class ArchiveResultFilter {
     Cancelled,
 }
 
+data class ArchivePrinterFilter(
+    val printerId: Int,
+    val printerName: String,
+)
+
+fun applyArchiveListFilters(
+    archives: List<PrintArchive>,
+    query: String,
+    filter: ArchiveResultFilter,
+    printerId: Int? = null,
+): List<PrintArchive> {
+    val scoped = if (printerId != null) {
+        archives.filter { it.printerId == printerId }
+    } else {
+        archives
+    }
+    return applyArchiveSearch(scoped, query, filter)
+}
+
 fun applyArchiveSearch(
     archives: List<PrintArchive>,
     query: String,

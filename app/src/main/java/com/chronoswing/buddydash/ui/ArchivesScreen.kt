@@ -4,26 +4,32 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -36,6 +42,7 @@ import com.chronoswing.buddydash.ui.components.EmptyContent
 import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.LoadingContent
+import com.chronoswing.buddydash.util.ArchivePrinterFilter
 import com.chronoswing.buddydash.util.ArchiveResultFilter
 import com.chronoswing.buddydash.util.ArchiveStatsSnapshot
 import com.chronoswing.buddydash.util.ArchiveStatsTimeRange
@@ -45,6 +52,7 @@ import com.chronoswing.buddydash.util.ArchivesSection
 fun ArchivesScreen(
     viewModel: ArchivesViewModel,
     onArchiveClick: (PrintArchive) -> Unit,
+    onClearPrinterFilter: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -68,6 +76,7 @@ fun ArchivesScreen(
         cameraToken = uiState.cameraToken,
         searchQuery = uiState.searchQuery,
         filter = uiState.filter,
+        printerFilter = uiState.printerFilter,
         section = uiState.section,
         statsTimeRange = uiState.statsTimeRange,
         statsSnapshot = uiState.statsSnapshot,
@@ -78,6 +87,7 @@ fun ArchivesScreen(
         onRefresh = { viewModel.loadArchives(showLoading = uiState.archives.isEmpty()) },
         onPullRefresh = { viewModel.loadArchives(showLoading = false, fromPull = true) },
         onArchiveClick = onArchiveClick,
+        onClearPrinterFilter = onClearPrinterFilter,
     )
 }
 
@@ -94,6 +104,7 @@ private fun ArchivesScreenContent(
     cameraToken: String,
     searchQuery: String,
     filter: ArchiveResultFilter,
+    printerFilter: ArchivePrinterFilter?,
     section: ArchivesSection,
     statsTimeRange: ArchiveStatsTimeRange,
     statsSnapshot: ArchiveStatsSnapshot,
@@ -104,6 +115,7 @@ private fun ArchivesScreenContent(
     onRefresh: () -> Unit,
     onPullRefresh: () -> Unit,
     onArchiveClick: (PrintArchive) -> Unit,
+    onClearPrinterFilter: () -> Unit,
 ) {
     val selectedTabIndex = when (section) {
         ArchivesSection.History -> 0
@@ -176,9 +188,11 @@ private fun ArchivesScreenContent(
                                 cameraToken = cameraToken,
                                 searchQuery = searchQuery,
                                 filter = filter,
+                                printerFilter = printerFilter,
                                 onSearchQueryChange = onSearchQueryChange,
                                 onFilterChange = onFilterChange,
                                 onArchiveClick = onArchiveClick,
+                                onClearPrinterFilter = onClearPrinterFilter,
                             )
                             ArchivesSection.Stats -> ArchiveStatsContent(
                                 stats = statsSnapshot,
@@ -201,11 +215,22 @@ private fun ArchivesHistoryContent(
     cameraToken: String,
     searchQuery: String,
     filter: ArchiveResultFilter,
+    printerFilter: ArchivePrinterFilter?,
     onSearchQueryChange: (String) -> Unit,
     onFilterChange: (ArchiveResultFilter) -> Unit,
     onArchiveClick: (PrintArchive) -> Unit,
+    onClearPrinterFilter: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
+        printerFilter?.let { activePrinterFilter ->
+            ArchivesPrinterFilterBanner(
+                printerName = activePrinterFilter.printerName,
+                onClear = onClearPrinterFilter,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+            )
+        }
         ArchiveSearchAndFilters(
             searchQuery = searchQuery,
             filter = filter,
@@ -316,4 +341,42 @@ private fun ArchiveFilterChip(
         onClick = onClick,
         label = { Text(label, style = MaterialTheme.typography.labelSmall) },
     )
+}
+
+@Composable
+private fun ArchivesPrinterFilterBanner(
+    printerName: String,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.archives_printer_filter_chip, printerName),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+                IconButton(onClick = onClear) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.archives_clear_printer_filter),
+                    )
+                }
+            }
+            TextButton(onClick = onClear) {
+                Text(stringResource(R.string.archives_clear_printer_filter))
+            }
+        }
+    }
 }

@@ -435,6 +435,7 @@ class BambuddyApiClient {
         apiKey: String,
         limit: Int = ARCHIVES_LIST_DEFAULT_LIMIT,
         offset: Int = 0,
+        printerId: Int? = null,
     ): Result<List<PrintArchive>> =
         withContext(Dispatchers.IO) {
             if (!BambuddyApi.hasArchivesEndpoint) {
@@ -446,7 +447,11 @@ class BambuddyApiClient {
                 val printers = fetchPrinters(serverUrl, apiKey).getOrElse { emptyList() }
                 val namesById = printers.associate { it.id to it.name }
                 val modelsById = printers.mapNotNull { p -> p.model?.let { p.id to it } }.toMap()
-                val path = BambuddyApi.archivesPath(limit = limit, offset = offset)
+                val path = BambuddyApi.archivesPath(
+                    limit = limit,
+                    offset = offset,
+                    printerId = printerId,
+                )
                 val archives = runApiCall(serverUrl, apiKey, path) { body ->
                     if (DEBUG_LOG_SPOOL_USAGE) {
                         logFullJsonPayload(TAG_SPOOL_USAGE_LINK, "archivesListRaw", body)

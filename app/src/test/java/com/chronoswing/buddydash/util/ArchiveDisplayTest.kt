@@ -75,6 +75,31 @@ class ArchiveDisplayTest {
     }
 
     @Test
+    fun applyArchiveListFilters_combinesPrinterSearchAndStatus() {
+        val babyBro = sampleArchive(id = 1, printerId = 10, printerName = "BabyBroBot", displayName = "clip A")
+        val other = sampleArchive(id = 2, printerId = 20, printerName = "Other", displayName = "clip B")
+        val babyFailed = sampleArchive(
+            id = 3,
+            printerId = 10,
+            printerName = "BabyBroBot",
+            displayName = "widget",
+            resultKind = ArchiveResultKind.Failed,
+            statusRaw = "failed",
+        )
+        val archives = listOf(babyBro, other, babyFailed)
+
+        val filtered = applyArchiveListFilters(
+            archives = archives,
+            query = "clip",
+            filter = ArchiveResultFilter.Success,
+            printerId = 10,
+        )
+
+        assertEquals(1, filtered.size)
+        assertEquals(1, filtered.first().id)
+    }
+
+    @Test
     fun formatArchiveListMetaLine_nullWhenNoFields() {
         val archive = com.chronoswing.buddydash.data.model.PrintArchive(
             id = 1,
@@ -101,16 +126,22 @@ class ArchiveDisplayTest {
     }
 
     private fun sampleArchive(
+        id: Int = 1,
+        displayName: String = "Test",
+        printerId: Int = 1,
+        printerName: String = "Printer",
         filamentType: String? = null,
         filamentColor: String? = null,
+        resultKind: ArchiveResultKind = ArchiveResultKind.Success,
+        statusRaw: String = "completed",
     ) = PrintArchive(
-        id = 1,
-        displayName = "Test",
-        printerId = 1,
-        printerName = "Printer",
+        id = id,
+        displayName = displayName,
+        printerId = printerId,
+        printerName = printerName,
         printerModel = null,
-        statusRaw = "completed",
-        resultKind = ArchiveResultKind.Success,
+        statusRaw = statusRaw,
+        resultKind = resultKind,
         startedAtIso = null,
         completedAtIso = null,
         durationSeconds = null,

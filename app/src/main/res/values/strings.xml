@@ -41,6 +41,8 @@
     <string name="archives_search_hint">Search prints, printer, material…</string>
     <string name="archives_empty">No archived prints</string>
     <string name="archives_no_match">No archives match your search</string>
+    <string name="archives_printer_filter_chip">Printer: %1$s</string>
+    <string name="archives_clear_printer_filter">Clear filter</string>
     <string name="archive_filter_all">All</string>
     <string name="archive_filter_success">Success</string>
     <string name="archive_filter_failed">Failed</string>
@@ -226,6 +228,7 @@
     <string name="machine_section_utilities">Utilities</string>
     <string name="machine_section_printer_info">Printer info</string>
     <string name="machine_step_mm">%1$d mm</string>
+    <string name="machine_files">Files</string>
     <string name="machine_home">Home axes</string>
     <string name="machine_home_confirm_title">Home printer?</string>
     <string name="machine_home_confirm_message">This will run the full auto-home sequence (park toolhead, then home all axes).</string>

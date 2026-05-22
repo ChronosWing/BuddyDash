@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
@@ -55,6 +56,7 @@ fun MachineTab(
     onJogBedDown: () -> Unit,
     onHomePrinter: () -> Unit,
     onToggleLight: (() -> Unit)? = null,
+    onOpenPrinterArchives: () -> Unit = {},
 ) {
     val caps = labels.machineTabCapabilities(cameraTokenConfigured = cameraToken.isNotBlank())
     var showCameraFullscreen by remember { mutableStateOf(false) }
@@ -136,6 +138,14 @@ fun MachineTab(
                             icon = Icons.Default.Home,
                             enabled = caps.homeEnabled && !isControlBusy,
                             onClick = { showHomeConfirm = true },
+                        )
+                    }
+                    if (caps.showFiles) {
+                        MachineUtilityButton(
+                            label = stringResource(R.string.machine_files),
+                            icon = Icons.Default.Folder,
+                            enabled = caps.filesEnabled,
+                            onClick = onOpenPrinterArchives,
                         )
                     }
                 }
