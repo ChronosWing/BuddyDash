@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -82,22 +83,67 @@ object Routes {
         val encoded = URLEncoder.encode(search, StandardCharsets.UTF_8.toString())
         return "archives?search=$encoded"
     }
+
+    /** Which bottom-nav tab is highlighted for the current destination (including detail screens). */
+    fun bottomNavTab(route: String?): BottomNavTab? {
+        val base = route?.substringBefore('?') ?: return null
+        return when {
+            base == HOME ||
+                base == PRINTER_QUEUE ||
+                base.startsWith("printer/") -> BottomNavTab.PRINTERS
+            base == SPOOLS_BASE ||
+                base.startsWith("spool/") -> BottomNavTab.SPOOLS
+            base == ARCHIVES_BASE ||
+                base.startsWith("archive/") -> BottomNavTab.ARCHIVES
+            base == SETTINGS -> BottomNavTab.SETTINGS
+            else -> null
+        }
+    }
+}
+
+enum class BottomNavTab {
+    PRINTERS,
+    SPOOLS,
+    ARCHIVES,
+    SETTINGS,
 }
 
 /** Temporary: verify bottom-tab destinations. Set false before release. */
 private const val DEBUG_LOG_NAV_DESTINATIONS = true
 private const val TAG_NAV = "BuddyDash/Nav"
 
-private val bottomNavRoutes = setOf(
-    Routes.HOME,
-    Routes.SPOOLS_BASE,
-    Routes.ARCHIVES_BASE,
-    Routes.SETTINGS,
-)
+private fun bottomNavSelectedLabel(route: String?): String =
+    when (Routes.bottomNavTab(route)) {
+        BottomNavTab.PRINTERS -> "Printers"
+        BottomNavTab.SPOOLS -> "Spools"
+        BottomNavTab.ARCHIVES -> "Archives"
+        BottomNavTab.SETTINGS -> "Settings"
+        null -> "none"
+    }
 
-private fun isBottomNavRoute(route: String?): Boolean {
-    val base = route?.substringBefore('?') ?: return false
-    return base in bottomNavRoutes
+/**
+ * Bottom-nav: always open a section root. Does not restore detail screens or filters.
+ */
+private fun NavHostController.navigateToSectionRoot(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) {
+            saveState = false
+        }
+        launchSingleTop = true
+        restoreState = false
+    }
+}
+
+private fun logNavState(
+    event: String,
+    currentRoute: String?,
+    extra: String = "",
+) {
+    if (!DEBUG_LOG_NAV_DESTINATIONS) return
+    Log.d(
+        TAG_NAV,
+        "$event currentRoute=$currentRoute selectedTab=${bottomNavSelectedLabel(currentRoute)} $extra",
+    )
 }
 
 @Composable
@@ -108,7 +154,6 @@ fun BuddyDashNav(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val showBottomBar = isBottomNavRoute(currentRoute)
 
     LaunchedEffect(Unit) {
         if (DEBUG_LOG_NAV_DESTINATIONS) {
@@ -120,49 +165,31 @@ fun BuddyDashNav(
         }
     }
 
+    LaunchedEffect(currentRoute) {
+        logNavState("routeChanged", currentRoute)
+    }
+
     Scaffold(
         bottomBar = {
-            if (showBottomBar) {
-                BuddyDashBottomNav(
-                    currentRoute = currentRoute,
-                    onPrinters = {
-                        navController.navigate(Routes.HOME) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    onSpools = {
-                        navController.navigate(Routes.spools()) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    onArchives = {
-                        navController.navigate(Routes.archives()) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    onSettings = {
-                        navController.navigate(Routes.SETTINGS) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                )
-            }
+            BuddyDashBottomNav(
+                currentRoute = currentRoute,
+                onPrinters = {
+                    logNavState("tapPrinters", currentRoute, "action=sectionRoot")
+                    navController.navigateToSectionRoot(Routes.HOME)
+                },
+                onSpools = {
+                    logNavState("tapSpools", currentRoute, "action=sectionRoot")
+                    navController.navigateToSectionRoot(Routes.spools())
+                },
+                onArchives = {
+                    logNavState("tapArchives", currentRoute, "action=sectionRoot")
+                    navController.navigateToSectionRoot(Routes.archives())
+                },
+                onSettings = {
+                    logNavState("tapSettings", currentRoute, "action=sectionRoot")
+                    navController.navigateToSectionRoot(Routes.SETTINGS)
+                },
+            )
         },
     ) { innerPadding ->
         NavHost(
@@ -267,12 +294,29 @@ fun BuddyDashNav(
                         SpoolsViewModel(settingsRepository, apiClient)
                     },
                 )
+                val fromArchiveMaterialLookup = archiveMatch
                 SpoolsScreen(
                     viewModel = viewModel,
                     initialSearchQuery = initialSearch,
                     initialArchiveLookupFilter = initialArchiveLookup,
+                    onBack = if (fromArchiveMaterialLookup) {
+                        {
+                            logNavState("tapSpoolsBack", currentRoute, "action=popToArchiveDetail")
+                            navController.popBackStack()
+                        }
+                    } else {
+                        null
+                    },
                     onSpoolClick = { spoolId ->
                         navController.navigate(Routes.spoolDetail(spoolId))
+                    },
+                    onClearArchiveLookup = {
+                        logNavState("clearArchiveLookup", currentRoute, "action=spoolsUnfilteredInStack")
+                        viewModel.clearArchiveLookupFilter()
+                        navController.navigate(Routes.spools()) {
+                            popUpTo(backStackEntry.destination.id) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     },
                 )
             }
@@ -328,9 +372,19 @@ fun BuddyDashNav(
                     onMaterialNavigation = { navigation ->
                         when (navigation) {
                             is ArchiveMaterialNavigation.SpoolDetail -> {
+                                logNavState(
+                                    "archiveMaterialTap",
+                                    currentRoute,
+                                    "matchCount=1 route=SpoolDetail spoolId=${navigation.spoolId}",
+                                )
                                 navController.navigate(Routes.spoolDetail(navigation.spoolId))
                             }
                             is ArchiveMaterialNavigation.SpoolsFiltered -> {
+                                logNavState(
+                                    "archiveMaterialTap",
+                                    currentRoute,
+                                    "route=SpoolsFilteredPush material=${navigation.lookupFilter.materialLabel}",
+                                )
                                 navController.navigate(
                                     Routes.spoolsArchiveLookup(navigation.lookupFilter),
                                 )

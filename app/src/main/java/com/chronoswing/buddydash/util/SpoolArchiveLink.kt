@@ -217,10 +217,23 @@ fun resolveArchiveMaterialNavigation(
         )
     }
 
-    return when (matches.size) {
+    val navigation = when (matches.size) {
         1 -> ArchiveMaterialNavigation.SpoolDetail(matches.first().id)
         else -> ArchiveMaterialNavigation.SpoolsFiltered(lookupFilter)
     }
+    if (DEBUG_LOG_SPOOL_ARCHIVE_LINK) {
+        val route = when (navigation) {
+            is ArchiveMaterialNavigation.SpoolDetail ->
+                "SpoolDetail spoolId=${navigation.spoolId}"
+            is ArchiveMaterialNavigation.SpoolsFiltered -> "SpoolsFilteredTopLevel"
+            ArchiveMaterialNavigation.None -> "None"
+        }
+        Log.d(
+            TAG_SPOOL_ARCHIVE_LINK,
+            "archiveMaterialNavigation archiveId=${archive.id} matchCount=${matches.size} route=$route",
+        )
+    }
+    return navigation
 }
 
 private fun materialsMatchForLookup(archiveType: String, spoolMaterial: String): Boolean =
