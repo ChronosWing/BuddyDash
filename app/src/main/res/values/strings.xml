@@ -23,9 +23,10 @@
     <string name="spool_usage_empty">No print history yet</string>
     <string name="empty_hint_spool_usage">Usage records will appear after prints</string>
     <string name="snackbar_no_matching_filament">No matching filament found</string>
-    <string name="home_dashboard_online">%1$d Online</string>
-    <string name="home_dashboard_printing">%1$d Printing</string>
-    <string name="home_dashboard_loaded_spools">%1$d Loaded</string>
+    <string name="home_header_meta_online">%1$d online</string>
+    <string name="home_header_meta_printing">%1$d printing</string>
+    <string name="home_header_meta_loaded">%1$d loaded</string>
+    <string name="home_header_meta_separator">•</string>
     <string name="search_printers">Search printers</string>
     <string name="search_printers_hint">Search printers…</string>
     <string name="close_search">Close search</string>

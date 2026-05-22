@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -64,8 +65,7 @@ import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.ui.components.FilamentHomeGroupsRow
 import com.chronoswing.buddydash.ui.components.HomePrinterSearchField
 import com.chronoswing.buddydash.ui.components.HomePrinterSearchFilterChips
-import com.chronoswing.buddydash.ui.components.HomeDashboardActivityStrip
-import com.chronoswing.buddydash.ui.components.HomeDashboardActivityStripSkeleton
+import com.chronoswing.buddydash.ui.components.HomeHeaderMetadataRow
 import com.chronoswing.buddydash.ui.components.HomeCardMicroMotionFrame
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
 import com.chronoswing.buddydash.ui.components.MicroMotionThumbnailFrame
@@ -152,11 +152,7 @@ private fun HomeScreenContent(
 ) {
     val cachedCount = printers.size
     val printerCounts = printers.homePrinterDashboardCounts()
-    val showDashboardStrip = settingsReady && hasCredentials
-    val dashboardStripLoading = showDashboardStrip &&
-        !hasCompletedLoad &&
-        cachedCount == 0 &&
-        loadedSpoolCount == null
+    val showHeaderMetadata = settingsReady && hasCredentials
     val showInitialSkeleton = ListLoadUi.showInitialSkeleton(
         settingsReady = settingsReady,
         hasCredentials = hasCredentials,
@@ -232,29 +228,22 @@ private fun HomeScreenContent(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        HomeTitleWordmark(
-                            ambientPulseEnabled = hasAnyPrinterPrinting(printers) &&
-                                !preferOfflineInHeader,
-                            modifier = Modifier
-                                .weight(1f)
-                                .semantics {
-                                    contentDescription = appNameContentDescription
-                                },
-                        )
-                        StatusLastUpdatedIndicator(
-                            lastUpdatedAtMillis = lastUpdatedAtMillis,
-                            isRefreshing = showHeaderUpdating,
-                            enabled = hasCredentials && !isLoading,
-                            onRefresh = onRefresh,
-                            preferConnectionStale = showConnectionStaleInHeader,
-                            preferOffline = preferOfflineInHeader,
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
-                    }
+                    HomeTopBarTitle(
+                        ambientPulseEnabled = hasAnyPrinterPrinting(printers) &&
+                            !preferOfflineInHeader,
+                        appNameContentDescription = appNameContentDescription,
+                        showHeaderMetadata = showHeaderMetadata,
+                        onlineCount = printerCounts.online,
+                        printingCount = printerCounts.printing,
+                        loadedSpoolCount = loadedSpoolCount ?: 0,
+                        lastUpdatedAtMillis = lastUpdatedAtMillis,
+                        showHeaderUpdating = showHeaderUpdating,
+                        hasCredentials = hasCredentials,
+                        isLoading = isLoading,
+                        onRefresh = onRefresh,
+                        showConnectionStaleInHeader = showConnectionStaleInHeader,
+                        preferOfflineInHeader = preferOfflineInHeader,
+                    )
                 },
                 actions = {
                     if (showPrinterSearch) {
@@ -292,16 +281,7 @@ private fun HomeScreenContent(
                 )
             }
             showInitialSkeleton -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                ) {
-                    if (showDashboardStrip) {
-                        HomeDashboardActivityStripSkeleton()
-                    }
-                    PrinterListSkeleton(Modifier.weight(1f))
-                }
+                PrinterListSkeleton(Modifier.padding(innerPadding))
             }
             loadState == HomePrintersLoadState.ErrorNoCachedData -> {
                 PullToRefreshBox(
@@ -319,26 +299,12 @@ private fun HomeScreenContent(
                 }
             }
             loadState == HomePrintersLoadState.EmptyLoadedSuccessfully -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                ) {
-                    if (showDashboardStrip) {
-                        HomeDashboardActivityStrip(
-                            onlineCount = printerCounts.online,
-                            printingCount = printerCounts.printing,
-                            loadedSpoolCount = loadedSpoolCount,
-                            isLoading = dashboardStripLoading,
-                        )
-                    }
-                    EmptyContent(
-                        message = stringResource(R.string.no_printers),
-                        subtitle = stringResource(R.string.empty_hint_printers),
-                        icon = BuddyDashEmptyIcon.Printers.asImageVector(),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+                EmptyContent(
+                    message = stringResource(R.string.no_printers),
+                    subtitle = stringResource(R.string.empty_hint_printers),
+                    icon = BuddyDashEmptyIcon.Printers.asImageVector(),
+                    modifier = Modifier.padding(innerPadding),
+                )
             }
             else -> {
                 val filteredPrinters = if (searchExpanded) {
@@ -351,14 +317,6 @@ private fun HomeScreenContent(
                         .fillMaxSize()
                         .padding(innerPadding),
                 ) {
-                    if (showDashboardStrip) {
-                        HomeDashboardActivityStrip(
-                            onlineCount = printerCounts.online,
-                            printingCount = printerCounts.printing,
-                            loadedSpoolCount = loadedSpoolCount,
-                            isLoading = dashboardStripLoading,
-                        )
-                    }
                     HomePrinterSearchField(
                         expanded = searchExpanded,
                         query = searchQuery,
@@ -560,11 +518,68 @@ private fun GlancePrinterCard(
 private val HomeTitleLogoImageSize = 104.dp
 private val HomeTitleLogoSlotWidth = 84.dp
 private val HomeTitleTextPullLeft = 14.dp
+private val HomeTitleStatusStartPadding = 16.dp
 
 private fun hasAnyPrinterPrinting(printers: List<Printer>): Boolean =
     printers.any { printer ->
         printer.liveStatus?.resolveActivityKind() == PrinterActivityKind.Printing
     }
+
+@Composable
+private fun HomeTopBarTitle(
+    ambientPulseEnabled: Boolean,
+    appNameContentDescription: String,
+    showHeaderMetadata: Boolean,
+    onlineCount: Int,
+    printingCount: Int,
+    loadedSpoolCount: Int,
+    lastUpdatedAtMillis: Long?,
+    showHeaderUpdating: Boolean,
+    hasCredentials: Boolean,
+    isLoading: Boolean,
+    onRefresh: () -> Unit,
+    showConnectionStaleInHeader: Boolean,
+    preferOfflineInHeader: Boolean,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(HomeTitleLogoImageSize),
+    ) {
+        HomeTitleWordmark(
+            ambientPulseEnabled = ambientPulseEnabled,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .semantics {
+                    contentDescription = appNameContentDescription
+                },
+        )
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .wrapContentWidth(Alignment.End)
+                .padding(start = HomeTitleStatusStartPadding),
+        ) {
+            StatusLastUpdatedIndicator(
+                lastUpdatedAtMillis = lastUpdatedAtMillis,
+                isRefreshing = showHeaderUpdating,
+                enabled = hasCredentials && !isLoading,
+                onRefresh = onRefresh,
+                preferConnectionStale = showConnectionStaleInHeader,
+                preferOffline = preferOfflineInHeader,
+            )
+            if (showHeaderMetadata) {
+                HomeHeaderMetadataRow(
+                    onlineCount = onlineCount,
+                    printingCount = printingCount,
+                    loadedSpoolCount = loadedSpoolCount,
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun HomeTitleWordmark(
@@ -577,7 +592,7 @@ private fun HomeTitleWordmark(
         fontWeight = FontWeight.SemiBold,
     )
     Row(
-        modifier = modifier,
+        modifier = modifier.wrapContentWidth(Alignment.Start),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(0.dp),
     ) {
@@ -598,7 +613,8 @@ private fun HomeTitleWordmark(
             modifier = Modifier.offset(x = -HomeTitleTextPullLeft),
             style = wordmarkTextStyle,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
+            overflow = TextOverflow.Visible,
         )
     }
 }
