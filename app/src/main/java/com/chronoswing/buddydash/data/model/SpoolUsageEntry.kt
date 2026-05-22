@@ -22,6 +22,7 @@ data class SpoolUsageDirectIds(
 
 /** One row from GET /api/v1/inventory/spools/{spool_id}/usage (SpoolUsageHistoryResponse). */
 data class SpoolUsageEntry(
+    /** [SpoolUsageHistory.id] — usage record PK, not archive id. */
     val id: Int,
     val spoolId: Int,
     val printerId: Int?,
@@ -31,10 +32,7 @@ data class SpoolUsageEntry(
     val status: String,
     val createdAtIso: String,
     val directIds: SpoolUsageDirectIds = SpoolUsageDirectIds(),
-    /** Optional runtime thumbnail URL or API path from usage JSON. */
-    val usageThumbnailPath: String? = null,
-    val libraryFileId: Int? = null,
-    val materialType: String? = null,
-    val filamentColor: String? = null,
-    val durationSeconds: Int? = null,
+    val plateNumber: Int? = null,
+    /** Full API object for discovery logging (Bambuddy may omit archive_id from schema). */
+    val rawJson: String = "",
 )

@@ -84,6 +84,7 @@ fun parsePrintArchive(
     return PrintArchive(
         id = id,
         displayName = resolveArchiveDisplayName(json),
+        filename = jsonOptionalString(json, "filename"),
         printerId = printerId,
         printerName = printerId?.let { printerNamesById[it] },
         printerModel = printerId?.let { printerModelsById[it] },
@@ -98,6 +99,8 @@ fun parsePrintArchive(
         filamentType = jsonOptionalString(json, "filament_type"),
         filamentColor = jsonOptionalString(json, "filament_color"),
         spoolId = resolveArchiveSpoolId(json),
+        plateNumber = resolveArchivePlateNumber(json),
+        contentHash = jsonOptionalString(json, "content_hash"),
         failureReason = jsonOptionalString(json, "failure_reason"),
         totalLayers = json.optInt("total_layers", -1).takeIf { it > 0 },
         quantity = json.optInt("quantity", -1).takeIf { it > 0 },
@@ -109,6 +112,14 @@ fun parsePrintArchive(
 
 private fun jsonOptionalString(json: JSONObject, key: String): String? =
     json.optString(key).trim().takeIf { isMeaningfulArchiveField(it) }
+
+private fun resolveArchivePlateNumber(json: JSONObject): Int? {
+    json.optInt("plate_number", -1).takeIf { it >= 0 }?.let { return it }
+    json.optInt("plate_id", -1).takeIf { it >= 0 }?.let { return it }
+    val extra = json.optJSONObject("extra_data") ?: return null
+    return extra.optInt("plate_number", -1).takeIf { it >= 0 }
+        ?: extra.optInt("plate_id", -1).takeIf { it >= 0 }
+}
 
 /** Non-empty text that is not the literal string "null". */
 fun isMeaningfulArchiveField(value: String?): Boolean {

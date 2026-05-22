@@ -298,7 +298,6 @@ private fun SpoolUsageHistoryRow(
     ) {
         SpoolUsageThumbnail(
             archiveId = item.archiveId,
-            usageImageUrl = item.usageImageUrl,
             serverUrl = serverUrl,
             cameraToken = cameraToken,
             size = 44.dp,

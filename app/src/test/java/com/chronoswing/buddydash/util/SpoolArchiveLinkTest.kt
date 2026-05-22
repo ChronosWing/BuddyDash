@@ -135,6 +135,56 @@ class SpoolArchiveLinkTest {
     }
 
     @Test
+    fun deriveColorFamilyName_mapsRedHex() {
+        assertEquals("red", deriveColorFamilyName("#FF0000"))
+        assertEquals("red", deriveColorFamilyName("#FF3300"))
+        assertEquals("red", deriveColorFamilyName("#E53935"))
+    }
+
+    @Test
+    fun spoolMatchesArchiveLookupFilter_petgRedArchiveMatchesKingroonPetgRedSpool() {
+        val filter = ArchiveSpoolLookupFilter(
+            materialLabel = "PETG",
+            materialKey = "petg",
+            colorHexes = listOf("#ff0000"),
+            colorDisplayLabel = "red",
+        )
+        val spool = sampleSpool(
+            id = 3,
+            material = "PETG",
+            colorName = "Red",
+            colorHexes = emptyList(),
+            displayNameOverride = "KINGROON PETG Red",
+        )
+        assertTrue(spoolMatchesArchiveLookupFilter(spool, filter))
+    }
+
+    @Test
+    fun spoolMatchesArchiveLookupFilter_nearRedHexesMatch() {
+        val filter = ArchiveSpoolLookupFilter(
+            materialLabel = "PETG",
+            materialKey = "petg",
+            colorHexes = listOf("#ff0000"),
+            colorDisplayLabel = "red",
+        )
+        val spool = sampleSpool(
+            id = 4,
+            material = "PETG",
+            colorName = "Red",
+            colorHexes = listOf("#E53935"),
+        )
+        assertTrue(spoolMatchesArchiveLookupFilter(spool, filter))
+    }
+
+    @Test
+    fun buildArchiveSpoolLookupFilter_derivesRedLabelFromHex() {
+        val archive = sampleArchive(id = 1, spoolId = null, filamentType = "PETG", filamentColor = "#FF0000")
+        val filter = buildArchiveSpoolLookupFilter(archive)
+        assertEquals("red", filter.colorDisplayLabel)
+        assertEquals(listOf("#ff0000"), filter.colorHexes)
+    }
+
+    @Test
     fun resolveArchiveMaterialNavigation_noMatchStillOpensFilteredLookup() {
         val archive = sampleArchive(id = 1, spoolId = 99, filamentType = "PETG", filamentColor = "#0000FF")
         val spools = listOf(sampleSpool(id = 1, material = "PLA"))
@@ -151,6 +201,7 @@ class SpoolArchiveLinkTest {
         colorName: String = "Blue",
         colorHexes: List<String> = listOf("#0000FF"),
         assignment: SpoolSlotAssignment? = null,
+        displayNameOverride: String? = null,
     ) = SpoolInventoryItem(
         id = id,
         material = material,
@@ -159,7 +210,7 @@ class SpoolArchiveLinkTest {
         remainPercent = null,
         lowStockThresholdPct = null,
         isLowStock = false,
-        displayName = "$material Blue",
+        displayName = displayNameOverride ?: "$material $colorName",
         assignment = assignment,
     )
 

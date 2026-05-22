@@ -9,7 +9,9 @@ import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.data.model.SpoolUsageEntry
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.SpoolUsageDisplayItem
+import com.chronoswing.buddydash.util.SPOOL_DETAIL_ARCHIVES_LIMIT
 import com.chronoswing.buddydash.util.buildSpoolUsageDisplayItems
+import com.chronoswing.buddydash.util.logSpoolUsageArchiveDiscovery
 import com.chronoswing.buddydash.util.logSpoolUsageDisplayItems
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -97,7 +99,13 @@ class SpoolDetailViewModel(
                 }
                 val usageHistory = usageDeferred.await().getOrElse { emptyList() }
                 val archivesDeferred = if (usageHistory.isNotEmpty()) {
-                    async { apiClient.fetchArchives(state.serverUrl, state.apiKey) }
+                    async {
+                        apiClient.fetchArchives(
+                            state.serverUrl,
+                            state.apiKey,
+                            limit = SPOOL_DETAIL_ARCHIVES_LIMIT,
+                        )
+                    }
                 } else {
                     null
                 }
@@ -129,14 +137,15 @@ class SpoolDetailViewModel(
                     }
                     val printerNamesById = printersResult.getOrElse { emptyList() }
                         .associate { it.id to it.name }
+                    logSpoolUsageArchiveDiscovery(
+                        spoolId = spoolId,
+                        usageEntries = usageHistory,
+                        archivesRawJson = null,
+                    )
                     val usageDisplayItems = buildSpoolUsageDisplayItems(
                         entries = usageHistory,
                         archives = archives,
                         printerNamesById = printerNamesById,
-                        spoolMaterial = spool.material,
-                        spoolColorName = spool.colorName,
-                        serverUrl = state.serverUrl,
-                        cameraToken = state.cameraToken,
                     )
                     logSpoolUsageDisplayItems(spoolId, usageDisplayItems)
                     _uiState.update {
