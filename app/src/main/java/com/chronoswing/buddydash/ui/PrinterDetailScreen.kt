@@ -371,6 +371,7 @@ private fun PrinterDetailScreenContent(
                                     onJogBedUp = onJogBedUp,
                                     onJogBedDown = onJogBedDown,
                                     onHomePrinter = onHomePrinter,
+                                    onToggleLight = onToggleLight,
                                 )
                             }
                         }

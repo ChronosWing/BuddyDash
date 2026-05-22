@@ -399,7 +399,12 @@ fun MachineUtilityButton(
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .machineActionShadow(enabled),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        colors = machineActionButtonColors(enabled),
+        border = machineActionBorder(enabled),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Row(
@@ -411,10 +416,16 @@ fun MachineUtilityButton(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
+                tint = if (enabled) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                },
             )
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (enabled) FontWeight.SemiBold else FontWeight.Normal,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -495,21 +506,12 @@ private fun MotionJogButton(
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.heightIn(min = if (compact) 48.dp else 56.dp),
-        colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
-        ),
-        border = BorderStroke(
-            width = if (enabled) 1.5.dp else 1.dp,
-            color = if (enabled) {
-                accent.copy(alpha = 0.55f)
-            } else {
-                MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
-            },
-        ),
+        modifier = modifier
+            .heightIn(min = if (compact) 48.dp else 56.dp)
+            .machineActionShadow(enabled),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        colors = machineActionButtonColors(enabled),
+        border = machineActionBorder(enabled),
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -519,11 +521,12 @@ private fun MotionJogButton(
                 imageVector = icon,
                 contentDescription = label,
                 modifier = Modifier.size(22.dp),
+                tint = if (enabled) accent.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSurface.copy(0.38f),
             )
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
+                fontWeight = if (enabled) FontWeight.SemiBold else FontWeight.Normal,
             )
         }
     }
