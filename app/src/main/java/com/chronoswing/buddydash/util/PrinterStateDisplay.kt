@@ -12,6 +12,7 @@ data class PrinterStateDisplay(
 private val IDLE_LIKE_STATES = setOf("IDLE", "FINISH", "FAILED")
 private val BUSY_LIKE_STATES = setOf(
     "PREPARE", "PREPARING", "SLICING", "CALIBRATING", "BUSY", "INITIALIZING",
+    "HOMING", "HOME", "AUTO_HOME", "AUTOHOMING",
 )
 
 fun PrinterStatus.toStateDisplay(): PrinterStateDisplay {
@@ -27,7 +28,7 @@ fun PrinterStatus.toStateDisplay(): PrinterStateDisplay {
         isPrinting = isPrinting,
         isPaused = isPaused,
         isActivePrint = isActivePrint,
-        hmsErrorCount = hmsErrorCount,
+        hasActiveFault = hasActiveFault(),
     )
 
     val showLastPrintOnCard = when (lastPrintResult) {
@@ -49,14 +50,14 @@ private fun resolveCurrentActivity(
     isPrinting: Boolean,
     isPaused: Boolean,
     isActivePrint: Boolean,
-    hmsErrorCount: Int,
+    hasActiveFault: Boolean,
 ): String {
     if (!connected) return "Offline"
-    if (isPrinting) return if (hmsErrorCount > 0) "Error" else "Printing"
-    if (isPaused) return if (hmsErrorCount > 0) "Error" else "Paused"
+    if (hasActiveFault) return "Error"
+    if (isPrinting) return "Printing"
+    if (isPaused) return "Paused"
     if (raw in IDLE_LIKE_STATES || raw.isNullOrBlank()) return "Idle"
     if (raw in BUSY_LIKE_STATES) return "Busy"
-    if (hmsErrorCount > 0) return "Error"
     return formatStateLabel(raw)
 }
 

@@ -39,6 +39,7 @@ data class PrinterDetailLabels(
     val bedTemp: String,
     val hmsHealth: String,
     val hmsHasErrors: Boolean,
+    val printerErrorDisplay: PrinterErrorDisplay,
     val filamentSlots: List<FilamentSlot>,
     val activeFilamentSlot: SlotInventoryKey? = null,
     val printerRawState: String? = null,
@@ -76,6 +77,7 @@ fun PrinterStatus.toDetailLabels(
     totalPrintHours: Double? = null,
     printerModel: String? = null,
     activePrintFilamentUsage: FilamentUsage? = null,
+    printerErrorNoDetailsFallback: String = "Printer reports an error, but no details were provided.",
 ): PrinterDetailLabels {
     val raw = rawState?.uppercase()
     val isPrinting = raw == "RUNNING"
@@ -147,6 +149,9 @@ fun PrinterStatus.toDetailLabels(
         bedTemp = formatTemp(bedTemp),
         hmsHealth = formatHmsHealth(hmsErrorCount),
         hmsHasErrors = hmsErrorCount > 0,
+        printerErrorDisplay = resolvePrinterErrorDisplay(
+            noDetailsFallback = printerErrorNoDetailsFallback,
+        ),
         filamentSlots = filamentSlots,
         activeFilamentSlot = activeFilamentSlot,
         printerRawState = rawState,

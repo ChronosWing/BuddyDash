@@ -1,6 +1,7 @@
 package com.chronoswing.buddydash.util
 
 import com.chronoswing.buddydash.data.model.Printer
+import com.chronoswing.buddydash.data.model.PrinterHmsError
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -97,6 +98,8 @@ class PrinterSearchTest {
         remainingTimeSeconds = null,
         nozzleTemp = null,
         bedTemp = null,
-        hmsErrorCount = hms,
+        hmsErrors = List(hms) { index ->
+            PrinterHmsError(code = "0300-0C00-0001-000$index")
+        },
     )
 }

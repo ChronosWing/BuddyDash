@@ -17,8 +17,14 @@ import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
 import com.chronoswing.buddydash.util.DEBUG_LOG_ARCHIVE_REPRINT
 import com.chronoswing.buddydash.util.TAG_ARCHIVE_REPRINT
 import com.chronoswing.buddydash.util.evaluateStartNextQueuedPrintReadiness
+import com.chronoswing.buddydash.util.ControlAction
+import com.chronoswing.buddydash.util.ControlFeedback
+import com.chronoswing.buddydash.util.logControlFailure
+import com.chronoswing.buddydash.util.PRINTER_STATUS_SETTLE_MS
+import com.chronoswing.buddydash.util.isTransientState
 import com.chronoswing.buddydash.util.motionDebugLog
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,7 +50,7 @@ data class PrinterDetailUiState(
     val isClearingPlate: Boolean = false,
     val isControlBusy: Boolean = false,
     val plateClearSnackbar: PlateClearSnackbar? = null,
-    val controlSnackbar: ControlSnackbar? = null,
+    val controlFeedback: ControlFeedback? = null,
     val isMaintenanceResetBusy: Boolean = false,
     val maintenanceResetSnackbar: MaintenanceResetSnackbar? = null,
     /** Epoch millis of last successful status fetch (for passive refresh indicator). */
@@ -68,13 +74,6 @@ enum class StartQueuedPrintSnackbar {
 enum class PlateClearSnackbar {
     Success,
     Failed,
-}
-
-enum class ControlSnackbar {
-    Success,
-    Failed,
-    StopSuccess,
-    StopFailed,
 }
 
 enum class MaintenanceResetSnackbar {
@@ -176,28 +175,7 @@ class PrinterDetailViewModel(
 
             statusResult.status.fold(
                 onSuccess = { status ->
-                    val queueSnapshot = statusResult.queue
-                    val activeFilament = status.filamentUsage
-                        ?: queueSnapshot.printing?.filamentUsage
-                    val upcoming = queueSnapshot.upcoming
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isRefreshing = false,
-                            status = status,
-                            maintenanceItems = statusResult.maintenance?.items.orEmpty(),
-                            totalPrintHours = statusResult.maintenance?.totalPrintHours,
-                            machineInfo = statusResult.machineInfo,
-                            queueUpcoming = upcoming,
-                            startNextQueuedPrintReadiness = evaluateStartNextQueuedPrintReadiness(
-                                status = status,
-                                queuedItemCount = upcoming.size,
-                            ),
-                            activePrintFilamentUsage = activeFilament,
-                            error = null,
-                            lastStatusUpdatedAtMillis = System.currentTimeMillis(),
-                        )
-                    }
+                    applyStatusFetchResult(status, statusResult)
                 },
                 onFailure = { error ->
                     _uiState.update {
@@ -216,6 +194,62 @@ class PrinterDetailViewModel(
                 },
             )
         }
+    }
+
+    private fun applyStatusFetchResult(status: PrinterStatus, bundle: StatusFetchBundle) {
+        val queueSnapshot = bundle.queue
+        val activeFilament = status.filamentUsage
+            ?: queueSnapshot.printing?.filamentUsage
+        val upcoming = queueSnapshot.upcoming
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                isRefreshing = false,
+                status = status,
+                maintenanceItems = bundle.maintenance?.items.orEmpty(),
+                totalPrintHours = bundle.maintenance?.totalPrintHours,
+                machineInfo = bundle.machineInfo,
+                queueUpcoming = upcoming,
+                startNextQueuedPrintReadiness = evaluateStartNextQueuedPrintReadiness(
+                    status = status,
+                    queuedItemCount = upcoming.size,
+                ),
+                activePrintFilamentUsage = activeFilament,
+                error = null,
+                lastStatusUpdatedAtMillis = System.currentTimeMillis(),
+            )
+        }
+    }
+
+    private suspend fun refreshStatusAfterControl() {
+        val state = _uiState.value
+        if (printerId < 0 || !state.hasCredentials) return
+
+        fun applyMotionStatus(status: PrinterStatus) {
+            _uiState.update { current ->
+                val upcoming = current.queueUpcoming
+                current.copy(
+                    status = status,
+                    startNextQueuedPrintReadiness = evaluateStartNextQueuedPrintReadiness(
+                        status = status,
+                        queuedItemCount = upcoming.size,
+                    ),
+                    activePrintFilamentUsage = status.filamentUsage
+                        ?: current.activePrintFilamentUsage,
+                    lastStatusUpdatedAtMillis = System.currentTimeMillis(),
+                )
+            }
+        }
+
+        apiClient.fetchPrinterStatus(state.serverUrl, state.apiKey, printerId)
+            .fold(onSuccess = ::applyMotionStatus, onFailure = { })
+        delay(PRINTER_STATUS_SETTLE_MS)
+        apiClient.fetchPrinterStatus(state.serverUrl, state.apiKey, printerId).fold(
+            onSuccess = { status ->
+                if (!status.isTransientState()) applyMotionStatus(status)
+            },
+            onFailure = { },
+        )
     }
 
     fun markPlateClear() {
@@ -247,29 +281,26 @@ class PrinterDetailViewModel(
         }
     }
 
-    fun setPrintSpeed(mode: Int) = runControl {
+    fun setPrintSpeed(mode: Int) = runControl(ControlAction.PrintSpeed) {
         apiClient.setPrintSpeed(it.serverUrl, it.apiKey, printerId, mode)
     }
 
-    fun pausePrint() = runControl {
+    fun pausePrint() = runControl(ControlAction.Pause) {
         apiClient.pausePrint(it.serverUrl, it.apiKey, printerId)
     }
 
-    fun resumePrint() = runControl {
+    fun resumePrint() = runControl(ControlAction.Resume) {
         apiClient.resumePrint(it.serverUrl, it.apiKey, printerId)
     }
 
-    fun stopPrint() = runControl(
-        successSnackbar = ControlSnackbar.StopSuccess,
-        failureSnackbar = ControlSnackbar.StopFailed,
-    ) {
+    fun stopPrint() = runControl(ControlAction.Stop) {
         apiClient.stopPrint(it.serverUrl, it.apiKey, printerId)
     }
 
     fun toggleChamberLight() {
         val state = _uiState.value
         val current = state.status?.chamberLightOn ?: return
-        runControl {
+        runControl(ControlAction.ChamberLight) {
             apiClient.setChamberLight(it.serverUrl, it.apiKey, printerId, on = !current)
         }
     }
@@ -286,18 +317,17 @@ class PrinterDetailViewModel(
     /** Bed down (away from nozzle) — positive Z per Bambuddy API. */
     fun jogBedDown() = jogBed(_uiState.value.bedJogStepMm, action = "down")
 
-    fun homePrinter() = runControl {
+    fun homePrinter() = runControl(ControlAction.HomeAxes) {
         apiClient.homeAxes(it.serverUrl, it.apiKey, printerId)
     }
 
-    private fun jogBed(distanceMm: Float, action: String) = runControl {
+    private fun jogBed(distanceMm: Float, action: String) = runControl(ControlAction.BedJog) {
         motionDebugLog(action, printerId, distanceMm)
         apiClient.bedJog(it.serverUrl, it.apiKey, printerId, distanceMm)
     }
 
     private fun runControl(
-        successSnackbar: ControlSnackbar = ControlSnackbar.Success,
-        failureSnackbar: ControlSnackbar = ControlSnackbar.Failed,
+        action: ControlAction,
         block: suspend (PrinterDetailUiState) -> Result<Unit>,
     ) {
         if (printerId < 0) return
@@ -311,16 +341,30 @@ class PrinterDetailViewModel(
                     _uiState.update {
                         it.copy(
                             isControlBusy = false,
-                            controlSnackbar = successSnackbar,
+                            controlFeedback = ControlFeedback(
+                                action = action,
+                                success = true,
+                            ),
                         )
                     }
-                    loadStatus(showLoading = false)
+                    when (action) {
+                        ControlAction.HomeAxes,
+                        ControlAction.BedJog,
+                        -> refreshStatusAfterControl()
+                        else -> loadStatus(showLoading = false)
+                    }
                 },
-                onFailure = {
+                onFailure = { error ->
+                    val detail = error.message ?: error.toString()
+                    logControlFailure(action, printerId, detail, error)
                     _uiState.update {
                         it.copy(
                             isControlBusy = false,
-                            controlSnackbar = failureSnackbar,
+                            controlFeedback = ControlFeedback(
+                                action = action,
+                                success = false,
+                                logDetail = detail,
+                            ),
                         )
                     }
                 },
@@ -332,8 +376,8 @@ class PrinterDetailViewModel(
         _uiState.update { it.copy(plateClearSnackbar = null) }
     }
 
-    fun onControlSnackbarShown() {
-        _uiState.update { it.copy(controlSnackbar = null) }
+    fun onControlFeedbackShown() {
+        _uiState.update { it.copy(controlFeedback = null) }
     }
 
     fun performMaintenanceReset(itemId: Int) {

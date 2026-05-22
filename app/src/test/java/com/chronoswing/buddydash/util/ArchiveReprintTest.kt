@@ -89,7 +89,6 @@ class ArchiveReprintTest {
         remainingTimeSeconds = null,
         nozzleTemp = null,
         bedTemp = null,
-        hmsErrorCount = 0,
         awaitingPlateClear = awaitingPlateClear,
     )
 

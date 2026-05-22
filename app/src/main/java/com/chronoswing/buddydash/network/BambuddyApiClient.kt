@@ -41,6 +41,9 @@ import com.chronoswing.buddydash.util.parseSpoolInventoryList
 import com.chronoswing.buddydash.util.parseSpoolUsageHistoryList
 import com.chronoswing.buddydash.data.model.SpoolUsageEntry
 import com.chronoswing.buddydash.util.etaDebugLogLine
+import com.chronoswing.buddydash.util.parsePrinterHmsErrors
+import com.chronoswing.buddydash.util.logPrinterStatusMapping
+import com.chronoswing.buddydash.util.parsePrinterStatusFaultMessages
 import com.chronoswing.buddydash.util.parseRemainingTimeSeconds
 import com.chronoswing.buddydash.util.DEBUG_LOG_FILAMENT_USAGE
 import com.chronoswing.buddydash.util.TAG_FILAMENT_USAGE
@@ -681,7 +684,9 @@ class BambuddyApiClient {
         inventoryBySlot: Map<SlotInventoryKey, SlotInventoryInfo> = emptyMap(),
     ): PrinterStatus {
         val temperatures = json.optJSONObject("temperatures")
-        val hmsErrors = json.optJSONArray("hms_errors")
+        val hmsErrorsArray = json.optJSONArray("hms_errors")
+        val hmsErrors = parsePrinterHmsErrors(hmsErrorsArray)
+        val statusFaultMessages = parsePrinterStatusFaultMessages(json)
 
         val awaitingPlateClear = if (json.has("awaiting_plate_clear") && !json.isNull("awaiting_plate_clear")) {
             json.getBoolean("awaiting_plate_clear")
@@ -703,7 +708,7 @@ class BambuddyApiClient {
             )
         }
 
-        return PrinterStatus(
+        val status = PrinterStatus(
             connected = json.optBoolean("connected", false),
             rawState = json.optString("state").takeIf { it.isNotBlank() },
             progress = json.optDouble("progress")
@@ -723,7 +728,8 @@ class BambuddyApiClient {
             nozzleTemp = temperatures?.optDouble("nozzle"),
             bedTemp = temperatures?.optDouble("bed"),
             chamberTemp = operational.chamberTemp,
-            hmsErrorCount = hmsErrors?.length() ?: 0,
+            hmsErrors = hmsErrors,
+            statusFaultMessages = statusFaultMessages,
             awaitingPlateClear = awaitingPlateClear,
             filamentSlots = filament.slots,
             activeFilamentSlot = filament.activeKey,
@@ -740,6 +746,12 @@ class BambuddyApiClient {
             nozzleDiameterDisplay = metadata.nozzleDiameterDisplay,
             filamentUsage = filamentUsage,
         )
+        logPrinterStatusMapping(
+            json = json,
+            status = status,
+            context = "printer=${json.optInt("id", -1)}",
+        )
+        return status
     }
 
     private data class PrinterMetadataFields(
