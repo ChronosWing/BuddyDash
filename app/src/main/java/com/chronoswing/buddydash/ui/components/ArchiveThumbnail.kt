@@ -58,6 +58,7 @@ fun ArchiveThumbnail(
 
     BuddyDashFadeInThumbnail(
         imageUrl = imageUrl,
+        cacheKey = "archive-thumb-$archiveId",
         modifier = modifier,
         size = size,
         shape = RoundedCornerShape(8.dp),

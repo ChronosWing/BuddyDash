@@ -73,24 +73,28 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LifecyclePollingEffect(
-        enabled = uiState.hasCredentials,
+        enabled = uiState.hasCredentials && uiState.hasCompletedLoad,
         intervalMs = 15_000L,
-        onPoll = {
-            val showLoading = uiState.printers.isEmpty() && uiState.error == null
-            viewModel.loadPrinters(showLoading = showLoading)
-        },
+        initialDelayMs = 15_000L,
+        pollImmediately = false,
+        onPoll = { viewModel.loadPrinters(showLoading = false) },
     )
 
     HomeScreenContent(
         printers = uiState.printers,
         isLoading = uiState.isLoading,
-        isRefreshing = uiState.isRefreshing,
+        isRefreshing = uiState.isRefreshing || uiState.isEnriching,
+        hasCompletedLoad = uiState.hasCompletedLoad,
         error = uiState.error,
+        refreshError = uiState.refreshError,
         hasCredentials = uiState.hasCredentials,
         serverUrl = uiState.serverUrl,
         cameraToken = uiState.cameraToken,
         onRefresh = {
-            viewModel.loadPrinters(showLoading = uiState.printers.isEmpty())
+            viewModel.loadPrinters(
+                showLoading = uiState.printers.isEmpty(),
+                fromUser = true,
+            )
         },
         onPullRefresh = {
             viewModel.loadPrinters(showLoading = false, fromPull = true)
@@ -106,7 +110,9 @@ private fun HomeScreenContent(
     printers: List<Printer>,
     isLoading: Boolean,
     isRefreshing: Boolean,
+    hasCompletedLoad: Boolean,
     error: String?,
+    refreshError: String?,
     hasCredentials: Boolean,
     serverUrl: String,
     cameraToken: String,
@@ -193,10 +199,10 @@ private fun HomeScreenContent(
                     modifier = Modifier.padding(innerPadding),
                 )
             }
-            isLoading && printers.isEmpty() -> {
+            !hasCompletedLoad && printers.isEmpty() -> {
                 PrinterListSkeleton(Modifier.padding(innerPadding))
             }
-            error != null && printers.isEmpty() -> {
+            error != null && printers.isEmpty() && hasCompletedLoad -> {
                 PullToRefreshBox(
                     isRefreshing = isRefreshing,
                     onRefresh = onPullRefresh,
@@ -210,7 +216,7 @@ private fun HomeScreenContent(
                     )
                 }
             }
-            printers.isEmpty() -> {
+            printers.isEmpty() && hasCompletedLoad -> {
                 EmptyContent(
                     message = stringResource(R.string.no_printers),
                     subtitle = stringResource(R.string.empty_hint_printers),
@@ -250,12 +256,14 @@ private fun HomeScreenContent(
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            if (error != null) {
-                                item {
+                            val bannerMessage = refreshError ?: error
+                            if (bannerMessage != null) {
+                                item(key = "error_banner") {
                                     Text(
-                                        text = error,
+                                        text = bannerMessage,
                                         color = MaterialTheme.colorScheme.error,
                                         style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(bottom = 4.dp),
                                     )
                                 }
                             }
@@ -297,6 +305,7 @@ private fun GlancePrinterCard(
     onClick: () -> Unit,
 ) {
     HomeCardMicroMotionFrame(
+        animateIdleBreath = false,
         motion = labels.cardMicroMotion,
         modifier = Modifier.fillMaxWidth(),
     ) {

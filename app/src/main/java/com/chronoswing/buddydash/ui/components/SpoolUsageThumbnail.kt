@@ -51,6 +51,7 @@ fun SpoolUsageThumbnail(
 
     BuddyDashFadeInThumbnail(
         imageUrl = imageUrl,
+        cacheKey = archiveId?.let { "spool-usage-thumb-$it" },
         modifier = modifier,
         size = size,
         shape = shape,

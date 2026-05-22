@@ -42,6 +42,8 @@ private val CardCorner = 12.dp
 fun HomeCardMicroMotionFrame(
     motion: CardMicroMotion,
     modifier: Modifier = Modifier,
+    /** Idle list cards use static styling to avoid N infinite transitions while scrolling. */
+    animateIdleBreath: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -58,7 +60,9 @@ fun HomeCardMicroMotionFrame(
         }
     }
 
-    val idleBreath = rememberIdleBreathPhase(enabled = motion == CardMicroMotion.IdleAmbient)
+    val idleBreath = rememberIdleBreathPhase(
+        enabled = animateIdleBreath && motion == CardMicroMotion.IdleAmbient,
+    )
     val printingGlow = rememberAttentionPulse(motion == CardMicroMotion.Printing, periodMillis = 3_200)
     val pausedPulse = rememberAttentionPulse(motion == CardMicroMotion.Frozen, periodMillis = 3_000)
     val errorPulse = rememberAttentionPulse(motion == CardMicroMotion.ErrorAttention, periodMillis = 4_500)

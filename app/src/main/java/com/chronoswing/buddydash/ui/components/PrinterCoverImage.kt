@@ -26,7 +26,7 @@ import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.network.printerCoverUrl
 
 /** Temporary: log cover URL and load failures. Set false before release. */
-private const val DEBUG_LOG_COVER = true
+import com.chronoswing.buddydash.util.BuddyDashDebug
 private const val TAG_COVER = "BuddyDash/Cover"
 
 private val CoverScrimGradient = Brush.verticalGradient(
@@ -58,17 +58,17 @@ fun PrinterCoverImage(
             .crossfade(false)
             .listener(
                 onStart = {
-                    if (DEBUG_LOG_COVER) {
+                    if (BuddyDashDebug.enabled) {
                         Log.d(TAG_COVER, "Cover load start printerId=$printerId")
                     }
                 },
                 onSuccess = { _, _ ->
-                    if (DEBUG_LOG_COVER) {
+                    if (BuddyDashDebug.enabled) {
                         Log.d(TAG_COVER, "Cover load ok printerId=$printerId")
                     }
                 },
                 onError = { _, result ->
-                    if (DEBUG_LOG_COVER) {
+                    if (BuddyDashDebug.enabled) {
                         Log.d(
                             TAG_COVER,
                             "Cover load failed printerId=$printerId url=${redactCoverToken(imageUrl)} " +

@@ -116,6 +116,8 @@
     <string name="spools_count">%1$d spools</string>
     <string name="spools_search_hint">Search material, color, brand…</string>
     <string name="spools_empty">No spools in inventory</string>
+    <string name="spools_refresh_failed">Could not refresh spools</string>
+    <string name="home_refresh_failed">Could not refresh printer status</string>
     <string name="spools_no_match">No spools match your search</string>
     <string name="spools_archive_no_matching_filament">No matching filament</string>
     <string name="spools_matching_filament_header">Likely filament matches</string>

@@ -8,7 +8,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +37,8 @@ fun BuddyDashFadeInThumbnail(
     size: Dp = 56.dp,
     shape: Shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
     contentScale: ContentScale = ContentScale.Crop,
+    /** Stable Coil cache key (e.g. archive id); avoids re-download when URL is stable. */
+    cacheKey: String? = null,
     onLoadFailed: () -> Unit = {},
     placeholder: @Composable () -> Unit = {
         ThumbnailPlaceholder(
@@ -46,10 +52,17 @@ fun BuddyDashFadeInThumbnail(
     val reduced = rememberPrefersReducedMotion()
     val fadeMs = if (reduced) 0 else BuddyDashMotion.THUMBNAIL_FADE_MS
 
-    val request = remember(imageUrl) {
+    var lastPainter by remember(cacheKey ?: imageUrl) { mutableStateOf<Painter?>(null) }
+    val request = remember(imageUrl, cacheKey) {
         ImageRequest.Builder(context)
             .data(imageUrl)
             .crossfade(false)
+            .apply {
+                cacheKey?.let { key ->
+                    memoryCacheKey(key)
+                    diskCacheKey(key)
+                }
+            }
             .listener(onError = { _, _ -> onLoadFailed() })
             .build()
     }
@@ -65,9 +78,32 @@ fun BuddyDashFadeInThumbnail(
                 .fillMaxSize()
                 .clip(shape),
             contentScale = contentScale,
-            loading = { placeholder() },
-            error = { placeholder() },
+            loading = {
+                if (lastPainter != null) {
+                    Image(
+                        painter = lastPainter!!,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = contentScale,
+                    )
+                } else {
+                    placeholder()
+                }
+            },
+            error = {
+                if (lastPainter != null) {
+                    Image(
+                        painter = lastPainter!!,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = contentScale,
+                    )
+                } else {
+                    placeholder()
+                }
+            },
             success = { state ->
+                lastPainter = state.painter
                 if (fadeMs <= 0) {
                     Image(
                         painter = state.painter,

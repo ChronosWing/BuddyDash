@@ -7,7 +7,7 @@ import kotlin.math.sqrt
 import org.json.JSONObject
 
 /** Temporary: spool ↔ archive linking diagnostics. Set false before release. */
-const val DEBUG_LOG_SPOOL_ARCHIVE_LINK = true // set false before release
+val DEBUG_LOG_SPOOL_ARCHIVE_LINK: Boolean get() = BuddyDashDebug.enabled
 
 const val TAG_SPOOL_ARCHIVE_LINK = "BuddyDash/SpoolArchiveLink"
 

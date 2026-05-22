@@ -43,7 +43,7 @@ import com.chronoswing.buddydash.network.printerCoverUrl
 import com.chronoswing.buddydash.ui.motion.BuddyDashMotion
 import com.chronoswing.buddydash.util.CardMicroMotion
 
-private const val DEBUG_LOG_CAMERA = true
+import com.chronoswing.buddydash.util.BuddyDashDebug
 private const val TAG_CAMERA = "BuddyDash/Camera"
 
 /** Refresh interval while detail Status tab is visible (RESUMED). */
@@ -199,7 +199,7 @@ private fun PrinterCameraSnapshotImage(
         return
     }
 
-    if (DEBUG_LOG_CAMERA) {
+    if (BuddyDashDebug.enabled) {
         LaunchedEffect(imageUrl) {
             Log.d(TAG_CAMERA, "Snapshot URL printerId=$printerId url=${redactImageToken(imageUrl)}")
         }
@@ -207,18 +207,20 @@ private fun PrinterCameraSnapshotImage(
 
     var lastPainter by remember(printerId) { mutableStateOf<Painter?>(null) }
     val context = LocalContext.current
-    val request = remember(imageUrl) {
+    val request = remember(imageUrl, printerId) {
         ImageRequest.Builder(context)
             .data(imageUrl)
+            .memoryCacheKey("camera-snapshot-$printerId")
+            .diskCacheKey("camera-snapshot-$printerId")
             .crossfade(false)
             .listener(
                 onSuccess = { _, _ ->
-                    if (DEBUG_LOG_CAMERA) {
+                    if (BuddyDashDebug.enabled) {
                         Log.d(TAG_CAMERA, "Snapshot load ok printerId=$printerId")
                     }
                 },
                 onError = { _, result ->
-                    if (DEBUG_LOG_CAMERA) {
+                    if (BuddyDashDebug.enabled) {
                         Log.d(
                             TAG_CAMERA,
                             "Snapshot load failed printerId=$printerId url=${redactImageToken(imageUrl)} " +

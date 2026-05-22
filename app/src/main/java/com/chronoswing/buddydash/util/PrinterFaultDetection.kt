@@ -7,7 +7,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Temporary: trace raw Bambuddy status → BuddyDash activity mapping. Set false before release. */
-const val DEBUG_LOG_STATUS_MAP = true
+val DEBUG_LOG_STATUS_MAP: Boolean get() = BuddyDashDebug.enabled
 
 const val TAG_STATUS_MAP = "BuddyDash/StatusMap"
 

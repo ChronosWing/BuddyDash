@@ -61,6 +61,8 @@ fun ArchivesScreen(
     LifecyclePollingEffect(
         enabled = uiState.settingsReady && uiState.hasCredentials,
         intervalMs = 60_000L,
+        initialDelayMs = 60_000L,
+        pollImmediately = false,
         onPoll = {
             val showLoading = uiState.archives.isEmpty() && uiState.error == null
             viewModel.loadArchives(showLoading = showLoading)
@@ -87,7 +89,12 @@ fun ArchivesScreen(
         onStatsTimeRangeChange = viewModel::onStatsTimeRangeChange,
         onSearchQueryChange = viewModel::onSearchQueryChange,
         onFilterChange = viewModel::onFilterChange,
-        onRefresh = { viewModel.loadArchives(showLoading = uiState.archives.isEmpty()) },
+        onRefresh = {
+            viewModel.loadArchives(
+                showLoading = uiState.archives.isEmpty(),
+                fromUser = true,
+            )
+        },
         onPullRefresh = { viewModel.loadArchives(showLoading = false, fromPull = true) },
         onArchiveClick = onArchiveClick,
         onClearPrinterFilter = onClearPrinterFilter,

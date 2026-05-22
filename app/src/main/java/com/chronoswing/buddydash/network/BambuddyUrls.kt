@@ -99,12 +99,7 @@ fun queueJobThumbnailUrl(
     if (apiPath == null) {
         return QueueJobThumbnailUrl(resolution.source, null)
     }
-    val cacheBust = if (resolution.source == QueueThumbnailSource.ARCHIVE) {
-        System.currentTimeMillis()
-    } else {
-        null
-    }
-    val url = tokenAuthenticatedImageUrl(serverUrl, apiPath, cameraToken, cacheBust = cacheBust)
+    val url = tokenAuthenticatedImageUrl(serverUrl, apiPath, cameraToken)
     return QueueJobThumbnailUrl(resolution.source, url)
 }
 
@@ -118,5 +113,4 @@ fun archiveThumbnailUrl(
         serverUrl,
         BambuddyApi.archiveThumbnailPath(archiveId),
         cameraToken,
-        cacheBust = System.currentTimeMillis(),
     )

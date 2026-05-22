@@ -22,7 +22,9 @@ import com.chronoswing.buddydash.util.ControlFeedback
 import com.chronoswing.buddydash.util.logControlFailure
 import com.chronoswing.buddydash.util.PRINTER_STATUS_SETTLE_MS
 import com.chronoswing.buddydash.util.isTransientState
+import com.chronoswing.buddydash.util.RefreshGuard
 import com.chronoswing.buddydash.util.motionDebugLog
+import com.chronoswing.buddydash.util.toUserNetworkMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
@@ -92,6 +94,7 @@ class PrinterDetailViewModel(
     val uiState: StateFlow<PrinterDetailUiState> = _uiState.asStateFlow()
 
     private var fetchJob: Job? = null
+    private val manualRefreshGuard = RefreshGuard()
 
     init {
         viewModelScope.launch {
@@ -127,7 +130,11 @@ class PrinterDetailViewModel(
         loadStatus()
     }
 
-    fun loadStatus(showLoading: Boolean = true, fromPull: Boolean = false) {
+    fun loadStatus(
+        showLoading: Boolean = true,
+        fromPull: Boolean = false,
+        fromUser: Boolean = false,
+    ) {
         if (printerId < 0) return
         val state = _uiState.value
         if (!state.hasCredentials) {
@@ -135,11 +142,13 @@ class PrinterDetailViewModel(
                 it.copy(
                     isLoading = false,
                     isRefreshing = false,
-                    error = "Configure server URL and API key in Settings",
+                    error = null,
                 )
             }
             return
         }
+        if (fromUser && !fromPull && manualRefreshGuard.shouldSkipManualRefresh()) return
+        if (fromUser && fetchJob?.isActive == true) return
 
         fetchJob?.cancel()
         fetchJob = viewModelScope.launch {
@@ -178,18 +187,28 @@ class PrinterDetailViewModel(
                     applyStatusFetchResult(status, statusResult)
                 },
                 onFailure = { error ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isRefreshing = false,
-                            status = null,
-                            maintenanceItems = emptyList(),
-                            totalPrintHours = null,
-                            queueUpcoming = emptyList(),
-                            startNextQueuedPrintReadiness = StartNextQueuedPrintReadiness(canStart = false),
-                            activePrintFilamentUsage = null,
-                            error = error.message ?: "Failed to load printer status",
-                        )
+                    _uiState.update { current ->
+                        val hadData = current.status != null
+                        if (hadData) {
+                            current.copy(
+                                isLoading = false,
+                                isRefreshing = false,
+                                error = error.toUserNetworkMessage("Failed to load printer status"),
+                            )
+                        } else {
+                            current.copy(
+                                isLoading = false,
+                                isRefreshing = false,
+                                status = null,
+                                maintenanceItems = emptyList(),
+                                totalPrintHours = null,
+                                queueUpcoming = emptyList(),
+                                startNextQueuedPrintReadiness =
+                                    StartNextQueuedPrintReadiness(canStart = false),
+                                activePrintFilamentUsage = null,
+                                error = error.toUserNetworkMessage("Failed to load printer status"),
+                            )
+                        }
                     }
                 },
             )
@@ -237,12 +256,11 @@ class PrinterDetailViewModel(
                     activePrintFilamentUsage = status.filamentUsage
                         ?: current.activePrintFilamentUsage,
                     lastStatusUpdatedAtMillis = System.currentTimeMillis(),
+                    error = null,
                 )
             }
         }
 
-        apiClient.fetchPrinterStatus(state.serverUrl, state.apiKey, printerId)
-            .fold(onSuccess = ::applyMotionStatus, onFailure = { })
         delay(PRINTER_STATUS_SETTLE_MS)
         apiClient.fetchPrinterStatus(state.serverUrl, state.apiKey, printerId).fold(
             onSuccess = { status ->
@@ -466,6 +484,11 @@ class PrinterDetailViewModel(
 
     fun onStartQueuedPrintSnackbarShown() {
         _uiState.update { it.copy(startQueuedPrintSnackbar = null) }
+    }
+
+    override fun onCleared() {
+        fetchJob?.cancel()
+        super.onCleared()
     }
 }
 

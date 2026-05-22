@@ -9,9 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -123,22 +124,27 @@ private fun SpoolDetailScreenContent(
                 modifier = Modifier.padding(innerPadding),
             )
             spool != null -> {
-                Column(
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
-                        .verticalScroll(rememberScrollState())
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    SpoolDetailHero(spool = spool)
-                    SpoolDetailFields(spool = spool)
-                    SpoolUsageHistorySection(
-                        items = usageDisplayItems,
-                        serverUrl = serverUrl,
-                        cameraToken = cameraToken,
-                        onArchiveClick = onArchiveClick,
-                    )
+                    item(key = "hero") {
+                        SpoolDetailHero(spool = spool)
+                    }
+                    item(key = "fields") {
+                        SpoolDetailFields(spool = spool)
+                    }
+                    item(key = "usage_section") {
+                        SpoolUsageHistorySection(
+                            items = usageDisplayItems,
+                            serverUrl = serverUrl,
+                            cameraToken = cameraToken,
+                            onArchiveClick = onArchiveClick,
+                        )
+                    }
                 }
             }
         }

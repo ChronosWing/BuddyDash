@@ -109,7 +109,7 @@ fun formatAmsUnitLabel(amsId: Int): String {
     return "AMS-$letter"
 }
 
-private const val DEBUG_LOG_MAINTENANCE = true
+private val debugLogMaintenance: Boolean get() = BuddyDashDebug.enabled
 private const val TAG_MAINTENANCE = "BuddyDash/Maintenance"
 
 enum class MaintenanceLineKind {
@@ -238,7 +238,7 @@ fun maintenanceDisplayLines(items: List<MaintenanceItem>): List<MaintenanceLine>
                 progressFraction = progressFraction,
                 canReset = canReset,
             )
-            if (DEBUG_LOG_MAINTENANCE) {
+            if (debugLogMaintenance) {
                 Log.d(
                     TAG_MAINTENANCE,
                     "item name=${item.name} is_due=${item.isDue} is_warning=${item.isWarning} " +

@@ -1,15 +1,22 @@
 package com.chronoswing.buddydash
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
+import com.chronoswing.buddydash.network.BambuddyApi
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.ArchiveSpoolLookupFilter
+import com.chronoswing.buddydash.util.BuddyDashDebug
+import com.chronoswing.buddydash.util.RefreshGuard
 import com.chronoswing.buddydash.util.SpoolInventoryFilter
 import com.chronoswing.buddydash.util.applySpoolInventorySearch
 import com.chronoswing.buddydash.util.spoolMatchesArchiveLookupFilter
+import com.chronoswing.buddydash.util.toUserNetworkMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,11 +24,18 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+private const val TAG_SPOOLS_VM = "BuddyDash/SpoolsVM"
+
 data class SpoolsUiState(
     val spools: List<SpoolInventoryItem> = emptyList(),
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
+    /** Blocking error when inventory never loaded successfully. */
     val error: String? = null,
+    /** Snackbar-only error after a failed refresh when spools are already shown. */
+    val refreshError: String? = null,
+    /** True after the first fetch finishes (success or failure). */
+    val hasCompletedLoad: Boolean = false,
     val serverUrl: String = "",
     val apiKey: String = "",
     val hasCredentials: Boolean = false,
@@ -49,6 +63,7 @@ class SpoolsViewModel(
     val uiState: StateFlow<SpoolsUiState> = _uiState.asStateFlow()
 
     private var fetchJob: Job? = null
+    private val manualRefreshGuard = RefreshGuard()
 
     init {
         viewModelScope.launch {
@@ -58,12 +73,17 @@ class SpoolsViewModel(
             ) { url, key ->
                 url to key
             }.collect { (url, key) ->
+                val hasCredentials = url.isNotBlank() && key.isNotBlank()
+                val hadCredentials = _uiState.value.hasCredentials
                 _uiState.update {
                     it.copy(
                         serverUrl = url,
                         apiKey = key,
-                        hasCredentials = url.isNotBlank() && key.isNotBlank(),
+                        hasCredentials = hasCredentials,
                     )
+                }
+                if (hasCredentials && (!hadCredentials || !_uiState.value.hasCompletedLoad)) {
+                    loadSpools(showLoading = _uiState.value.spools.isEmpty())
                 }
             }
         }
@@ -100,29 +120,113 @@ class SpoolsViewModel(
         }
     }
 
-    fun loadSpools(showLoading: Boolean = false, fromPull: Boolean = false) {
+    fun onRefreshErrorShown() {
+        _uiState.update { it.copy(refreshError = null) }
+    }
+
+    fun loadSpools(
+        showLoading: Boolean = false,
+        fromPull: Boolean = false,
+        fromUser: Boolean = false,
+    ) {
         val state = _uiState.value
         if (!state.hasCredentials) {
-            _uiState.update { it.copy(error = "Configure server URL and API key in Settings") }
-            return
-        }
-
-        fetchJob?.cancel()
-        fetchJob = viewModelScope.launch {
-            if (fromPull) {
-                _uiState.update { it.copy(isRefreshing = true, error = null) }
-            } else if (showLoading) {
-                _uiState.update { it.copy(isLoading = true, error = null) }
-            }
-            val result = apiClient.fetchSpoolInventory(state.serverUrl, state.apiKey)
             _uiState.update {
                 it.copy(
                     isLoading = false,
                     isRefreshing = false,
-                    spools = result.getOrElse { emptyList() },
-                    error = result.exceptionOrNull()?.message,
+                    error = null,
+                    refreshError = null,
                 )
             }
+            return
         }
+        if (fromUser && !fromPull && manualRefreshGuard.shouldSkipManualRefresh()) return
+        if (fromUser && fetchJob?.isActive == true) return
+
+        val hadSpools = state.spools.isNotEmpty()
+        if (BuddyDashDebug.enabled) {
+            Log.d(
+                TAG_SPOOLS_VM,
+                "loadSpools start showLoading=$showLoading fromPull=$fromPull fromUser=$fromUser " +
+                    "hadSpools=$hadSpools hasCompletedLoad=${state.hasCompletedLoad} " +
+                    "endpoint=${BambuddyApi.inventorySpoolsPath()}",
+            )
+        }
+
+        fetchJob?.cancel()
+        fetchJob = viewModelScope.launch {
+            try {
+                if (fromPull) {
+                    _uiState.update { it.copy(isRefreshing = true, refreshError = null) }
+                } else if (showLoading && !hadSpools) {
+                    _uiState.update { it.copy(isLoading = true, error = null) }
+                }
+
+                val credentials = _uiState.value
+                ensureActive()
+                val result = apiClient.fetchSpoolInventory(
+                    credentials.serverUrl,
+                    credentials.apiKey,
+                )
+                ensureActive()
+
+                result.fold(
+                    onSuccess = { spools ->
+                        if (BuddyDashDebug.enabled) {
+                            Log.d(
+                                TAG_SPOOLS_VM,
+                                "loadSpools success mappedCount=${spools.size} " +
+                                    "uiState=${_uiState.value.spools.size}->${spools.size}",
+                            )
+                        }
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                isRefreshing = false,
+                                spools = spools,
+                                error = null,
+                                refreshError = null,
+                                hasCompletedLoad = true,
+                            )
+                        }
+                    },
+                    onFailure = { error ->
+                        val message = error.toUserNetworkMessage("Failed to load spools")
+                        if (BuddyDashDebug.enabled) {
+                            Log.w(TAG_SPOOLS_VM, "loadSpools failure: $message", error)
+                        }
+                        _uiState.update { current ->
+                            if (current.spools.isNotEmpty()) {
+                                current.copy(
+                                    isLoading = false,
+                                    isRefreshing = false,
+                                    refreshError = message,
+                                    hasCompletedLoad = true,
+                                )
+                            } else {
+                                current.copy(
+                                    isLoading = false,
+                                    isRefreshing = false,
+                                    error = message,
+                                    refreshError = null,
+                                    hasCompletedLoad = true,
+                                )
+                            }
+                        }
+                    },
+                )
+            } catch (e: CancellationException) {
+                if (BuddyDashDebug.enabled) {
+                    Log.d(TAG_SPOOLS_VM, "loadSpools cancelled (keeping prior list)")
+                }
+                throw e
+            }
+        }
+    }
+
+    override fun onCleared() {
+        fetchJob?.cancel()
+        super.onCleared()
     }
 }

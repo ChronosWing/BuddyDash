@@ -1,6 +1,5 @@
 package com.chronoswing.buddydash.ui.components
 
-import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,9 +24,6 @@ import com.chronoswing.buddydash.network.queueJobThumbnailUrl
 import com.chronoswing.buddydash.util.QUEUE_DISPLAY_NAME_FALLBACK
 import com.chronoswing.buddydash.util.formatQueueDurationAndFilament
 
-private const val DEBUG_LOG_QUEUE_THUMB = true
-private const val TAG_QUEUE_THUMB = "BuddyDash/Queue"
-
 @Composable
 fun PrintQueueItemRow(
     job: PrintQueueJob,
@@ -48,16 +44,6 @@ fun PrintQueueItemRow(
     }
     var showThumbnail by remember(job.id, thumbResult) { mutableStateOf(thumbUrl != null) }
 
-    if (DEBUG_LOG_QUEUE_THUMB) {
-        LaunchedEffect(job.id, thumbResult, displayName) {
-            Log.d(
-                TAG_QUEUE_THUMB,
-                "jobId=${job.id} name=$displayName meta=$metaLine " +
-                    "source=${thumbResult.source} finalUrl=${redactToken(thumbUrl.orEmpty())}",
-            )
-        }
-    }
-
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -66,6 +52,7 @@ fun PrintQueueItemRow(
         if (thumbUrl != null && showThumbnail) {
             BuddyDashFadeInThumbnail(
                 imageUrl = thumbUrl,
+                cacheKey = "queue-thumb-${job.id}-${thumbResult.source}",
                 size = 44.dp,
                 shape = RoundedCornerShape(8.dp),
                 onLoadFailed = { showThumbnail = false },

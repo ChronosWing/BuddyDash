@@ -6,7 +6,7 @@ import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.network.BambuddyApi
 
 /** Temporary: log archive queue/reprint API calls. Set false before release. */
-const val DEBUG_LOG_ARCHIVE_REPRINT = true
+val DEBUG_LOG_ARCHIVE_REPRINT: Boolean get() = BuddyDashDebug.enabled
 
 const val TAG_ARCHIVE_REPRINT = "BuddyDash/ArchiveReprint"
 
