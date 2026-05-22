@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">BuddyDash</string>
+    <string name="home_title_suffix">uddyDash</string>
     <string name="settings_title">Settings</string>
     <string name="server_url_label">Bambuddy server URL</string>
     <string name="server_url_placeholder">http://192.168.1.50:8080</string>
