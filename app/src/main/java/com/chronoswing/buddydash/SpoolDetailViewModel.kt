@@ -3,9 +3,14 @@ package com.chronoswing.buddydash
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
+import com.chronoswing.buddydash.data.model.PrintArchive
+import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.data.model.SpoolUsageEntry
 import com.chronoswing.buddydash.network.BambuddyApiClient
+import com.chronoswing.buddydash.util.SpoolUsageDisplayItem
+import com.chronoswing.buddydash.util.buildSpoolUsageDisplayItems
+import com.chronoswing.buddydash.util.logSpoolUsageDisplayItems
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -19,11 +24,13 @@ import kotlinx.coroutines.launch
 data class SpoolDetailUiState(
     val spool: SpoolInventoryItem? = null,
     val usageHistory: List<SpoolUsageEntry> = emptyList(),
+    val usageDisplayItems: List<SpoolUsageDisplayItem> = emptyList(),
     val printerNamesById: Map<Int, String> = emptyMap(),
     val isLoading: Boolean = false,
     val error: String? = null,
     val serverUrl: String = "",
     val apiKey: String = "",
+    val cameraToken: String = "",
     val hasCredentials: Boolean = false,
 )
 
@@ -43,13 +50,15 @@ class SpoolDetailViewModel(
             combine(
                 settingsRepository.serverUrl,
                 settingsRepository.apiKey,
-            ) { url, key ->
-                url to key
-            }.collect { (url, key) ->
+                settingsRepository.cameraToken,
+            ) { url, key, cameraToken ->
+                Triple(url, key, cameraToken)
+            }.collect { (url, key, cameraToken) ->
                 _uiState.update {
                     it.copy(
                         serverUrl = url,
                         apiKey = key,
+                        cameraToken = cameraToken,
                         hasCredentials = url.isNotBlank() && key.isNotBlank(),
                     )
                 }
@@ -86,15 +95,23 @@ class SpoolDetailViewModel(
                 val printersDeferred = async {
                     apiClient.fetchPrinters(state.serverUrl, state.apiKey)
                 }
-                Triple(
-                    spoolsDeferred.await(),
-                    usageDeferred.await(),
-                    printersDeferred.await(),
+                val usageHistory = usageDeferred.await().getOrElse { emptyList() }
+                val archivesDeferred = if (usageHistory.isNotEmpty()) {
+                    async { apiClient.fetchArchives(state.serverUrl, state.apiKey) }
+                } else {
+                    null
+                }
+                SpoolDetailFetchBundle(
+                    spools = spoolsDeferred.await(),
+                    usageHistory = usageHistory,
+                    printers = printersDeferred.await(),
+                    archives = archivesDeferred?.await()?.getOrElse { emptyList() } ?: emptyList(),
                 )
             }
-            val spoolsResult = result.first
-            val usageResult = result.second
-            val printersResult = result.third
+            val spoolsResult = result.spools
+            val usageHistory = result.usageHistory
+            val printersResult = result.printers
+            val archives = result.archives
             spoolsResult.fold(
                 onSuccess = { spools ->
                     val spool = spools.find { it.id == spoolId }
@@ -104,19 +121,30 @@ class SpoolDetailViewModel(
                                 isLoading = false,
                                 spool = null,
                                 usageHistory = emptyList(),
+                                usageDisplayItems = emptyList(),
                                 error = "Spool not found",
                             )
                         }
                         return@fold
                     }
-                    val usageHistory = usageResult.getOrElse { emptyList() }
                     val printerNamesById = printersResult.getOrElse { emptyList() }
                         .associate { it.id to it.name }
+                    val usageDisplayItems = buildSpoolUsageDisplayItems(
+                        entries = usageHistory,
+                        archives = archives,
+                        printerNamesById = printerNamesById,
+                        spoolMaterial = spool.material,
+                        spoolColorName = spool.colorName,
+                        serverUrl = state.serverUrl,
+                        cameraToken = state.cameraToken,
+                    )
+                    logSpoolUsageDisplayItems(spoolId, usageDisplayItems)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             spool = spool,
                             usageHistory = usageHistory,
+                            usageDisplayItems = usageDisplayItems,
                             printerNamesById = printerNamesById,
                             error = null,
                         )
@@ -134,3 +162,10 @@ class SpoolDetailViewModel(
         }
     }
 }
+
+private data class SpoolDetailFetchBundle(
+    val spools: Result<List<SpoolInventoryItem>>,
+    val usageHistory: List<SpoolUsageEntry>,
+    val printers: Result<List<Printer>>,
+    val archives: List<PrintArchive>,
+)

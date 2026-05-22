@@ -291,6 +291,9 @@ fun BuddyDashNav(
                     spoolId = spoolId,
                     viewModel = viewModel,
                     onBack = { navController.popBackStack() },
+                    onArchiveClick = { archiveId ->
+                        navController.navigate(Routes.archiveDetail(archiveId))
+                    },
                 )
             }
 
