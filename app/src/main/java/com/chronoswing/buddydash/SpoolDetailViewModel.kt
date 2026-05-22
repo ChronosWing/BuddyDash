@@ -146,6 +146,8 @@ class SpoolDetailViewModel(
                         entries = usageHistory,
                         archives = archives,
                         printerNamesById = printerNamesById,
+                        spoolMaterial = spool.material,
+                        spoolColorName = spool.colorName,
                     )
                     logSpoolUsageDisplayItems(spoolId, usageDisplayItems)
                     _uiState.update {

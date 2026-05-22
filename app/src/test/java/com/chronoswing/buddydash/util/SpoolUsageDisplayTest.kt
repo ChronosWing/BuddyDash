@@ -113,9 +113,10 @@ class SpoolUsageDisplayTest {
             createdAtIso = "2024-06-01T14:00:00Z",
             rawJson = "{}",
         )
+        val sameCompletedAt = "2024-06-01T14:00:00Z"
         val archives = listOf(
-            printArchive(id = 100, name = "Duplicate.3mf", printerId = 2, grams = 50.0, completedAt = "2024-06-01T14:00:00Z"),
-            printArchive(id = 101, name = "Duplicate.3mf", printerId = 2, grams = 80.0, completedAt = "2024-06-01T14:00:30Z"),
+            printArchive(id = 100, name = "Duplicate.3mf", printerId = 2, grams = 10.0, completedAt = sameCompletedAt),
+            printArchive(id = 101, name = "Duplicate.3mf", printerId = 2, grams = 10.0, completedAt = sameCompletedAt),
         )
         assertNull(resolveSpoolUsageArchiveLink(entry, archives).archiveId)
     }
@@ -132,6 +133,73 @@ class SpoolUsageDisplayTest {
         assertEquals(SpoolUsageThumbnailSource.Archive, items.first().thumbnailSource)
     }
 
+    @Test
+    fun resolveSpoolUsageArchiveLink_titleAndPrinterIgnoresArchiveFilamentColor() {
+        val entry = SpoolUsageEntry(
+            id = 9,
+            spoolId = 1,
+            printerId = 2,
+            printName = "Widget.3mf",
+            weightUsedGrams = 30.0,
+            percentUsed = null,
+            status = "completed",
+            createdAtIso = "2024-09-15T10:00:00Z",
+            rawJson = "{}",
+        )
+        val archives = listOf(
+            printArchive(
+                id = 300,
+                name = "Widget.3mf",
+                printerId = 2,
+                grams = 50.0,
+                completedAt = "2024-06-01T12:00:00Z",
+                filamentType = "PETG",
+                filamentColor = "red",
+            ),
+        )
+        val link = resolveSpoolUsageArchiveLink(
+            entry = entry,
+            archives = archives,
+            spoolMaterial = "PLA",
+            spoolColorName = "blue",
+        )
+        assertEquals(300, link.archiveId)
+        assertEquals(SpoolUsageArchiveLinkKind.CompositeKey, link.kind)
+    }
+
+    @Test
+    fun resolveSpoolUsageArchiveLink_picksClosestTimeAmongDuplicateTitles() {
+        val entry = SpoolUsageEntry(
+            id = 10,
+            spoolId = 1,
+            printerId = 2,
+            printName = "Dup.3mf",
+            weightUsedGrams = 10.0,
+            percentUsed = null,
+            status = "completed",
+            createdAtIso = "2024-06-01T14:00:10Z",
+            rawJson = "{}",
+        )
+        val archives = listOf(
+            printArchive(
+                id = 401,
+                name = "Dup.3mf",
+                printerId = 2,
+                grams = 10.0,
+                completedAt = "2024-06-01T14:00:00Z",
+            ),
+            printArchive(
+                id = 402,
+                name = "Dup.3mf",
+                printerId = 2,
+                grams = 10.0,
+                completedAt = "2024-01-01T00:00:00Z",
+            ),
+        )
+        val link = resolveSpoolUsageArchiveLink(entry, archives)
+        assertEquals(401, link.archiveId)
+    }
+
     private fun printArchive(
         id: Int,
         name: String,
@@ -139,6 +207,8 @@ class SpoolUsageDisplayTest {
         grams: Double,
         filename: String? = name,
         completedAt: String? = "2024-06-01T12:00:00Z",
+        filamentType: String? = null,
+        filamentColor: String? = null,
     ): PrintArchive = PrintArchive(
         id = id,
         displayName = name,
@@ -154,8 +224,8 @@ class SpoolUsageDisplayTest {
         statsCompletedAtMillis = completedAt?.let { parseArchiveTimestamp(it)?.toEpochMilli() },
         durationSeconds = null,
         filamentUsage = FilamentUsage(weightGrams = grams),
-        filamentType = null,
-        filamentColor = null,
+        filamentType = filamentType,
+        filamentColor = filamentColor,
         spoolId = null,
         plateNumber = null,
         contentHash = null,
