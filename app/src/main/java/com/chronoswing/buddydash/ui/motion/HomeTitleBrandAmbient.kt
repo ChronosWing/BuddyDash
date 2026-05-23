@@ -30,7 +30,7 @@ private const val PRINTING_AMBIENT_ALPHA_MAX = 0.15f
 private const val PRINTING_AMBIENT_RADIUS_SCALE = 0.58f
 
 /** Static idle halo — visible but clearly below [PRINTING_AMBIENT_ALPHA_MIN]. */
-private const val IDLE_AMBIENT_ALPHA = 0.07f
+private const val IDLE_AMBIENT_ALPHA = 0.078f
 private const val IDLE_AMBIENT_RADIUS_SCALE = 0.64f
 
 /**

@@ -41,7 +41,7 @@ fun HomeActivityGhostPillsRow(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .padding(top = 4.dp, bottom = 2.dp),
+            .padding(top = 3.dp, bottom = 1.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
