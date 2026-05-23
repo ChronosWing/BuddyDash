@@ -18,6 +18,7 @@ import com.chronoswing.buddydash.ui.motion.FadeValueText
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import com.chronoswing.buddydash.ui.motion.refreshSpinning
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -117,6 +118,7 @@ fun DetailInfoCard(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -155,7 +157,7 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier) {
         text = title,
         modifier = modifier.padding(top = 4.dp),
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.76f),
         fontWeight = FontWeight.SemiBold,
     )
 }
@@ -176,7 +178,7 @@ fun SectionHeaderRow(
         Text(
             text = title,
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.76f),
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
         )
