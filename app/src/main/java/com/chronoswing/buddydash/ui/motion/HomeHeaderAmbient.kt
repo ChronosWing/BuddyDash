@@ -144,6 +144,65 @@ fun HomeAtmosphericFade(modifier: Modifier = Modifier) {
     )
 }
 
+/**
+ * Shared header ambient for non-Home screens (Printer Details, Spools, Archives, Settings).
+ *
+ * Uses the same gradient recipe as [HomeHeaderBackground] for visual cohesion, but with a
+ * softer, less-anchored teal wash so each screen feels part of the same product without
+ * looking like a duplicate of the Home branding header.
+ *
+ * Usage: place as the FIRST child of a [Box] that wraps the screen's [TopAppBar], then set
+ * `TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent))`.
+ * Use [HomeAtmosphericFade] in the Scaffold content Box to carry the atmosphere downward.
+ */
+@Composable
+fun SecondaryScreenHeader(modifier: Modifier = Modifier) {
+    val surface = MaterialTheme.colorScheme.surface
+    // Same top-lift as Home so the gradient shade matches exactly when navigating between screens.
+    val topRich = lerp(surface, Slate800, HEADER_GRADIENT_TOP_LIFT)
+    Box(modifier = modifier.fillMaxWidth()) {
+        Box(Modifier.matchParentSize().background(surface))
+        Box(
+            Modifier
+                .matchParentSize()
+                .graphicsLayer { clip = false }
+                .drawBehind {
+                    // Identical 4-stop fade to Home — no flat plateau, decays to surface at bottom.
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0f to topRich,
+                                0.28f to lerp(topRich, surface, 0.28f),
+                                0.62f to lerp(topRich, surface, 0.68f),
+                                1f to surface,
+                            ),
+                            startY = 0f,
+                            endY = size.height,
+                        ),
+                    )
+                    // Softer, less-anchored ambient wash: slightly lower alpha and not logo-offset.
+                    // Carries the teal tint without suggesting a focal point that isn't there.
+                    val washCenter = Offset(size.width * 0.18f, size.height * 0.42f)
+                    val washRadius = size.maxDimension * 1.10f
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colorStops = arrayOf(
+                                0f to CyanAccentDim.copy(alpha = 0.058f),
+                                0.40f to CyanAccentDim.copy(alpha = 0.020f),
+                                1f to Color.Transparent,
+                            ),
+                            center = washCenter,
+                            radius = washRadius,
+                        ),
+                        radius = washRadius,
+                        center = washCenter,
+                    )
+                    drawHeaderDotTexture(alpha = HEADER_TEXTURE_DOT_ALPHA * 0.75f)
+                },
+        )
+    }
+}
+
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHeaderDotTexture(alpha: Float) {
     val spacing = 12.dp.toPx()
     val dotColor = Color.White.copy(alpha = alpha)

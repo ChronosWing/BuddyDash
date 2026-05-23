@@ -1,9 +1,12 @@
 package com.chronoswing.buddydash.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
+import com.chronoswing.buddydash.ui.motion.SecondaryScreenHeader
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -23,6 +26,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -78,21 +82,30 @@ private fun SettingsScreenContent(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_title)) },
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.back),
-                            )
+            Box {
+                SecondaryScreenHeader(Modifier.matchParentSize())
+                TopAppBar(
+                    title = { Text(stringResource(R.string.settings_title)) },
+                    navigationIcon = {
+                        if (onBack != null) {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.back),
+                                )
+                            }
                         }
-                    }
-                },
-            )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        scrolledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    ),
+                )
+            }
         },
     ) { innerPadding ->
+        Box(Modifier.fillMaxSize()) {
+            HomeAtmosphericFade(Modifier.padding(top = innerPadding.calculateTopPadding()))
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -188,6 +201,7 @@ private fun SettingsScreenContent(
                 )
             }
         }
+        } // Box
     }
 }
 

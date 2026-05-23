@@ -1,10 +1,13 @@
 package com.chronoswing.buddydash.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
+import com.chronoswing.buddydash.ui.motion.SecondaryScreenHeader
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -188,32 +192,41 @@ private fun SpoolsScreenContent(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(stringResource(R.string.spools_title))
-                        if (totalCount > 0) {
-                            Text(
-                                text = stringResource(R.string.spools_count, totalCount),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                            )
+            Box {
+                SecondaryScreenHeader(Modifier.matchParentSize())
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(stringResource(R.string.spools_title))
+                            if (totalCount > 0) {
+                                Text(
+                                    text = stringResource(R.string.spools_count, totalCount),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                )
+                            }
                         }
-                    }
-                },
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.back),
-                            )
+                    },
+                    navigationIcon = {
+                        if (onBack != null) {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.back),
+                                )
+                            }
                         }
-                    }
-                },
-            )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        scrolledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    ),
+                )
+            }
         },
     ) { innerPadding ->
+        Box(Modifier.fillMaxSize()) {
+            HomeAtmosphericFade(Modifier.padding(top = innerPadding.calculateTopPadding()))
         when {
             !hasCredentials -> {
                 EmptyContent(
@@ -320,6 +333,7 @@ private fun SpoolsScreenContent(
                 }
             }
         }
+        } // Box
     }
 }
 

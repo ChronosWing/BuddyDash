@@ -1,7 +1,10 @@
 package com.chronoswing.buddydash.ui
 
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
+import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
+import com.chronoswing.buddydash.ui.motion.SecondaryScreenHeader
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -107,26 +111,35 @@ private fun SpoolDetailScreenContent(
     val showOfflineEmpty = hasCompletedLoad && hasAttemptedNetworkLoad && spool == null && error != null
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = spool?.let { formatSpoolCardTitle(it) }
-                            ?: stringResource(R.string.spool_detail_title),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
+            Box {
+                SecondaryScreenHeader(Modifier.matchParentSize())
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = spool?.let { formatSpoolCardTitle(it) }
+                                ?: stringResource(R.string.spool_detail_title),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                    }
-                },
-            )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        scrolledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    ),
+                )
+            }
         },
     ) { innerPadding ->
+        Box(Modifier.fillMaxSize()) {
+            HomeAtmosphericFade(Modifier.padding(top = innerPadding.calculateTopPadding()))
         when {
             showInitialLoading -> PrinterDetailSkeleton(Modifier.padding(innerPadding))
             showOfflineEmpty -> EmptyContent(
@@ -167,6 +180,7 @@ private fun SpoolDetailScreenContent(
                 }
             }
         }
+        } // Box
     }
 }
 

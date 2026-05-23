@@ -1,6 +1,7 @@
 package com.chronoswing.buddydash.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +52,8 @@ import com.chronoswing.buddydash.ui.components.BuddyDashEmptyIcon
 import com.chronoswing.buddydash.ui.components.PrinterDetailSkeleton
 import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.ui.motion.buddyDashButtonPress
+import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
+import com.chronoswing.buddydash.ui.motion.SecondaryScreenHeader
 import com.chronoswing.buddydash.ui.motion.rememberBuddyDashInteractionSource
 import com.chronoswing.buddydash.ui.motion.successPulseOn
 import androidx.compose.runtime.mutableIntStateOf
@@ -185,17 +189,24 @@ private fun ArchiveDetailScreenContent(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.archive_detail_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-            )
+            Box {
+                SecondaryScreenHeader(Modifier.matchParentSize())
+                TopAppBar(
+                    title = { Text(stringResource(R.string.archive_detail_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        scrolledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    ),
+                )
+            }
         },
         bottomBar = {
             if (archive != null && hasCredentials) {
@@ -220,6 +231,8 @@ private fun ArchiveDetailScreenContent(
         val showInitialLoading = !settingsReady || !hasCompletedLoad ||
             (!hasAttemptedNetworkLoad && archive == null && error == null)
         val showOfflineEmpty = hasCompletedLoad && hasAttemptedNetworkLoad && archive == null && error != null
+        Box(Modifier.fillMaxSize()) {
+            HomeAtmosphericFade(Modifier.padding(top = innerPadding.calculateTopPadding()))
         when {
             showInitialLoading -> {
                 PrinterDetailSkeleton(Modifier.padding(innerPadding))
@@ -273,6 +286,7 @@ private fun ArchiveDetailScreenContent(
                 )
             }
         }
+        } // Box
     }
 }
 
