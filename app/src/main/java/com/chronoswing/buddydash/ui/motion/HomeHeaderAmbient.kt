@@ -15,15 +15,17 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.ui.theme.CyanAccentDim
 import com.chronoswing.buddydash.ui.theme.Slate800
-import com.chronoswing.buddydash.ui.theme.Slate950
 import com.chronoswing.buddydash.util.HomeHeaderVisualTuning
 
 private const val HEADER_TEXTURE_DOT_ALPHA = 0.036f
-private const val HEADER_GRADIENT_TOP_LIFT = 0.22f
-private const val HEADER_GRADIENT_DEPTH = 0.75f
-// Large-radius wash is the primary ambient integration effect — keeps the header
-// from reading as a gray rectangle. Radius 1.28× maxDimension covers the full header.
-private const val HEADER_LOGO_WASH_CENTER_ALPHA = 0.088f
+
+// Base constants are calibrated so 2× ambientMultiplier = design target.
+// 1× = subtle but present; 2× = preferred blended look; 3× = obviously strong for debug.
+// At 2×: topLift = 0.22 → topRich = lerp(Slate900, Slate800, 0.22) ≈ #1C2636
+private const val HEADER_GRADIENT_TOP_LIFT = 0.11f
+// At 2×: washAlpha = 0.088 — large-radius wash is the primary ambient integration effect.
+// Radius 1.28× maxDimension covers the full header with a soft teal tint.
+private const val HEADER_LOGO_WASH_CENTER_ALPHA = 0.044f
 
 /**
  * Static header ambience: base → gradient → subtle logo wash → texture.
@@ -37,10 +39,8 @@ fun HomeHeaderBackground(
 ) {
     val surface = MaterialTheme.colorScheme.surface
     val topLift = HomeHeaderVisualTuning.effectiveGradientTopLift(HEADER_GRADIENT_TOP_LIFT, ambientMultiplier)
-    val depth = HomeHeaderVisualTuning.effectiveGradientDepth(HEADER_GRADIENT_DEPTH, ambientMultiplier)
     val washAlpha = HomeHeaderVisualTuning.effectiveHeaderWashAlpha(HEADER_LOGO_WASH_CENTER_ALPHA, ambientMultiplier)
     val topRich = lerp(surface, Slate800, topLift)
-    val depthBase = lerp(surface, Slate950, depth)
     Box(modifier = modifier.fillMaxWidth()) {
         Box(
             Modifier
@@ -51,12 +51,16 @@ fun HomeHeaderBackground(
             Modifier
                 .matchParentSize()
                 .drawBehind {
+                    // Smooth top-down fade: richer navy at top, returns to surface by 72%,
+                    // holds surface at 100% — header/content seam is always a color match,
+                    // no hard divider. No midpoint bounce.
                     drawRect(
                         brush = Brush.verticalGradient(
                             colorStops = arrayOf(
                                 0f to topRich,
-                                0.42f to surface,
-                                1f to depthBase,
+                                0.30f to lerp(topRich, surface, 0.40f),
+                                0.72f to surface,
+                                1f to surface,
                             ),
                             startY = 0f,
                             endY = size.height,
