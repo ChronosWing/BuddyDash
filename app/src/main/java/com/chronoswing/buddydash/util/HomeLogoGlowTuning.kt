@@ -18,13 +18,16 @@ object HomeLogoGlowTuning {
     private const val IDLE_FEATHER_RADIUS_FRAC = 1.20f
 
     // --- Print (pulsing) — scaled only by printGlowMultiplier ---
-    private const val PRINT_CORE_ALPHA_MIN_1X = 0.58f
-    private const val PRINT_CORE_ALPHA_MAX_1X = 0.78f
-    private const val PRINT_FEATHER_ALPHA_MIN_1X = 0.28f
-    private const val PRINT_FEATHER_ALPHA_MAX_1X = 0.45f
+    // Wide alpha swing (floor-to-ceiling ratio ~2×) so the rhythm is visible within 2–3 s.
+    // Lower min keeps the floor meaningfully dimmer than max; higher max gives it presence.
+    private const val PRINT_CORE_ALPHA_MIN_1X = 0.42f
+    private const val PRINT_CORE_ALPHA_MAX_1X = 0.88f
+    private const val PRINT_FEATHER_ALPHA_MIN_1X = 0.18f
+    private const val PRINT_FEATHER_ALPHA_MAX_1X = 0.55f
     private const val PRINT_CORE_RADIUS_FRAC = 0.65f
     private const val PRINT_FEATHER_RADIUS_FRAC = 1.80f
-    private const val PRINT_RADIUS_BREATHE_FRAC = 0.10f
+    // 18% radius expansion at peak — enough peripheral movement to read as breathing.
+    private const val PRINT_RADIUS_BREATHE_FRAC = 0.18f
 
     fun idleCoreAlpha(multiplier: Float): Float = IDLE_CORE_ALPHA_1X * multiplier
 
