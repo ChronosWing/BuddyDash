@@ -1,7 +1,10 @@
 package com.chronoswing.buddydash.ui
 
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
+import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
+import com.chronoswing.buddydash.ui.motion.SecondaryScreenHeader
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -28,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -176,22 +180,31 @@ private fun ArchivesScreenContent(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(stringResource(R.string.archives_title))
-                        if (section == ArchivesSection.History && totalCount > 0) {
-                            Text(
-                                text = stringResource(R.string.archives_count, totalCount),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                            )
+            Box {
+                SecondaryScreenHeader(Modifier.matchParentSize())
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(stringResource(R.string.archives_title))
+                            if (section == ArchivesSection.History && totalCount > 0) {
+                                Text(
+                                    text = stringResource(R.string.archives_count, totalCount),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                )
+                            }
                         }
-                    }
-                },
-            )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        scrolledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    ),
+                )
+            }
         },
     ) { innerPadding ->
+        Box(Modifier.fillMaxSize()) {
+            HomeAtmosphericFade(Modifier.padding(top = innerPadding.calculateTopPadding()))
         when {
             !settingsReady -> {
                 ArchiveListSkeleton(Modifier.padding(innerPadding))
@@ -267,6 +280,7 @@ private fun ArchivesScreenContent(
                 }
             }
         }
+        } // Box
     }
 }
 
