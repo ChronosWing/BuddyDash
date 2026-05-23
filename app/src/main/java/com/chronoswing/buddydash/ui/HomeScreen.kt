@@ -1,5 +1,11 @@
 package com.chronoswing.buddydash.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import com.chronoswing.buddydash.ui.motion.HomeTitleLogoSlot
 import com.chronoswing.buddydash.ui.motion.HomeLogoGlowLayer
 import com.chronoswing.buddydash.ui.motion.HomeLogoGlowState
@@ -264,21 +270,34 @@ private fun HomeScreenContent(
             HomeAtmosphericFade(
                 modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
             )
-            when {
-            !settingsReady -> {
+            val contentPhase = when {
+                !settingsReady || showInitialSkeleton -> "skeleton"
+                !hasCredentials && cachedCount == 0 -> "no_creds"
+                loadState == HomePrintersLoadState.ErrorNoCachedData -> "error"
+                loadState == HomePrintersLoadState.EmptyLoadedSuccessfully -> "empty"
+                else -> "content"
+            }
+            AnimatedContent(
+                targetState = contentPhase,
+                transitionSpec = {
+                    fadeIn(tween(180, easing = FastOutSlowInEasing)) togetherWith
+                        fadeOut(tween(110, easing = FastOutSlowInEasing))
+                },
+                modifier = Modifier.fillMaxSize(),
+                label = "homeContent",
+            ) { phase ->
+            when (phase) {
+            "skeleton" -> {
                 PrinterListSkeleton(Modifier.padding(innerPadding))
             }
-            !hasCredentials && cachedCount == 0 -> {
+            "no_creds" -> {
                 EmptyContent(
                     message = stringResource(R.string.configure_settings_hint),
                     icon = BuddyDashEmptyIcon.Settings.asImageVector(),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
-            showInitialSkeleton -> {
-                PrinterListSkeleton(Modifier.padding(innerPadding))
-            }
-            loadState == HomePrintersLoadState.ErrorNoCachedData -> {
+            "error" -> {
                 PullToRefreshBox(
                     isRefreshing = showPullRefreshIndicator,
                     onRefresh = onPullRefresh,
@@ -293,7 +312,7 @@ private fun HomeScreenContent(
                     )
                 }
             }
-            loadState == HomePrintersLoadState.EmptyLoadedSuccessfully -> {
+            "empty" -> {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -335,12 +354,11 @@ private fun HomeScreenContent(
                         selectedFilter = searchFilter,
                         onFilterSelected = { searchFilter = it },
                     )
-                    if (showStaleBanner) {
-                        OfflineStaleBanner(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                            refreshFailed = staleBannerRefreshFailed,
-                        )
-                    }
+                    OfflineStaleBanner(
+                        visible = showStaleBanner,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        refreshFailed = staleBannerRefreshFailed,
+                    )
                     if (showHeaderMetadata) {
                         HomeActivityGhostPillsRow(
                             onlineCount = printerCounts.online,
@@ -391,6 +409,7 @@ private fun HomeScreenContent(
                 }
             }
         } // when
+        } // AnimatedContent
         } // Box
     }
 }

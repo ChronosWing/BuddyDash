@@ -1,5 +1,11 @@
 package com.chronoswing.buddydash.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -233,18 +239,34 @@ private fun ArchiveDetailScreenContent(
         val showOfflineEmpty = hasCompletedLoad && hasAttemptedNetworkLoad && archive == null && error != null
         Box(Modifier.fillMaxSize()) {
             HomeAtmosphericFade(Modifier.padding(top = innerPadding.calculateTopPadding()))
-        when {
-            showInitialLoading -> {
+            val contentPhase = when {
+                showInitialLoading -> "skeleton"
+                settingsReady && !hasCredentials && archive == null -> "no_creds"
+                showOfflineEmpty -> "offline"
+                archive != null -> "content"
+                else -> "skeleton"
+            }
+            AnimatedContent(
+                targetState = contentPhase,
+                transitionSpec = {
+                    fadeIn(tween(180, easing = FastOutSlowInEasing)) togetherWith
+                        fadeOut(tween(110, easing = FastOutSlowInEasing))
+                },
+                modifier = Modifier.fillMaxSize(),
+                label = "archiveDetailContent",
+            ) { phase ->
+        when (phase) {
+            "skeleton" -> {
                 PrinterDetailSkeleton(Modifier.padding(innerPadding))
             }
-            settingsReady && !hasCredentials && archive == null -> {
+            "no_creds" -> {
                 EmptyContent(
                     message = stringResource(R.string.configure_settings_hint),
                     icon = BuddyDashEmptyIcon.Settings.asImageVector(),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
-            showOfflineEmpty -> {
+            "offline" -> {
                 EmptyContent(
                     message = stringResource(R.string.offline_empty_archive_detail_title),
                     subtitle = stringResource(R.string.offline_empty_archive_detail_subtitle),
@@ -252,7 +274,8 @@ private fun ArchiveDetailScreenContent(
                     modifier = Modifier.padding(innerPadding),
                 )
             }
-            archive != null -> {
+            else -> {
+                val archive = archive ?: return@AnimatedContent
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -261,9 +284,10 @@ private fun ArchiveDetailScreenContent(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    if (isStaleCachedData && hasAttemptedNetworkLoad) {
-                        OfflineStaleBanner(limited = isLimitedFromListCache)
-                    }
+                    OfflineStaleBanner(
+                        visible = isStaleCachedData && hasAttemptedNetworkLoad,
+                        limited = isLimitedFromListCache,
+                    )
                     ArchiveDetailBody(
                         archive = archive,
                         serverUrl = serverUrl,
@@ -286,6 +310,7 @@ private fun ArchiveDetailScreenContent(
                 )
             }
         }
+        } // AnimatedContent
         } // Box
     }
 }

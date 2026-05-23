@@ -1,5 +1,11 @@
 package com.chronoswing.buddydash.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
 import com.chronoswing.buddydash.ui.motion.SecondaryScreenHeader
@@ -205,21 +211,33 @@ private fun ArchivesScreenContent(
     ) { innerPadding ->
         Box(Modifier.fillMaxSize()) {
             HomeAtmosphericFade(Modifier.padding(top = innerPadding.calculateTopPadding()))
-        when {
-            !settingsReady -> {
+            val contentPhase = when {
+                !settingsReady || showInitialSkeleton -> "skeleton"
+                !hasCredentials -> "no_creds"
+                error != null && totalCount == 0 && hasCompletedLoad && hasAttemptedNetworkLoad -> "error"
+                else -> "content"
+            }
+            AnimatedContent(
+                targetState = contentPhase,
+                transitionSpec = {
+                    fadeIn(tween(180, easing = FastOutSlowInEasing)) togetherWith
+                        fadeOut(tween(110, easing = FastOutSlowInEasing))
+                },
+                modifier = Modifier.fillMaxSize(),
+                label = "archivesContent",
+            ) { phase ->
+        when (phase) {
+            "skeleton" -> {
                 ArchiveListSkeleton(Modifier.padding(innerPadding))
             }
-            !hasCredentials -> {
+            "no_creds" -> {
                 EmptyContent(
                     message = stringResource(R.string.configure_settings_hint),
                     icon = BuddyDashEmptyIcon.Settings.asImageVector(),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
-            showInitialSkeleton -> {
-                ArchiveListSkeleton(Modifier.padding(innerPadding))
-            }
-            error != null && totalCount == 0 && hasCompletedLoad && hasAttemptedNetworkLoad -> {
+            "error" -> {
                 EmptyContent(
                     message = stringResource(R.string.offline_empty_archives_title),
                     subtitle = stringResource(R.string.offline_empty_archives_subtitle),
@@ -233,12 +251,11 @@ private fun ArchivesScreenContent(
                         .fillMaxSize()
                         .padding(innerPadding),
                 ) {
-                    if (showStaleBanner) {
-                        OfflineStaleBanner(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            refreshFailed = staleBannerRefreshFailed,
-                        )
-                    }
+                    OfflineStaleBanner(
+                        visible = showStaleBanner,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        refreshFailed = staleBannerRefreshFailed,
+                    )
                     PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
                         Tab(
                             selected = section == ArchivesSection.History,
@@ -280,6 +297,7 @@ private fun ArchivesScreenContent(
                 }
             }
         }
+        } // AnimatedContent
         } // Box
     }
 }

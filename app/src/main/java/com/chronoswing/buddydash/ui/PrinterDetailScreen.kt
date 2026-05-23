@@ -1,5 +1,11 @@
 package com.chronoswing.buddydash.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -544,28 +550,42 @@ private fun PrinterDetailScreenContent(
     ) { innerPadding ->
         Box(Modifier.fillMaxSize()) {
             HomeAtmosphericFade(Modifier.padding(top = innerPadding.calculateTopPadding()))
-        when {
-            showInitialLoading -> LoadingContent(Modifier.padding(innerPadding))
-            showOfflineEmpty -> EmptyContent(
+            val contentPhase = when {
+                showInitialLoading -> "skeleton"
+                showOfflineEmpty -> "offline"
+                labels == null -> "skeleton"
+                else -> "content"
+            }
+            AnimatedContent(
+                targetState = contentPhase,
+                transitionSpec = {
+                    fadeIn(tween(180, easing = FastOutSlowInEasing)) togetherWith
+                        fadeOut(tween(110, easing = FastOutSlowInEasing))
+                },
+                modifier = Modifier.fillMaxSize(),
+                label = "printerDetailContent",
+            ) { phase ->
+        when (phase) {
+            "skeleton" -> LoadingContent(Modifier.padding(innerPadding))
+            "offline" -> EmptyContent(
                 message = stringResource(R.string.offline_empty_printer_detail_title),
                 subtitle = stringResource(R.string.offline_empty_printer_detail_subtitle),
                 icon = BuddyDashEmptyIcon.Printers.asImageVector(),
                 modifier = Modifier.padding(innerPadding),
             )
-            labels == null -> Unit
             else -> {
+                val labels = labels ?: return@AnimatedContent
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
                 ) {
-                    if (showStaleBanner) {
-                        OfflineStaleBanner(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            limited = isLimitedFromHomeCache,
-                            refreshFailed = staleBannerRefreshFailed,
-                        )
-                    }
+                    OfflineStaleBanner(
+                        visible = showStaleBanner,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        limited = isLimitedFromHomeCache,
+                        refreshFailed = staleBannerRefreshFailed,
+                    )
                     PrimaryTabRow(selectedTabIndex = selectedTab) {
                         detailTabs.forEachIndexed { index, tabTitle ->
                             Tab(
@@ -658,6 +678,7 @@ private fun PrinterDetailScreenContent(
                 }
             }
         }
+        } // AnimatedContent
         } // Box
     }
 }

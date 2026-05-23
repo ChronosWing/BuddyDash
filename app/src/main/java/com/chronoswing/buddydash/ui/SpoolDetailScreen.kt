@@ -1,5 +1,11 @@
 package com.chronoswing.buddydash.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
 import com.chronoswing.buddydash.ui.motion.SecondaryScreenHeader
@@ -140,15 +146,31 @@ private fun SpoolDetailScreenContent(
     ) { innerPadding ->
         Box(Modifier.fillMaxSize()) {
             HomeAtmosphericFade(Modifier.padding(top = innerPadding.calculateTopPadding()))
-        when {
-            showInitialLoading -> PrinterDetailSkeleton(Modifier.padding(innerPadding))
-            showOfflineEmpty -> EmptyContent(
+            val contentPhase = when {
+                showInitialLoading -> "skeleton"
+                showOfflineEmpty -> "offline"
+                spool != null -> "content"
+                else -> "skeleton"
+            }
+            AnimatedContent(
+                targetState = contentPhase,
+                transitionSpec = {
+                    fadeIn(tween(180, easing = FastOutSlowInEasing)) togetherWith
+                        fadeOut(tween(110, easing = FastOutSlowInEasing))
+                },
+                modifier = Modifier.fillMaxSize(),
+                label = "spoolDetailContent",
+            ) { phase ->
+        when (phase) {
+            "skeleton" -> PrinterDetailSkeleton(Modifier.padding(innerPadding))
+            "offline" -> EmptyContent(
                 message = stringResource(R.string.offline_empty_spool_detail_title),
                 subtitle = stringResource(R.string.offline_empty_spool_detail_subtitle),
                 icon = BuddyDashEmptyIcon.Spools.asImageVector(),
                 modifier = Modifier.padding(innerPadding),
             )
-            spool != null -> {
+            else -> {
+                val spool = spool ?: return@AnimatedContent
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -156,10 +178,11 @@ private fun SpoolDetailScreenContent(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    if (showStaleBanner) {
-                        item(key = "offline_banner") {
-                            OfflineStaleBanner(limited = isLimitedFromListCache)
-                        }
+                    item(key = "offline_banner") {
+                        OfflineStaleBanner(
+                            visible = showStaleBanner,
+                            limited = isLimitedFromListCache,
+                        )
                     }
                     item(key = "hero") {
                         SpoolDetailHero(spool = spool)
@@ -180,6 +203,7 @@ private fun SpoolDetailScreenContent(
                 }
             }
         }
+        } // AnimatedContent
         } // Box
     }
 }

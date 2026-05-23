@@ -1,5 +1,11 @@
 package com.chronoswing.buddydash.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -227,18 +233,33 @@ private fun SpoolsScreenContent(
     ) { innerPadding ->
         Box(Modifier.fillMaxSize()) {
             HomeAtmosphericFade(Modifier.padding(top = innerPadding.calculateTopPadding()))
-        when {
-            !hasCredentials -> {
+            val contentPhase = when {
+                !hasCredentials -> "no_creds"
+                showInitialSkeleton -> "skeleton"
+                error != null && totalCount == 0 && hasCompletedLoad && hasAttemptedNetworkLoad -> "error"
+                else -> "content"
+            }
+            AnimatedContent(
+                targetState = contentPhase,
+                transitionSpec = {
+                    fadeIn(tween(180, easing = FastOutSlowInEasing)) togetherWith
+                        fadeOut(tween(110, easing = FastOutSlowInEasing))
+                },
+                modifier = Modifier.fillMaxSize(),
+                label = "spoolsContent",
+            ) { phase ->
+        when (phase) {
+            "no_creds" -> {
                 EmptyContent(
                     message = stringResource(R.string.configure_settings_hint),
                     icon = BuddyDashEmptyIcon.Settings.asImageVector(),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
-            showInitialSkeleton -> {
+            "skeleton" -> {
                 SpoolListSkeleton(Modifier.padding(innerPadding))
             }
-            error != null && totalCount == 0 && hasCompletedLoad && hasAttemptedNetworkLoad -> {
+            "error" -> {
                 EmptyContent(
                     message = stringResource(R.string.offline_empty_spools_title),
                     subtitle = stringResource(R.string.offline_empty_spools_subtitle),
@@ -255,12 +276,11 @@ private fun SpoolsScreenContent(
                         .padding(innerPadding),
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        if (showStaleBanner) {
-                            OfflineStaleBanner(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                refreshFailed = staleBannerRefreshFailed,
-                            )
-                        }
+                        OfflineStaleBanner(
+                            visible = showStaleBanner,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            refreshFailed = staleBannerRefreshFailed,
+                        )
                         SpoolSearchAndFilters(
                             searchQuery = searchQuery,
                             filter = filter,
@@ -333,6 +353,7 @@ private fun SpoolsScreenContent(
                 }
             }
         }
+        } // AnimatedContent
         } // Box
     }
 }
