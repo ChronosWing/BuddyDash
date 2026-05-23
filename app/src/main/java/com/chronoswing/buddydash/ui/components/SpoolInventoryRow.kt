@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import com.chronoswing.buddydash.ui.motion.FadeValueText
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import com.chronoswing.buddydash.ui.motion.rememberAttentionPulse
@@ -52,6 +53,7 @@ fun SpoolInventoryRow(
                 .buddyDashClickable(onClick = onClick),
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surfaceVariant,
+            border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
         ) {
             SpoolInventoryCardContent(
                 spool = spool,
