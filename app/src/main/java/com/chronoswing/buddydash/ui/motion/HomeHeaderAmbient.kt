@@ -18,9 +18,9 @@ import com.chronoswing.buddydash.ui.theme.Slate800
 import com.chronoswing.buddydash.ui.theme.Slate950
 
 private const val HEADER_TEXTURE_DOT_ALPHA = 0.036f
-private const val HEADER_LOGO_WASH_CENTER_ALPHA = 0.078f
-private const val HEADER_GRADIENT_TOP_LIFT = 0.2f
-private const val HEADER_GRADIENT_DEPTH = 0.68f
+private const val HEADER_LOGO_WASH_CENTER_ALPHA = 0.088f
+private const val HEADER_GRADIENT_TOP_LIFT = 0.22f
+private const val HEADER_GRADIENT_DEPTH = 0.75f
 
 /**
  * Home header stack: solid base → ambient depth → foreground chrome.

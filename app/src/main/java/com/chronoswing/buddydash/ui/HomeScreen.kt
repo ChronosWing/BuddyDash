@@ -3,6 +3,7 @@ package com.chronoswing.buddydash.ui
 import com.chronoswing.buddydash.ui.motion.HomeTitleLogoSlot
 import com.chronoswing.buddydash.ui.motion.HomeHeaderBackground
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
+import com.chronoswing.buddydash.ui.motion.refreshSpinning
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -42,6 +44,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -75,7 +78,6 @@ import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterCoverImage
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
-import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
 import com.chronoswing.buddydash.util.HOME_PRINTER_SEARCH_MIN_COUNT
 import com.chronoswing.buddydash.util.HomePrintersLoadState
 import com.chronoswing.buddydash.util.ListLoadUi
@@ -90,6 +92,7 @@ import com.chronoswing.buddydash.util.homePrinterDashboardCounts
 import com.chronoswing.buddydash.util.PrinterActivityKind
 import com.chronoswing.buddydash.util.resolveActivityKind
 import com.chronoswing.buddydash.util.toCardLabels
+import com.chronoswing.buddydash.ui.theme.OfflineRed
 
 @Composable
 fun HomeScreen(
@@ -218,6 +221,8 @@ private fun HomeScreenContent(
                 hasCredentials = hasCredentials,
                 isLoading = isLoading,
                 onRefresh = onRefresh,
+                refreshFailed = staleBannerRefreshFailed,
+                offlineStale = showStaleBanner && !staleBannerRefreshFailed,
                 showPrinterSearch = showPrinterSearch,
                 searchExpanded = searchExpanded,
                 onSearchToggle = {
@@ -509,9 +514,12 @@ private val HomeTitleStatusStartPadding = 16.dp
 private val HomeTopBarHorizontalPadding = 16.dp
 private val HomeTopBarActionsEndPadding = 4.dp
 /** Below status bar; outer NavHost no longer applies top safe-area inset. */
-private val HomeTopBarContentTopPadding = 2.dp
-private val HomeTopBarContentBottomPadding = 3.dp
-private val HomePrinterListTopPadding = 4.dp
+private val HomeTopBarContentTopPadding = 1.dp
+private val HomeTopBarContentBottomPadding = 2.dp
+private val HomePrinterListTopPadding = 1.dp
+private val HomeHeaderRefreshIdleAlpha = 0.48f
+private val HomeHeaderRefreshActiveAlpha = 0.62f
+private val HomeHeaderRefreshWarningTint = Color(0xFFF59E0B)
 
 private fun hasAnyPrinterPrinting(printers: List<Printer>): Boolean =
     printers.any { printer ->
@@ -526,6 +534,8 @@ private fun HomeCompactTopBar(
     hasCredentials: Boolean,
     isLoading: Boolean,
     onRefresh: () -> Unit,
+    refreshFailed: Boolean,
+    offlineStale: Boolean,
     showPrinterSearch: Boolean,
     searchExpanded: Boolean,
     onSearchToggle: () -> Unit,
@@ -553,6 +563,8 @@ private fun HomeCompactTopBar(
                     hasCredentials = hasCredentials,
                     isLoading = isLoading,
                     onRefresh = onRefresh,
+                    refreshFailed = refreshFailed,
+                    offlineStale = offlineStale,
                     modifier = Modifier.weight(1f),
                 )
                 if (showPrinterSearch) {
@@ -579,6 +591,8 @@ private fun HomeTopBarTitle(
     hasCredentials: Boolean,
     isLoading: Boolean,
     onRefresh: () -> Unit,
+    refreshFailed: Boolean,
+    offlineStale: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -594,15 +608,44 @@ private fun HomeTopBarTitle(
                     contentDescription = appNameContentDescription
                 },
         )
-        StatusLastUpdatedIndicator(
+        HomeHeaderRefreshAffordance(
             isRefreshing = isRefreshActive,
+            refreshFailed = refreshFailed,
+            offlineStale = offlineStale,
             enabled = hasCredentials && !isLoading,
             onRefresh = onRefresh,
             modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(start = HomeTitleStatusStartPadding),
+                .align(Alignment.TopEnd)
+                .padding(top = 2.dp, start = HomeTitleStatusStartPadding),
         )
     }
+}
+
+@Composable
+private fun HomeHeaderRefreshAffordance(
+    isRefreshing: Boolean,
+    refreshFailed: Boolean,
+    offlineStale: Boolean,
+    enabled: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val tint = when {
+        isRefreshing -> muted.copy(alpha = HomeHeaderRefreshActiveAlpha)
+        refreshFailed -> HomeHeaderRefreshWarningTint.copy(alpha = 0.72f)
+        offlineStale -> OfflineRed.copy(alpha = 0.68f)
+        else -> muted.copy(alpha = HomeHeaderRefreshIdleAlpha)
+    }
+    Icon(
+        imageVector = Icons.Default.Refresh,
+        contentDescription = stringResource(R.string.cd_refresh_status),
+        modifier = modifier
+            .size(18.dp)
+            .refreshSpinning(isRefreshing)
+            .buddyDashClickable(enabled = enabled, onClick = onRefresh),
+        tint = tint,
+    )
 }
 
 @Composable
