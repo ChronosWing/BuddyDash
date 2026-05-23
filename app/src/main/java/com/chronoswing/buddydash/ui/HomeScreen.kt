@@ -1,6 +1,9 @@
 package com.chronoswing.buddydash.ui
 
 import com.chronoswing.buddydash.ui.motion.HomeTitleLogoSlot
+import com.chronoswing.buddydash.ui.motion.HomeLogoGlowLayer
+import com.chronoswing.buddydash.ui.motion.HomeLogoGlowState
+import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
 import com.chronoswing.buddydash.ui.motion.HomeHeaderBackground
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import com.chronoswing.buddydash.ui.motion.refreshSpinning
@@ -44,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -126,6 +130,11 @@ fun HomeScreen(
         onPullRefresh = { viewModel.refreshManual() },
         lastUpdatedAtMillis = uiState.lastUpdatedAtMillis,
         loadedSpoolCount = uiState.loadedSpoolCount,
+        idleGlowMultiplier = uiState.idleGlowMultiplier,
+        headerAmbientMultiplier = uiState.headerAmbientMultiplier,
+        printGlowMultiplier = uiState.printGlowMultiplier,
+        debugForcePrintGlow = uiState.debugForcePrintGlow,
+        debugShowLogoGlowBounds = uiState.debugShowLogoGlowBounds,
         onPrinterClick = onPrinterClick,
     )
 }
@@ -149,6 +158,11 @@ private fun HomeScreenContent(
     onPullRefresh: () -> Unit,
     lastUpdatedAtMillis: Long?,
     loadedSpoolCount: Int?,
+    idleGlowMultiplier: Float,
+    headerAmbientMultiplier: Float,
+    printGlowMultiplier: Float,
+    debugForcePrintGlow: Boolean,
+    debugShowLogoGlowBounds: Boolean,
     onPrinterClick: (Printer) -> Unit,
 ) {
     val cachedCount = printers.size
@@ -223,6 +237,11 @@ private fun HomeScreenContent(
                 onRefresh = onRefresh,
                 refreshFailed = staleBannerRefreshFailed,
                 offlineStale = showStaleBanner && !staleBannerRefreshFailed,
+                idleGlowMultiplier = idleGlowMultiplier,
+                headerAmbientMultiplier = headerAmbientMultiplier,
+                printGlowMultiplier = printGlowMultiplier,
+                debugForcePrintGlow = debugForcePrintGlow,
+                debugShowLogoGlowBounds = debugShowLogoGlowBounds,
                 showPrinterSearch = showPrinterSearch,
                 searchExpanded = searchExpanded,
                 onSearchToggle = {
@@ -235,7 +254,14 @@ private fun HomeScreenContent(
             )
         },
     ) { innerPadding ->
-        when {
+        // Box wraps all content branches so HomeAtmosphericFade can be placed behind
+        // everything (first child = lowest z-order) while each branch retains its own
+        // innerPadding. The fade is offset to the content-area top — not behind the topBar.
+        Box(modifier = Modifier.fillMaxSize()) {
+            HomeAtmosphericFade(
+                modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
+            )
+            when {
             !settingsReady -> {
                 PrinterListSkeleton(Modifier.padding(innerPadding))
             }
@@ -361,7 +387,8 @@ private fun HomeScreenContent(
                     }
                 }
             }
-        }
+        } // when
+        } // Box
     }
 }
 
@@ -536,11 +563,19 @@ private fun HomeCompactTopBar(
     onRefresh: () -> Unit,
     refreshFailed: Boolean,
     offlineStale: Boolean,
+    idleGlowMultiplier: Float,
+    headerAmbientMultiplier: Float,
+    printGlowMultiplier: Float,
+    debugForcePrintGlow: Boolean,
+    debugShowLogoGlowBounds: Boolean,
     showPrinterSearch: Boolean,
     searchExpanded: Boolean,
     onSearchToggle: () -> Unit,
 ) {
-    HomeHeaderBackground(modifier = Modifier.fillMaxWidth()) {
+    HomeHeaderBackground(
+        modifier = Modifier.fillMaxWidth(),
+        ambientMultiplier = headerAmbientMultiplier,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -565,6 +600,10 @@ private fun HomeCompactTopBar(
                     onRefresh = onRefresh,
                     refreshFailed = refreshFailed,
                     offlineStale = offlineStale,
+                    idleGlowMultiplier = idleGlowMultiplier,
+                    printGlowMultiplier = printGlowMultiplier,
+                    debugForcePrintGlow = debugForcePrintGlow,
+                    debugShowLogoGlowBounds = debugShowLogoGlowBounds,
                     modifier = Modifier.weight(1f),
                 )
                 if (showPrinterSearch) {
@@ -593,15 +632,24 @@ private fun HomeTopBarTitle(
     onRefresh: () -> Unit,
     refreshFailed: Boolean,
     offlineStale: Boolean,
+    idleGlowMultiplier: Float,
+    printGlowMultiplier: Float,
+    debugForcePrintGlow: Boolean,
+    debugShowLogoGlowBounds: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(HomeTitleLogoImageSize),
+            .height(HomeTitleLogoImageSize)
+            .graphicsLayer { clip = false },
     ) {
         HomeTitleWordmark(
             ambientPulseEnabled = ambientPulseEnabled,
+            idleGlowMultiplier = idleGlowMultiplier,
+            printGlowMultiplier = printGlowMultiplier,
+            debugForcePrintGlow = debugForcePrintGlow,
+            debugShowLogoGlowBounds = debugShowLogoGlowBounds,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .semantics {
@@ -651,6 +699,10 @@ private fun HomeHeaderRefreshAffordance(
 @Composable
 private fun HomeTitleWordmark(
     ambientPulseEnabled: Boolean,
+    idleGlowMultiplier: Float,
+    printGlowMultiplier: Float,
+    debugForcePrintGlow: Boolean,
+    debugShowLogoGlowBounds: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val wordmarkTextStyle = MaterialTheme.typography.titleLarge.copy(
@@ -658,30 +710,49 @@ private fun HomeTitleWordmark(
         lineHeight = 34.sp,
         fontWeight = FontWeight.SemiBold,
     )
-    Row(
-        modifier = modifier.wrapContentWidth(Alignment.Start),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
+    val glowState = when {
+        ambientPulseEnabled || debugForcePrintGlow -> HomeLogoGlowState.Printing
+        else -> HomeLogoGlowState.Idle
+    }
+    Box(
+        modifier = modifier
+            .wrapContentWidth(Alignment.Start)
+            .height(HomeTitleLogoImageSize)
+            .graphicsLayer { clip = false },
     ) {
-        HomeTitleLogoSlot(
-            ambientPulseEnabled = ambientPulseEnabled,
-            slotWidth = HomeTitleLogoSlotWidth,
-            ambientDiameter = HomeTitleLogoImageSize,
+        HomeLogoGlowLayer(
+            state = glowState,
+            logoImageSize = HomeTitleLogoImageSize,
+            logoSlotWidth = HomeTitleLogoSlotWidth,
+            textPullLeft = HomeTitleTextPullLeft,
+            idleGlowMultiplier = idleGlowMultiplier,
+            printGlowMultiplier = printGlowMultiplier,
+            showDebugBounds = debugShowLogoGlowBounds,
+            modifier = Modifier.matchParentSize(),
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
         ) {
-            Image(
-                painter = painterResource(R.drawable.buddydash_logo_white),
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.size(HomeTitleLogoImageSize),
+            HomeTitleLogoSlot(
+                slotWidth = HomeTitleLogoSlotWidth,
+                ambientDiameter = HomeTitleLogoImageSize,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.buddydash_logo_white),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(HomeTitleLogoImageSize),
+                )
+            }
+            Text(
+                text = stringResource(R.string.home_title_suffix),
+                modifier = Modifier.offset(x = -HomeTitleTextPullLeft),
+                style = wordmarkTextStyle,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Visible,
             )
         }
-        Text(
-            text = stringResource(R.string.home_title_suffix),
-            modifier = Modifier.offset(x = -HomeTitleTextPullLeft),
-            style = wordmarkTextStyle,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Visible,
-        )
     }
 }
