@@ -494,9 +494,30 @@ class HomeViewModel(
                 onSuccess = { enriched ->
                     val updatedAt = System.currentTimeMillis()
                     homePrintersCacheRepository.save(serverUrl, enriched, updatedAt)
-                    _uiState.update {
-                        it.copy(
-                            printers = enriched,
+                    _uiState.update { current ->
+                        // On the very first enrichment (hasAttemptedNetworkLoad still false),
+                        // preserve the cached liveStatus for any printer where the fresh status
+                        // has connected=false but the cached status had connected=true.
+                        // The Bambulab API can momentarily report connected=false at server
+                        // startup before the connection is established, causing a brief
+                        // Offline flash. Once hasAttemptedNetworkLoad is true, fresh status
+                        // always wins so real confirmed-offline states still show correctly.
+                        val finalPrinters = if (!current.hasAttemptedNetworkLoad) {
+                            val cachedById = current.printers.associateBy { it.id }
+                            enriched.map { printer ->
+                                val fresh = printer.liveStatus
+                                val cached = cachedById[printer.id]?.liveStatus
+                                if (cached?.connected == true && fresh?.connected != true) {
+                                    printer.copy(liveStatus = cached)
+                                } else {
+                                    printer
+                                }
+                            }
+                        } else {
+                            enriched
+                        }
+                        current.copy(
+                            printers = finalPrinters,
                             isEnriching = false,
                             isRefreshing = false,
                             lastUpdatedAtMillis = updatedAt,
