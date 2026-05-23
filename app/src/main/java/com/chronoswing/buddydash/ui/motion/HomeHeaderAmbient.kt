@@ -28,9 +28,11 @@ private const val HEADER_GRADIENT_TOP_LIFT = 0.22f
 // from reading as a gray rectangle. Radius 1.28× maxDimension covers the full header.
 private const val HEADER_LOGO_WASH_CENTER_ALPHA = 0.088f
 
-// How far below the header the bleed fade extends (dp).
-// Bridges the Slate900 surface → Slate950 background color step at the header seam.
-private const val HEADER_BLEED_DP = 40f
+// Length of the atmospheric tail drawn below the header boundary (dp).
+// Long enough that the eye reads it as depth/atmosphere, not a visible gradient band.
+// Surface-over-surface blending is invisible on card backgrounds — only the
+// Slate950 background gaps are tinted, creating the soft header-to-content dissolve.
+private const val HEADER_ATMOSPHERE_DP = 200f
 
 /**
  * Static header ambience: base → gradient → subtle logo wash → texture → bleed tail.
@@ -61,14 +63,16 @@ fun HomeHeaderBackground(
                 // clip=false lets the wash circle and bleed tail draw below the header boundary.
                 .graphicsLayer { clip = false }
                 .drawBehind {
-                    // Top-down fade: richer navy at top, returns to surface by 72%,
-                    // holds surface to 100% — no midpoint bounce, no hard bottom edge.
+                    // Top-down fade: richer navy at top, decays continuously to surface
+                    // at the very bottom edge — no flat plateau, no tonal shelf.
+                    // Gradient keeps changing all the way to 100% so luminance never
+                    // visibly "stops" at an intermediate depth like the pill row.
                     drawRect(
                         brush = Brush.verticalGradient(
                             colorStops = arrayOf(
                                 0f to topRich,
-                                0.30f to lerp(topRich, surface, 0.40f),
-                                0.72f to surface,
+                                0.28f to lerp(topRich, surface, 0.28f),
+                                0.62f to lerp(topRich, surface, 0.68f),
                                 1f to surface,
                             ),
                             startY = 0f,
@@ -98,19 +102,26 @@ fun HomeHeaderBackground(
 
                     drawHeaderDotTexture(alpha = HEADER_TEXTURE_DOT_ALPHA)
 
-                    // Bleed tail: a short surface-color gradient below the header that
-                    // bridges the Slate900/Slate950 color step at the header/content seam.
-                    // Alpha is low so it's invisible on card backgrounds (which are also
-                    // surface) but softens the raw background gap between header and cards.
-                    val bleedPx = HEADER_BLEED_DP.dp.toPx()
+                    // Atmospheric tail: dissolves the header surface colour into the
+                    // Slate950 content background over 200 dp. Invisible on card
+                    // backgrounds (surface blended over surface = no change); only
+                    // the raw Slate950 gaps are tinted, creating a mist-like fade.
+                    // Five stops spaced to avoid any visible band or shelf.
+                    val atmospherePx = HEADER_ATMOSPHERE_DP.dp.toPx()
                     drawRect(
                         brush = Brush.verticalGradient(
-                            colors = listOf(surface.copy(alpha = 0.68f), Color.Transparent),
+                            colors = listOf(
+                                surface.copy(alpha = 0.90f),
+                                surface.copy(alpha = 0.65f),
+                                surface.copy(alpha = 0.32f),
+                                surface.copy(alpha = 0.10f),
+                                Color.Transparent,
+                            ),
                             startY = size.height,
-                            endY = size.height + bleedPx,
+                            endY = size.height + atmospherePx,
                         ),
                         topLeft = Offset(0f, size.height),
-                        size = Size(size.width, bleedPx),
+                        size = Size(size.width, atmospherePx),
                     )
                 },
         )
