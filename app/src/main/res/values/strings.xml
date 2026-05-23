@@ -8,6 +8,14 @@
     <string name="camera_cover_token_label">Camera / cover token</string>
     <string name="save_settings">Save</string>
     <string name="settings_saved">Settings saved</string>
+    <string name="debug_header_visual_tuning_title">Home header visual tuning (debug)</string>
+    <string name="debug_idle_glow_multiplier_label">Idle logo glow multiplier</string>
+    <string name="debug_header_ambient_multiplier_label">Header ambient multiplier</string>
+    <string name="debug_print_glow_multiplier_label">Print glow multiplier</string>
+    <string name="debug_force_print_glow_label">Preview print glow on Home</string>
+    <string name="debug_force_print_glow_hint">Shows the animated printing halo without an active print job.</string>
+    <string name="debug_show_logo_glow_bounds_label">Show logo glow debug bounds</string>
+    <string name="debug_show_logo_glow_bounds_hint">Magenta overlay for the glow layer (above ambient, below logo). Check Logcat tag BuddyDash/LogoGlow.</string>
     <string name="test_connection">Test connection</string>
     <string name="testing_connection">Testing…</string>
     <string name="back">Back</string>
