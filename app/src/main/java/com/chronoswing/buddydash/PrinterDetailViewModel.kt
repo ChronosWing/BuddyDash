@@ -112,6 +112,8 @@ data class PrinterDetailUiState(
     val printingQueueJobId: Int? = null,
     /** One-shot navigation to spool detail; consumed by UI before navigate. */
     val pendingSpoolDetailNavigationId: Int? = null,
+    /** True after the first network load attempt completes (success or failure). Gates stale/error UI. */
+    val hasAttemptedNetworkLoad: Boolean = false,
 )
 
 data class AssignSpoolConfirm(
@@ -407,6 +409,7 @@ class PrinterDetailViewModel(
                                     refreshError = error.toUserNetworkMessage("Could not refresh"),
                                     isStaleCachedData = true,
                                     hasCompletedLoad = true,
+                                    hasAttemptedNetworkLoad = true,
                                 )
                             }
                             logOfflineLoadState(
@@ -432,6 +435,7 @@ class PrinterDetailViewModel(
                                             printingQueueJobId = null,
                                             error = "offline_no_cache",
                                             hasCompletedLoad = true,
+                                            hasAttemptedNetworkLoad = true,
                                         )
                                     }
                                     logOfflineLoadState(
@@ -449,6 +453,7 @@ class PrinterDetailViewModel(
                                             error = null,
                                             hasCompletedLoad = true,
                                             isStaleCachedData = true,
+                                            hasAttemptedNetworkLoad = true,
                                         )
                                     }
                                     logOfflineLoadState(
@@ -514,6 +519,7 @@ class PrinterDetailViewModel(
                 isLimitedFromHomeCache = false,
                 hasCompletedLoad = true,
                 lastStatusUpdatedAtMillis = updatedAt,
+                hasAttemptedNetworkLoad = true,
             )
         }
         logOfflineLoadState(

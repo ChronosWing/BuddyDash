@@ -140,6 +140,7 @@ fun PrinterDetailScreen(
         hasCredentials = uiState.hasCredentials,
         isLoading = uiState.isLoading,
         isRefreshing = uiState.isRefreshing,
+        hasAttemptedNetworkLoad = uiState.hasAttemptedNetworkLoad,
         error = uiState.error,
         refreshError = uiState.refreshError,
         isStaleCachedData = uiState.isStaleCachedData,
@@ -230,6 +231,7 @@ private fun PrinterDetailScreenContent(
     hasCredentials: Boolean,
     isLoading: Boolean,
     isRefreshing: Boolean,
+    hasAttemptedNetworkLoad: Boolean,
     error: String?,
     refreshError: String?,
     isStaleCachedData: Boolean,
@@ -310,19 +312,20 @@ private fun PrinterDetailScreenContent(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val hasCachedData = labels != null
-    val showStaleBanner = showStaleDataBanner(
+    val showStaleBanner = hasAttemptedNetworkLoad && showStaleDataBanner(
         hasCachedContent = hasCachedData,
         isStaleCachedData = isStaleCachedData,
         refreshError = refreshError,
         lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
     )
-    val staleBannerRefreshFailed = staleBannerShowsRefreshFailed(
+    val staleBannerRefreshFailed = hasAttemptedNetworkLoad && staleBannerShowsRefreshFailed(
         hasCachedContent = hasCachedData,
         isStaleCachedData = isStaleCachedData,
         refreshError = refreshError,
     )
-    val showInitialLoading = !hasCompletedLoad
-    val showOfflineEmpty = hasCompletedLoad && labels == null && error != null
+    // Keep skeleton visible until the first network attempt completes when there is no cached data.
+    val showInitialLoading = !hasCompletedLoad || (!hasAttemptedNetworkLoad && labels == null && error == null)
+    val showOfflineEmpty = hasCompletedLoad && hasAttemptedNetworkLoad && labels == null && error != null
     val showPullRefreshIndicator = ListLoadUi.showPullRefreshIndicator(
         isRefreshing = isRefreshing,
         cachedItemCount = if (hasCachedData) 1 else 0,

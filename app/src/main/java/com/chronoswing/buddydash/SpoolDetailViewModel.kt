@@ -51,6 +51,8 @@ data class SpoolDetailUiState(
     val apiKey: String = "",
     val cameraToken: String = "",
     val hasCredentials: Boolean = false,
+    /** True after the first network load attempt completes (success or failure). Gates stale/error UI. */
+    val hasAttemptedNetworkLoad: Boolean = false,
 )
 
 class SpoolDetailViewModel(
@@ -306,6 +308,7 @@ class SpoolDetailViewModel(
                         isStaleCachedData = false,
                         isLimitedFromListCache = false,
                         hasCompletedLoad = true,
+                        hasAttemptedNetworkLoad = true,
                     )
                 }
                 logOfflineLoadState(
@@ -331,6 +334,7 @@ class SpoolDetailViewModel(
                             isLoading = false,
                             error = null,
                             hasCompletedLoad = true,
+                            hasAttemptedNetworkLoad = true,
                         )
                     }
                     logOfflineLoadState(
@@ -354,12 +358,14 @@ class SpoolDetailViewModel(
                     error = null,
                     isStaleCachedData = true,
                     hasCompletedLoad = true,
+                    hasAttemptedNetworkLoad = true,
                 )
             } else {
                 it.copy(
                     isLoading = false,
                     error = OFFLINE_NO_CACHE_MARKER,
                     hasCompletedLoad = true,
+                    hasAttemptedNetworkLoad = true,
                 )
             }
         }

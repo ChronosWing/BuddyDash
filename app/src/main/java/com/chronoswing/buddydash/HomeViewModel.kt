@@ -50,8 +50,16 @@ data class HomeUiState(
     /** True after settings DataStore has emitted at least once. */
     val settingsReady: Boolean = false,
     val lastUpdatedAtMillis: Long? = null,
+    /** True after the first network load attempt completes (success or failure). Gates stale/error UI. */
+    val hasAttemptedNetworkLoad: Boolean = false,
     /** Null until spool inventory is known from cache or network. */
     val loadedSpoolCount: Int? = null,
+    /** Debug-only multipliers for on-device header visual calibration (default 1). */
+    val idleGlowMultiplier: Float = 1f,
+    val headerAmbientMultiplier: Float = 1f,
+    val printGlowMultiplier: Float = 1f,
+    val debugForcePrintGlow: Boolean = false,
+    val debugShowLogoGlowBounds: Boolean = false,
 )
 
 class HomeViewModel(
@@ -124,7 +132,42 @@ class HomeViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            combine(
+                settingsRepository.homeIdleGlowMultiplier,
+                settingsRepository.homeHeaderAmbientMultiplier,
+                settingsRepository.homePrintGlowMultiplier,
+                settingsRepository.homeDebugForcePrintGlow,
+                settingsRepository.homeDebugShowLogoGlowBounds,
+            ) { idleGlow, headerAmbient, printGlow, forcePrintGlow, showGlowBounds ->
+                VisualTuningSnapshot(
+                    idleGlow,
+                    headerAmbient,
+                    printGlow,
+                    forcePrintGlow,
+                    showGlowBounds,
+                )
+            }.collect { tuning ->
+                _uiState.update {
+                    it.copy(
+                        idleGlowMultiplier = tuning.idleGlowMultiplier,
+                        headerAmbientMultiplier = tuning.headerAmbientMultiplier,
+                        printGlowMultiplier = tuning.printGlowMultiplier,
+                        debugForcePrintGlow = tuning.debugForcePrintGlow,
+                        debugShowLogoGlowBounds = tuning.debugShowLogoGlowBounds,
+                    )
+                }
+            }
+        }
     }
+
+    private data class VisualTuningSnapshot(
+        val idleGlowMultiplier: Float,
+        val headerAmbientMultiplier: Float,
+        val printGlowMultiplier: Float,
+        val debugForcePrintGlow: Boolean,
+        val debugShowLogoGlowBounds: Boolean,
+    )
 
     private suspend fun hydrateFromDiskCache(serverUrl: String) {
         val snapshot = homePrintersCacheRepository.load(serverUrl)
@@ -153,6 +196,7 @@ class HomeViewModel(
                         error = null,
                         refreshError = null,
                         isStaleCachedData = false,
+                        hasAttemptedNetworkLoad = false,
                     )
                 }
                 else -> state
@@ -359,6 +403,7 @@ class HomeViewModel(
                                     refreshError = null,
                                     isStaleCachedData = false,
                                     lastUpdatedAtMillis = System.currentTimeMillis(),
+                                    hasAttemptedNetworkLoad = true,
                                 )
                             }
                             refreshLoadedSpoolCount()
@@ -412,6 +457,7 @@ class HomeViewModel(
                                     refreshError = message,
                                     isStaleCachedData = true,
                                     hasCompletedLoad = true,
+                                    hasAttemptedNetworkLoad = true,
                                 )
                             } else {
                                 current.copy(
@@ -421,6 +467,7 @@ class HomeViewModel(
                                     error = message,
                                     refreshError = null,
                                     hasCompletedLoad = true,
+                                    hasAttemptedNetworkLoad = true,
                                 )
                             }
                         }
@@ -456,6 +503,7 @@ class HomeViewModel(
                             error = null,
                             refreshError = null,
                             isStaleCachedData = false,
+                            hasAttemptedNetworkLoad = true,
                         )
                     }
                     HomeLoadTiming.log("secondary data applied to printer cards")
@@ -476,12 +524,14 @@ class HomeViewModel(
                                 error = null,
                                 refreshError = message,
                                 isStaleCachedData = true,
+                                hasAttemptedNetworkLoad = true,
                             )
                         } else {
                             current.copy(
                                 isEnriching = false,
                                 isRefreshing = false,
                                 refreshError = message,
+                                hasAttemptedNetworkLoad = true,
                             )
                         }
                     }

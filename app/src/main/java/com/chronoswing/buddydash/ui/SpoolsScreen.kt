@@ -97,6 +97,7 @@ fun SpoolsScreen(
         isLoading = uiState.isLoading,
         isRefreshing = uiState.isRefreshing,
         hasCompletedLoad = uiState.hasCompletedLoad,
+        hasAttemptedNetworkLoad = uiState.hasAttemptedNetworkLoad,
         error = uiState.error,
         refreshError = uiState.refreshError,
         isStaleCachedData = uiState.isStaleCachedData,
@@ -129,6 +130,7 @@ private fun SpoolsScreenContent(
     isLoading: Boolean,
     isRefreshing: Boolean,
     hasCompletedLoad: Boolean,
+    hasAttemptedNetworkLoad: Boolean,
     error: String?,
     refreshError: String?,
     isStaleCachedData: Boolean,
@@ -149,13 +151,13 @@ private fun SpoolsScreenContent(
     val snackbarHostState = remember { SnackbarHostState() }
     val noMatchMessage = stringResource(R.string.snackbar_no_matching_filament)
     val cachedCount = totalCount
-    val showStaleBanner = showStaleDataBanner(
+    val showStaleBanner = hasAttemptedNetworkLoad && showStaleDataBanner(
         hasCachedContent = cachedCount > 0,
         isStaleCachedData = isStaleCachedData,
         refreshError = refreshError,
         lastUpdatedAtMillis = lastUpdatedAtMillis,
     )
-    val staleBannerRefreshFailed = staleBannerShowsRefreshFailed(
+    val staleBannerRefreshFailed = hasAttemptedNetworkLoad && staleBannerShowsRefreshFailed(
         hasCachedContent = cachedCount > 0,
         isStaleCachedData = isStaleCachedData,
         refreshError = refreshError,
@@ -223,7 +225,7 @@ private fun SpoolsScreenContent(
             showInitialSkeleton -> {
                 SpoolListSkeleton(Modifier.padding(innerPadding))
             }
-            error != null && totalCount == 0 && hasCompletedLoad -> {
+            error != null && totalCount == 0 && hasCompletedLoad && hasAttemptedNetworkLoad -> {
                 EmptyContent(
                     message = stringResource(R.string.offline_empty_spools_title),
                     subtitle = stringResource(R.string.offline_empty_spools_subtitle),
