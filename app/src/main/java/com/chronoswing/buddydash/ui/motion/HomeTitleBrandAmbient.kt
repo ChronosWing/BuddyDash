@@ -27,6 +27,8 @@ import com.chronoswing.buddydash.ui.theme.CyanAccent
 private const val AMBIENT_PULSE_PERIOD_MS = 4_000
 private const val AMBIENT_ALPHA_MIN = 0.02f
 private const val AMBIENT_ALPHA_MAX = 0.055f
+/** Static idle halo — always below the animated printing glow. */
+private const val IDLE_AMBIENT_ALPHA = 0.014f
 
 /**
  * Clips ambient glow to [slotWidth] so it cannot bleed into the title row.
@@ -58,9 +60,41 @@ fun HomeTitleLogoSlot(
                 diameter = ambientDiameter,
                 modifier = Modifier.align(Alignment.CenterEnd),
             )
+        } else {
+            HomeTitleLogoIdleAmbientGlow(
+                diameter = ambientDiameter,
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
         }
         content()
     }
+}
+
+@Composable
+private fun HomeTitleLogoIdleAmbientGlow(
+    diameter: Dp,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(diameter)
+            .drawBehind {
+                val radius = size.minDimension * 0.5f
+                val center = Offset(size.width / 2f, size.height / 2f)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            CyanAccent.copy(alpha = IDLE_AMBIENT_ALPHA),
+                            Color.Transparent,
+                        ),
+                        center = center,
+                        radius = radius,
+                    ),
+                    radius = radius,
+                    center = center,
+                )
+            },
+    )
 }
 
 @Composable

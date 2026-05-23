@@ -1,6 +1,7 @@
 package com.chronoswing.buddydash.ui
 
 import com.chronoswing.buddydash.ui.motion.HomeTitleLogoSlot
+import com.chronoswing.buddydash.ui.motion.homeHeaderAmbientBackground
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -303,7 +305,7 @@ private fun HomeScreenContent(
                     )
                     if (showStaleBanner) {
                         OfflineStaleBanner(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                             refreshFailed = staleBannerRefreshFailed,
                         )
                     }
@@ -322,7 +324,12 @@ private fun HomeScreenContent(
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                            contentPadding = PaddingValues(
+                                start = 12.dp,
+                                end = 12.dp,
+                                top = HomePrinterListTopPadding,
+                                bottom = 8.dp,
+                            ),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             if (searchExpanded && filteredPrinters.isEmpty()) {
@@ -504,8 +511,9 @@ private val HomeTitleStatusStartPadding = 16.dp
 private val HomeTopBarHorizontalPadding = 16.dp
 private val HomeTopBarActionsEndPadding = 4.dp
 /** Below status bar; outer NavHost no longer applies top safe-area inset. */
-private val HomeTopBarContentTopPadding = 4.dp
-private val HomeTopBarContentBottomPadding = 6.dp
+private val HomeTopBarContentTopPadding = 2.dp
+private val HomeTopBarContentBottomPadding = 3.dp
+private val HomePrinterListTopPadding = 4.dp
 
 private fun hasAnyPrinterPrinting(printers: List<Printer>): Boolean =
     printers.any { printer ->
@@ -525,8 +533,10 @@ private fun HomeCompactTopBar(
     onSearchToggle: () -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth(),
+        color = Color.Transparent,
+        modifier = Modifier
+            .fillMaxWidth()
+            .homeHeaderAmbientBackground(),
     ) {
         Column(
             modifier = Modifier
