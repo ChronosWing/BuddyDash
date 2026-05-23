@@ -19,13 +19,12 @@ import com.chronoswing.buddydash.util.HomeHeaderVisualTuning
 
 private const val HEADER_TEXTURE_DOT_ALPHA = 0.036f
 
-// Base constants are calibrated so 2× ambientMultiplier = design target.
-// 1× = subtle but present; 2× = preferred blended look; 3× = obviously strong for debug.
-// At 2×: topLift = 0.22 → topRich = lerp(Slate900, Slate800, 0.22) ≈ #1C2636
-private const val HEADER_GRADIENT_TOP_LIFT = 0.11f
-// At 2×: washAlpha = 0.088 — large-radius wash is the primary ambient integration effect.
-// Radius 1.28× maxDimension covers the full header with a soft teal tint.
-private const val HEADER_LOGO_WASH_CENTER_ALPHA = 0.044f
+// 1× IS the design target — the preferred richer blended look at default multiplier.
+// topLift = 0.22 → topRich = lerp(Slate900, Slate800, 0.22) ≈ #1C2636
+private const val HEADER_GRADIENT_TOP_LIFT = 0.22f
+// Large-radius wash is the primary ambient integration effect — keeps the header
+// from reading as a gray rectangle. Radius 1.28× maxDimension covers the full header.
+private const val HEADER_LOGO_WASH_CENTER_ALPHA = 0.088f
 
 /**
  * Static header ambience: base → gradient → subtle logo wash → texture.
