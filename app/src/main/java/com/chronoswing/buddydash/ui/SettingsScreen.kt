@@ -2,6 +2,7 @@ package com.chronoswing.buddydash.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,6 +16,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Switch
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -22,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -31,6 +35,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.SettingsUiState
 import com.chronoswing.buddydash.SettingsViewModel
+import com.chronoswing.buddydash.util.BuddyDashDebug
+import com.chronoswing.buddydash.util.HomeLogoGlowTuning
 
 @Composable
 fun SettingsScreen(
@@ -45,6 +51,11 @@ fun SettingsScreen(
         onCameraTokenChange = viewModel::onCameraTokenChange,
         onSave = viewModel::saveSettings,
         onTestConnection = viewModel::testConnection,
+        onIdleGlowMultiplierSelected = viewModel::onIdleGlowMultiplierSelected,
+        onHeaderAmbientMultiplierSelected = viewModel::onHeaderAmbientMultiplierSelected,
+        onPrintGlowMultiplierSelected = viewModel::onPrintGlowMultiplierSelected,
+        onDebugForcePrintGlowChange = viewModel::onDebugForcePrintGlowChange,
+        onDebugShowLogoGlowBoundsChange = viewModel::onDebugShowLogoGlowBoundsChange,
         onBack = onBack,
     )
 }
@@ -58,6 +69,11 @@ private fun SettingsScreenContent(
     onCameraTokenChange: (String) -> Unit,
     onSave: () -> Unit,
     onTestConnection: () -> Unit,
+    onIdleGlowMultiplierSelected: (Float) -> Unit,
+    onHeaderAmbientMultiplierSelected: (Float) -> Unit,
+    onPrintGlowMultiplierSelected: (Float) -> Unit,
+    onDebugForcePrintGlowChange: (Boolean) -> Unit,
+    onDebugShowLogoGlowBoundsChange: (Boolean) -> Unit,
     onBack: (() -> Unit)?,
 ) {
     Scaffold(
@@ -156,6 +172,140 @@ private fun SettingsScreenContent(
                     style = MaterialTheme.typography.bodyLarge,
                 )
             }
+
+            if (BuddyDashDebug.enabled) {
+                HomeHeaderVisualDebugSection(
+                    idleGlowMultiplier = uiState.idleGlowMultiplier,
+                    headerAmbientMultiplier = uiState.headerAmbientMultiplier,
+                    printGlowMultiplier = uiState.printGlowMultiplier,
+                    debugForcePrintGlow = uiState.debugForcePrintGlow,
+                    debugShowLogoGlowBounds = uiState.debugShowLogoGlowBounds,
+                    onIdleGlowMultiplierSelected = onIdleGlowMultiplierSelected,
+                    onHeaderAmbientMultiplierSelected = onHeaderAmbientMultiplierSelected,
+                    onPrintGlowMultiplierSelected = onPrintGlowMultiplierSelected,
+                    onDebugForcePrintGlowChange = onDebugForcePrintGlowChange,
+                    onDebugShowLogoGlowBoundsChange = onDebugShowLogoGlowBoundsChange,
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun HomeHeaderVisualDebugSection(
+    idleGlowMultiplier: Float,
+    headerAmbientMultiplier: Float,
+    printGlowMultiplier: Float,
+    debugForcePrintGlow: Boolean,
+    debugShowLogoGlowBounds: Boolean,
+    onIdleGlowMultiplierSelected: (Float) -> Unit,
+    onHeaderAmbientMultiplierSelected: (Float) -> Unit,
+    onPrintGlowMultiplierSelected: (Float) -> Unit,
+    onDebugForcePrintGlowChange: (Boolean) -> Unit,
+    onDebugShowLogoGlowBoundsChange: (Boolean) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.debug_header_visual_tuning_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = stringResource(R.string.debug_idle_glow_multiplier_label),
+            style = MaterialTheme.typography.labelMedium,
+        )
+        VisualMultiplierChipRow(
+            selected = idleGlowMultiplier,
+            onSelected = onIdleGlowMultiplierSelected,
+        )
+        Text(
+            text = stringResource(R.string.debug_header_ambient_multiplier_label),
+            style = MaterialTheme.typography.labelMedium,
+        )
+        VisualMultiplierChipRow(
+            selected = headerAmbientMultiplier,
+            onSelected = onHeaderAmbientMultiplierSelected,
+        )
+        Text(
+            text = stringResource(R.string.debug_print_glow_multiplier_label),
+            style = MaterialTheme.typography.labelMedium,
+        )
+        VisualMultiplierChipRow(
+            selected = printGlowMultiplier,
+            onSelected = onPrintGlowMultiplierSelected,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.debug_force_print_glow_label),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Text(
+                    text = stringResource(R.string.debug_force_print_glow_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = debugForcePrintGlow,
+                onCheckedChange = onDebugForcePrintGlowChange,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.debug_show_logo_glow_bounds_label),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Text(
+                    text = stringResource(R.string.debug_show_logo_glow_bounds_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = debugShowLogoGlowBounds,
+                onCheckedChange = onDebugShowLogoGlowBoundsChange,
+            )
+        }
+    }
+}
+
+@Composable
+private fun VisualMultiplierChipRow(
+    selected: Float,
+    onSelected: (Float) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        HomeLogoGlowTuning.multiplierPresets.forEach { preset ->
+            FilterChip(
+                selected = selected == preset,
+                onClick = { onSelected(preset) },
+                label = { Text(visualMultiplierLabel(preset)) },
+            )
+        }
+    }
+}
+
+private fun visualMultiplierLabel(preset: Float): String = when (preset) {
+    0.5f -> "0.5×"
+    1f -> "1×"
+    2f -> "2×"
+    else -> "3×"
 }
