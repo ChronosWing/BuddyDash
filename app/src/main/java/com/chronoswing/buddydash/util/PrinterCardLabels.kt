@@ -37,13 +37,15 @@ fun Printer.toCardLabels(): PrinterCardLabels {
     val (title, subtitle) = displayNameAndModel(name, model)
     val status = liveStatus
     if (status == null) {
+        // null liveStatus means status is not yet known — use neutral Idle, not Offline.
+        // Offline is reserved for a confirmed connected=false from a completed status fetch.
         return PrinterCardLabels(
             title = title,
             subtitle = subtitle,
             connection = "—",
             isConnected = false,
             isActivePrint = false,
-            activityKind = PrinterActivityKind.Offline,
+            activityKind = PrinterActivityKind.Idle,
             progressCompact = null,
             plateKind = null,
             currentActivity = "—",
