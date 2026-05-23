@@ -1,9 +1,16 @@
 package com.chronoswing.buddydash.ui.motion
 
 import android.util.Log
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -27,7 +34,8 @@ enum class HomeLogoGlowState {
     Printing,
 }
 
-private const val PRINT_PULSE_PERIOD_MS = 4_500
+// ~5.5 s per half-cycle; sine-like easing makes breathing feel organic, not mechanical.
+private const val PRINT_PULSE_PERIOD_MS = 5_500
 
 private const val GLOW_ELLIPSE_SCALE_X = 0.72f
 private const val GLOW_ELLIPSE_SCALE_Y = 0.82f
@@ -50,10 +58,7 @@ fun HomeLogoGlowLayer(
     showDebugBounds: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val printPhase = rememberAttentionPulse(
-        enabled = state == HomeLogoGlowState.Printing,
-        periodMillis = PRINT_PULSE_PERIOD_MS,
-    )
+    val printPhase = rememberLogoPrintPulse(enabled = state == HomeLogoGlowState.Printing)
     val density = LocalDensity.current
     val logoBasePx = with(density) { logoImageSize.toPx() }
     val logoSlotWidthPx = with(density) { logoSlotWidth.toPx() }
@@ -115,6 +120,34 @@ fun HomeLogoGlowLayer(
                 }
             },
     )
+}
+
+/**
+ * Sine-like breathing pulse for the logo print glow.
+ * Uses a symmetric ease-in-out curve so the animation spends equal time rising and falling,
+ * producing organic breathing rather than the asymmetric rush of [FastOutSlowInEasing].
+ * Isolated from [rememberAttentionPulse] so card/chip pulses elsewhere are unaffected.
+ */
+@Composable
+private fun rememberLogoPrintPulse(enabled: Boolean): Float {
+    if (!enabled) return 0f
+    val reduced = rememberPrefersReducedMotion()
+    if (reduced) return 0f
+    val transition = rememberInfiniteTransition(label = "logoPrintPulse")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            // CubicBezier approximating sin ease-in-out: symmetric, smooth, never abrupt.
+            animation = tween(
+                durationMillis = PRINT_PULSE_PERIOD_MS,
+                easing = CubicBezierEasing(0.37f, 0f, 0.63f, 1f),
+            ),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "logoPrintPulsePhase",
+    )
+    return phase
 }
 
 /** Logo icon center, nudged toward wordmark start. Coordinates in brand-row space. */
