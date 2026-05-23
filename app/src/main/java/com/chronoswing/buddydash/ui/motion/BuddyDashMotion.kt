@@ -28,6 +28,12 @@ object BuddyDashMotion {
     const val THUMBNAIL_FADE_MS = 220
     const val VALUE_FADE_MS = 200
     const val SUCCESS_PULSE_MS = 280
+    // Content-phase crossfade: skeleton → content, error → content, etc.
+    const val CONTENT_FADE_IN_MS = 180
+    const val CONTENT_FADE_OUT_MS = 110
+    // Detail slide: fraction of container width the screen travels during push/pop.
+    // 0.12 = 12% — subtle depth shift rather than a full-screen sweep.
+    const val NAV_DETAIL_SLIDE_FRACTION = 0.12f
 }
 
 fun Context.prefersReducedMotion(): Boolean = isReducedMotionEnabled()

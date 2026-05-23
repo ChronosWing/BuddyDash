@@ -18,6 +18,10 @@ import com.chronoswing.buddydash.ui.motion.FadeValueText
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import com.chronoswing.buddydash.ui.motion.refreshSpinning
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -197,18 +201,23 @@ fun StatusLastUpdatedIndicator(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (!isRefreshing) return
-
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
-    Icon(
-        imageVector = Icons.Default.Refresh,
-        contentDescription = stringResource(R.string.cd_refresh_status),
-        modifier = modifier
-            .size(14.dp)
-            .refreshSpinning(true)
-            .buddyDashClickable(enabled = enabled, onClick = onRefresh),
-        tint = muted,
-    )
+    AnimatedVisibility(
+        visible = isRefreshing,
+        enter = fadeIn(tween(220)),
+        exit = fadeOut(tween(220)),
+        modifier = modifier,
+    ) {
+        val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
+        Icon(
+            imageVector = Icons.Default.Refresh,
+            contentDescription = stringResource(R.string.cd_refresh_status),
+            modifier = Modifier
+                .size(14.dp)
+                .refreshSpinning(true)
+                .buddyDashClickable(enabled = enabled, onClick = onRefresh),
+            tint = muted,
+        )
+    }
 }
 
 @Composable
