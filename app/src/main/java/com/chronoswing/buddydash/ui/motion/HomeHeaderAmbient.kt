@@ -9,8 +9,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.ui.theme.CyanAccentDim
@@ -26,9 +28,16 @@ private const val HEADER_GRADIENT_TOP_LIFT = 0.22f
 // from reading as a gray rectangle. Radius 1.28× maxDimension covers the full header.
 private const val HEADER_LOGO_WASH_CENTER_ALPHA = 0.088f
 
+// How far below the header the bleed fade extends (dp).
+// Bridges the Slate900 surface → Slate950 background color step at the header seam.
+private const val HEADER_BLEED_DP = 40f
+
 /**
- * Static header ambience: base → gradient → subtle logo wash → texture.
+ * Static header ambience: base → gradient → subtle logo wash → texture → bleed tail.
  * No idle/print glow — see [HomeLogoGlowLayer].
+ *
+ * The draw box uses [graphicsLayer] with clip disabled so the wash circle and bleed
+ * tail can extend below the header boundary, melting the header into the content area.
  */
 @Composable
 fun HomeHeaderBackground(
@@ -49,10 +58,11 @@ fun HomeHeaderBackground(
         Box(
             Modifier
                 .matchParentSize()
+                // clip=false lets the wash circle and bleed tail draw below the header boundary.
+                .graphicsLayer { clip = false }
                 .drawBehind {
-                    // Smooth top-down fade: richer navy at top, returns to surface by 72%,
-                    // holds surface at 100% — header/content seam is always a color match,
-                    // no hard divider. No midpoint bounce.
+                    // Top-down fade: richer navy at top, returns to surface by 72%,
+                    // holds surface to 100% — no midpoint bounce, no hard bottom edge.
                     drawRect(
                         brush = Brush.verticalGradient(
                             colorStops = arrayOf(
@@ -65,6 +75,10 @@ fun HomeHeaderBackground(
                             endY = size.height,
                         ),
                     )
+
+                    // Wash circle: large radius so the teal tint covers the full header.
+                    // With clip=false it extends naturally below the boundary — this is the
+                    // primary source of the soft header/content blend.
                     val washCenter = Offset(size.width * 0.11f, size.height * 0.46f)
                     val washRadius = size.maxDimension * 1.28f
                     drawCircle(
@@ -81,7 +95,23 @@ fun HomeHeaderBackground(
                         radius = washRadius,
                         center = washCenter,
                     )
+
                     drawHeaderDotTexture(alpha = HEADER_TEXTURE_DOT_ALPHA)
+
+                    // Bleed tail: a short surface-color gradient below the header that
+                    // bridges the Slate900/Slate950 color step at the header/content seam.
+                    // Alpha is low so it's invisible on card backgrounds (which are also
+                    // surface) but softens the raw background gap between header and cards.
+                    val bleedPx = HEADER_BLEED_DP.dp.toPx()
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(surface.copy(alpha = 0.68f), Color.Transparent),
+                            startY = size.height,
+                            endY = size.height + bleedPx,
+                        ),
+                        topLeft = Offset(0f, size.height),
+                        size = Size(size.width, bleedPx),
+                    )
                 },
         )
         content()
