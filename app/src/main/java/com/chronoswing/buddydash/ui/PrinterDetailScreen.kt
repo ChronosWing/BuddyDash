@@ -97,6 +97,7 @@ import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
 import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
 import com.chronoswing.buddydash.util.showStaleDataBanner
+import com.chronoswing.buddydash.util.staleBannerShowsRefreshFailed
 import com.chronoswing.buddydash.util.ListLoadUi
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildPrintHeadline
@@ -315,6 +316,11 @@ private fun PrinterDetailScreenContent(
         refreshError = refreshError,
         lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
     )
+    val staleBannerRefreshFailed = staleBannerShowsRefreshFailed(
+        hasCachedContent = hasCachedData,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+    )
     val showInitialLoading = !hasCompletedLoad
     val showOfflineEmpty = hasCompletedLoad && labels == null && error != null
     val showPullRefreshIndicator = ListLoadUi.showPullRefreshIndicator(
@@ -504,13 +510,9 @@ private fun PrinterDetailScreenContent(
                             overflow = TextOverflow.Ellipsis,
                         )
                         StatusLastUpdatedIndicator(
-                            lastUpdatedAtMillis = lastStatusUpdatedAtMillis,
                             isRefreshing = isRefreshing,
                             enabled = !isClearingPlate && !isControlBusy,
                             onRefresh = onRefresh,
-                            hasCachedContent = hasCachedData,
-                            isStaleCachedData = isStaleCachedData,
-                            refreshError = refreshError,
                             modifier = Modifier.padding(start = 8.dp),
                         )
                     }
@@ -545,6 +547,7 @@ private fun PrinterDetailScreenContent(
                         OfflineStaleBanner(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             limited = isLimitedFromHomeCache,
+                            refreshFailed = staleBannerRefreshFailed,
                         )
                     }
                     PrimaryTabRow(selectedTabIndex = selectedTab) {

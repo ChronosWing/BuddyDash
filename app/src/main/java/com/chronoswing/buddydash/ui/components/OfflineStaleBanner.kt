@@ -15,20 +15,20 @@ import com.chronoswing.buddydash.R
 fun OfflineStaleBanner(
     modifier: Modifier = Modifier,
     limited: Boolean = false,
+    refreshFailed: Boolean = false,
 ) {
+    val messageRes = when {
+        limited -> R.string.offline_limited_cached_banner
+        refreshFailed -> R.string.home_stale_banner
+        else -> R.string.offline_stale_banner
+    }
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
     ) {
         Text(
-            text = stringResource(
-                if (limited) {
-                    R.string.offline_limited_cached_banner
-                } else {
-                    R.string.offline_stale_banner
-                },
-            ),
+            text = stringResource(messageRes),
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),

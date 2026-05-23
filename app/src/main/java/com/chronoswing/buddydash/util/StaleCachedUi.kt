@@ -23,7 +23,7 @@ fun showOfflineInHeader(
         isStaleCachedData &&
         (refreshError == null || isHomeRefreshOfflineError(refreshError))
 
-/** Non-offline refresh failure while cached content is visible (header attention only). */
+/** Non-offline refresh failure while cached content is visible. */
 fun showConnectionStaleInHeader(
     hasCachedContent: Boolean,
     isStaleCachedData: Boolean,
@@ -35,33 +35,16 @@ fun showConnectionStaleInHeader(
     return refreshError != null && !isHomeRefreshOfflineError(refreshError)
 }
 
-enum class HeaderStatusAttention {
-    /** Healthy / live — no header status UI. */
-    None,
-    /** Active network request — spinner only. */
-    Refreshing,
-    /** Cached data, offline or not yet refreshed. */
-    Offline,
-    /** Refresh failed while showing cached data. */
-    RefreshFailed,
-}
-
-fun resolveHeaderStatusAttention(
-    isRefreshActive: Boolean,
+/** Use refresh-failed banner copy instead of offline copy. */
+fun staleBannerShowsRefreshFailed(
     hasCachedContent: Boolean,
     isStaleCachedData: Boolean,
     refreshError: String?,
-): HeaderStatusAttention {
-    if (isRefreshActive) return HeaderStatusAttention.Refreshing
-    if (!hasCachedContent) return HeaderStatusAttention.None
-    if (showOfflineInHeader(hasCachedContent, isStaleCachedData, refreshError)) {
-        return HeaderStatusAttention.Offline
-    }
-    if (showConnectionStaleInHeader(hasCachedContent, isStaleCachedData, refreshError)) {
-        return HeaderStatusAttention.RefreshFailed
-    }
-    return HeaderStatusAttention.None
-}
+): Boolean = showConnectionStaleInHeader(
+    hasCachedContent = hasCachedContent,
+    isStaleCachedData = isStaleCachedData,
+    refreshError = refreshError,
+)
 
 /** True when cached content is shown but server actions should be blocked. */
 fun isShowingStaleCachedContent(

@@ -25,8 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
 import com.chronoswing.buddydash.R
-import com.chronoswing.buddydash.util.HeaderStatusAttention
-import com.chronoswing.buddydash.util.resolveHeaderStatusAttention
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -187,67 +185,28 @@ fun SectionHeaderRow(
 }
 
 /**
- * Calm header status: hidden when healthy, spinner-only while refreshing,
- * persistent muted text only for offline or refresh-failure attention states.
+ * Header refresh affordance: subtle spinner only while actively refreshing.
+ * Stale/offline copy lives in [OfflineStaleBanner].
  */
 @Composable
 fun StatusLastUpdatedIndicator(
-    @Suppress("UNUSED_PARAMETER") lastUpdatedAtMillis: Long?,
     isRefreshing: Boolean,
     enabled: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
-    hasCachedContent: Boolean = true,
-    isStaleCachedData: Boolean = false,
-    refreshError: String? = null,
 ) {
-    val display = resolveHeaderStatusAttention(
-        isRefreshActive = isRefreshing,
-        hasCachedContent = hasCachedContent,
-        isStaleCachedData = isStaleCachedData,
-        refreshError = refreshError,
-    )
-    if (display == HeaderStatusAttention.None) return
+    if (!isRefreshing) return
 
     val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
-    val attentionColor = MaterialTheme.colorScheme.error.copy(alpha = 0.82f)
-    val message = when (display) {
-        HeaderStatusAttention.Refreshing -> null
-        HeaderStatusAttention.Offline -> stringResource(R.string.status_header_offline)
-        HeaderStatusAttention.RefreshFailed -> stringResource(R.string.status_header_refresh_failed)
-        HeaderStatusAttention.None -> return
-    }
-    val iconTint = when (display) {
-        HeaderStatusAttention.Refreshing -> muted
-        else -> attentionColor.copy(alpha = 0.75f)
-    }
-
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        message?.let { text ->
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = attentionColor,
-                maxLines = 2,
-            )
-        }
-        Icon(
-            imageVector = Icons.Default.Refresh,
-            contentDescription = stringResource(R.string.cd_refresh_status),
-            modifier = Modifier
-                .size(if (display == HeaderStatusAttention.Refreshing) 14.dp else 12.dp)
-                .refreshSpinning(display == HeaderStatusAttention.Refreshing)
-                .buddyDashClickable(
-                    enabled = enabled && display != HeaderStatusAttention.Refreshing,
-                    onClick = onRefresh,
-                ),
-            tint = iconTint,
-        )
-    }
+    Icon(
+        imageVector = Icons.Default.Refresh,
+        contentDescription = stringResource(R.string.cd_refresh_status),
+        modifier = modifier
+            .size(14.dp)
+            .refreshSpinning(true)
+            .buddyDashClickable(enabled = enabled, onClick = onRefresh),
+        tint = muted,
+    )
 }
 
 @Composable
