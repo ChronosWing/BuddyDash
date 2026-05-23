@@ -4,12 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -28,18 +28,18 @@ private const val HEADER_GRADIENT_TOP_LIFT = 0.22f
 // from reading as a gray rectangle. Radius 1.28× maxDimension covers the full header.
 private const val HEADER_LOGO_WASH_CENTER_ALPHA = 0.088f
 
-// Length of the atmospheric tail drawn below the header boundary (dp).
-// Long enough that the eye reads it as depth/atmosphere, not a visible gradient band.
-// Surface-over-surface blending is invisible on card backgrounds — only the
-// Slate950 background gaps are tinted, creating the soft header-to-content dissolve.
-private const val HEADER_ATMOSPHERE_DP = 200f
+// Height of the atmospheric fade drawn in the Scaffold content area (behind pills/cards).
+// Long enough to read as atmosphere rather than a visible gradient band.
+internal const val HEADER_ATMOSPHERE_DP = 200f
 
 /**
- * Static header ambience: base → gradient → subtle logo wash → texture → bleed tail.
+ * Static header ambience: base → gradient → subtle logo wash → texture.
  * No idle/print glow — see [HomeLogoGlowLayer].
  *
- * The draw box uses [graphicsLayer] with clip disabled so the wash circle and bleed
- * tail can extend below the header boundary, melting the header into the content area.
+ * The draw box uses [graphicsLayer] with clip disabled so the wash circle can
+ * extend naturally below the header boundary. The atmospheric surface fade is
+ * drawn separately via [HomeAtmosphericFade] in the Scaffold content area
+ * (behind pills and cards) to maintain the correct draw order.
  */
 @Composable
 fun HomeHeaderBackground(
@@ -60,13 +60,12 @@ fun HomeHeaderBackground(
         Box(
             Modifier
                 .matchParentSize()
-                // clip=false lets the wash circle and bleed tail draw below the header boundary.
+                // clip=false lets the wash circle extend below the header boundary,
+                // carrying the teal ambient tint into the content area with a soft falloff.
                 .graphicsLayer { clip = false }
                 .drawBehind {
                     // Top-down fade: richer navy at top, decays continuously to surface
                     // at the very bottom edge — no flat plateau, no tonal shelf.
-                    // Gradient keeps changing all the way to 100% so luminance never
-                    // visibly "stops" at an intermediate depth like the pill row.
                     drawRect(
                         brush = Brush.verticalGradient(
                             colorStops = arrayOf(
@@ -80,9 +79,8 @@ fun HomeHeaderBackground(
                         ),
                     )
 
-                    // Wash circle: large radius so the teal tint covers the full header.
-                    // With clip=false it extends naturally below the boundary — this is the
-                    // primary source of the soft header/content blend.
+                    // Wash circle: large radius covers the full header with teal tint.
+                    // With clip=false it extends naturally below the boundary.
                     val washCenter = Offset(size.width * 0.11f, size.height * 0.46f)
                     val washRadius = size.maxDimension * 1.28f
                     drawCircle(
@@ -101,32 +99,49 @@ fun HomeHeaderBackground(
                     )
 
                     drawHeaderDotTexture(alpha = HEADER_TEXTURE_DOT_ALPHA)
-
-                    // Atmospheric tail: dissolves the header surface colour into the
-                    // Slate950 content background over 200 dp. Invisible on card
-                    // backgrounds (surface blended over surface = no change); only
-                    // the raw Slate950 gaps are tinted, creating a mist-like fade.
-                    // Five stops spaced to avoid any visible band or shelf.
-                    val atmospherePx = HEADER_ATMOSPHERE_DP.dp.toPx()
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                surface.copy(alpha = 0.90f),
-                                surface.copy(alpha = 0.65f),
-                                surface.copy(alpha = 0.32f),
-                                surface.copy(alpha = 0.10f),
-                                Color.Transparent,
-                            ),
-                            startY = size.height,
-                            endY = size.height + atmospherePx,
-                        ),
-                        topLeft = Offset(0f, size.height),
-                        size = Size(size.width, atmospherePx),
-                    )
                 },
         )
         content()
     }
+}
+
+/**
+ * Atmospheric fade placed at the TOP of the Scaffold content area, behind all content.
+ * Dissolves the header surface colour (Slate900) into the Slate950 body background
+ * over [HEADER_ATMOSPHERE_DP] dp.
+ *
+ * Must be placed as the FIRST child of the Scaffold content Box so it draws behind
+ * pills and cards. Non-interactive — no pointer input is consumed.
+ *
+ * Position via [modifier]: use `Modifier.padding(top = innerPadding.calculateTopPadding())`
+ * so the fade starts at the content-area top (right below the header).
+ */
+@Composable
+fun HomeAtmosphericFade(modifier: Modifier = Modifier) {
+    val surface = MaterialTheme.colorScheme.surface
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(HEADER_ATMOSPHERE_DP.dp)
+            .drawBehind {
+                // Five stops spaced to avoid visible banding within the 200 dp range.
+                // surface.copy(alpha) over surface card backgrounds = no visible change;
+                // only the raw Slate950 body gaps are tinted — the mist dissolve effect.
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            surface.copy(alpha = 0.90f),
+                            surface.copy(alpha = 0.65f),
+                            surface.copy(alpha = 0.32f),
+                            surface.copy(alpha = 0.10f),
+                            Color.Transparent,
+                        ),
+                        startY = 0f,
+                        endY = size.height,
+                    ),
+                )
+            },
+    )
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHeaderDotTexture(alpha: Float) {
