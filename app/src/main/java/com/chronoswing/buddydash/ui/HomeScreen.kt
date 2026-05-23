@@ -119,6 +119,7 @@ fun HomeScreen(
         isRefreshing = uiState.isRefreshing,
         isEnriching = uiState.isEnriching,
         hasCompletedLoad = uiState.hasCompletedLoad,
+        hasAttemptedNetworkLoad = uiState.hasAttemptedNetworkLoad,
         error = uiState.error,
         refreshError = uiState.refreshError,
         isStaleCachedData = uiState.isStaleCachedData,
@@ -147,6 +148,7 @@ private fun HomeScreenContent(
     isRefreshing: Boolean,
     isEnriching: Boolean,
     hasCompletedLoad: Boolean,
+    hasAttemptedNetworkLoad: Boolean,
     error: String?,
     refreshError: String?,
     isStaleCachedData: Boolean,
@@ -192,13 +194,13 @@ private fun HomeScreenContent(
         refreshError = refreshError,
         lastUpdatedAtMillis = lastUpdatedAtMillis,
     )
-    val showStaleBanner = showHomeStaleDataBanner(
+    val showStaleBanner = hasAttemptedNetworkLoad && showHomeStaleDataBanner(
         printers = printers,
         isStaleCachedData = isStaleCachedData,
         refreshError = refreshError,
         lastUpdatedAtMillis = lastUpdatedAtMillis,
     )
-    val staleBannerRefreshFailed = showHomeStaleBannerRefreshFailed(
+    val staleBannerRefreshFailed = hasAttemptedNetworkLoad && showHomeStaleBannerRefreshFailed(
         printers = printers,
         isStaleCachedData = isStaleCachedData,
         refreshError = refreshError,

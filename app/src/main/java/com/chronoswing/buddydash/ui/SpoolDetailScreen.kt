@@ -75,6 +75,7 @@ fun SpoolDetailScreen(
         cameraToken = uiState.cameraToken,
         isLoading = uiState.isLoading,
         hasCompletedLoad = uiState.hasCompletedLoad,
+        hasAttemptedNetworkLoad = uiState.hasAttemptedNetworkLoad,
         error = uiState.error,
         isStaleCachedData = uiState.isStaleCachedData,
         isLimitedFromListCache = uiState.isLimitedFromListCache,
@@ -93,6 +94,7 @@ private fun SpoolDetailScreenContent(
     cameraToken: String,
     isLoading: Boolean,
     hasCompletedLoad: Boolean,
+    hasAttemptedNetworkLoad: Boolean,
     error: String?,
     isStaleCachedData: Boolean,
     isLimitedFromListCache: Boolean,
@@ -100,9 +102,9 @@ private fun SpoolDetailScreenContent(
     onRetry: () -> Unit,
     onArchiveClick: (Int) -> Unit,
 ) {
-    val showStaleBanner = spool != null && isStaleCachedData
-    val showInitialLoading = !hasCompletedLoad
-    val showOfflineEmpty = hasCompletedLoad && spool == null && error != null
+    val showStaleBanner = spool != null && isStaleCachedData && hasAttemptedNetworkLoad
+    val showInitialLoading = !hasCompletedLoad || (!hasAttemptedNetworkLoad && spool == null && error == null)
+    val showOfflineEmpty = hasCompletedLoad && hasAttemptedNetworkLoad && spool == null && error != null
     Scaffold(
         topBar = {
             TopAppBar(

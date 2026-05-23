@@ -85,6 +85,7 @@ fun ArchiveDetailScreen(
         archive = uiState.archive,
         isLoading = uiState.isLoading,
         hasCompletedLoad = uiState.hasCompletedLoad,
+        hasAttemptedNetworkLoad = uiState.hasAttemptedNetworkLoad,
         settingsReady = uiState.settingsReady,
         error = uiState.error,
         isStaleCachedData = uiState.isStaleCachedData,
@@ -119,6 +120,7 @@ private fun ArchiveDetailScreenContent(
     archive: PrintArchive?,
     isLoading: Boolean,
     hasCompletedLoad: Boolean,
+    hasAttemptedNetworkLoad: Boolean,
     settingsReady: Boolean,
     error: String?,
     isStaleCachedData: Boolean,
@@ -215,8 +217,9 @@ private fun ArchiveDetailScreenContent(
             }
         },
     ) { innerPadding ->
-        val showInitialLoading = !settingsReady || !hasCompletedLoad
-        val showOfflineEmpty = hasCompletedLoad && archive == null && error != null
+        val showInitialLoading = !settingsReady || !hasCompletedLoad ||
+            (!hasAttemptedNetworkLoad && archive == null && error == null)
+        val showOfflineEmpty = hasCompletedLoad && hasAttemptedNetworkLoad && archive == null && error != null
         when {
             showInitialLoading -> {
                 PrinterDetailSkeleton(Modifier.padding(innerPadding))
@@ -245,7 +248,7 @@ private fun ArchiveDetailScreenContent(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    if (isStaleCachedData) {
+                    if (isStaleCachedData && hasAttemptedNetworkLoad) {
                         OfflineStaleBanner(limited = isLimitedFromListCache)
                     }
                     ArchiveDetailBody(

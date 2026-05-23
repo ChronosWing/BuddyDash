@@ -82,6 +82,8 @@ data class ArchiveDetailUiState(
     val queuedPrinterId: Int? = null,
     val queuedPrinterName: String? = null,
     val queuedPrinterModel: String? = null,
+    /** True after the first network load attempt completes (success or failure). Gates stale/error UI. */
+    val hasAttemptedNetworkLoad: Boolean = false,
 )
 
 class ArchiveDetailViewModel(
@@ -258,6 +260,7 @@ class ArchiveDetailViewModel(
                         isStaleCachedData = false,
                         isLimitedFromListCache = false,
                         hasCompletedLoad = true,
+                        hasAttemptedNetworkLoad = true,
                     )
                 }
                 loadSpoolsForMaterialLink(archive)
@@ -286,6 +289,7 @@ class ArchiveDetailViewModel(
                         isStaleCachedData = true,
                         isLimitedFromListCache = fromList,
                         hasCompletedLoad = true,
+                        hasAttemptedNetworkLoad = true,
                     )
                 }
                 logOfflineLoadState(
@@ -308,12 +312,14 @@ class ArchiveDetailViewModel(
                     error = null,
                     isStaleCachedData = true,
                     hasCompletedLoad = true,
+                    hasAttemptedNetworkLoad = true,
                 )
             } else {
                 it.copy(
                     isLoading = false,
                     error = OFFLINE_NO_CACHE_MARKER,
                     hasCompletedLoad = true,
+                    hasAttemptedNetworkLoad = true,
                 )
             }
         }

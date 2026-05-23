@@ -56,6 +56,8 @@ data class ArchivesUiState(
     val statsTimeRange: ArchiveStatsTimeRange = ArchiveStatsTimeRange.Last30Days,
     val printerFilter: ArchivePrinterFilter? = null,
     val lastUpdatedAtMillis: Long? = null,
+    /** True after the first network load attempt completes (success or failure). Gates stale/error UI. */
+    val hasAttemptedNetworkLoad: Boolean = false,
 ) {
     val filteredArchives: List<PrintArchive> =
         applyArchiveListFilters(
@@ -328,6 +330,7 @@ class ArchivesViewModel(
                             isStaleCachedData = false,
                             hasCompletedLoad = true,
                             lastUpdatedAtMillis = updatedAt,
+                            hasAttemptedNetworkLoad = true,
                         )
                     }
                 },
@@ -349,6 +352,7 @@ class ArchivesViewModel(
                                 refreshError = message,
                                 isStaleCachedData = true,
                                 hasCompletedLoad = true,
+                                hasAttemptedNetworkLoad = true,
                             )
                         } else {
                             current.copy(
@@ -357,6 +361,7 @@ class ArchivesViewModel(
                                 error = message,
                                 refreshError = null,
                                 hasCompletedLoad = true,
+                                hasAttemptedNetworkLoad = true,
                             )
                         }
                     }

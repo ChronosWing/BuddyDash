@@ -54,6 +54,8 @@ data class SpoolsUiState(
     val filter: SpoolInventoryFilter = SpoolInventoryFilter.All,
     val archiveLookupFilter: ArchiveSpoolLookupFilter? = null,
     val printerFilamentActivityById: Map<Int, PrinterFilamentActivity> = emptyMap(),
+    /** True after the first network load attempt completes (success or failure). Gates stale/error UI. */
+    val hasAttemptedNetworkLoad: Boolean = false,
 ) {
     val showArchiveMatchHeader: Boolean get() = archiveLookupFilter != null
 
@@ -293,6 +295,7 @@ class SpoolsViewModel(
                                 isStaleCachedData = false,
                                 hasCompletedLoad = true,
                                 lastUpdatedAtMillis = updatedAt,
+                                hasAttemptedNetworkLoad = true,
                             )
                         }
                     },
@@ -317,6 +320,7 @@ class SpoolsViewModel(
                                     refreshError = message,
                                     isStaleCachedData = true,
                                     hasCompletedLoad = true,
+                                    hasAttemptedNetworkLoad = true,
                                 )
                             } else {
                                 current.copy(
@@ -325,6 +329,7 @@ class SpoolsViewModel(
                                     error = message,
                                     refreshError = null,
                                     hasCompletedLoad = true,
+                                    hasAttemptedNetworkLoad = true,
                                 )
                             }
                         }
