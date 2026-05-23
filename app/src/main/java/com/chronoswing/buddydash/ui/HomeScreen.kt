@@ -80,8 +80,7 @@ import com.chronoswing.buddydash.util.HOME_PRINTER_SEARCH_MIN_COUNT
 import com.chronoswing.buddydash.util.HomePrintersLoadState
 import com.chronoswing.buddydash.util.ListLoadUi
 import com.chronoswing.buddydash.util.resolveHomePrintersLoadState
-import com.chronoswing.buddydash.util.showHomeConnectionStaleInHeader
-import com.chronoswing.buddydash.util.showHomeOfflineInHeader
+import com.chronoswing.buddydash.util.showHomeStaleBannerRefreshFailed
 import com.chronoswing.buddydash.util.showHomeStaleDataBanner
 import com.chronoswing.buddydash.util.PrinterCardLabels
 import com.chronoswing.buddydash.util.HomePrinterSearchFilter
@@ -182,7 +181,7 @@ private fun HomeScreenContent(
         refreshError = refreshError,
         lastUpdatedAtMillis = lastUpdatedAtMillis,
     )
-    val preferOfflineInHeader = showHomeOfflineInHeader(
+    val staleBannerRefreshFailed = showHomeStaleBannerRefreshFailed(
         printers = printers,
         isStaleCachedData = isStaleCachedData,
         refreshError = refreshError,
@@ -213,17 +212,12 @@ private fun HomeScreenContent(
         // topBar height is only the branded header; content top padding matches that height.
         topBar = {
             HomeCompactTopBar(
-                ambientPulseEnabled = hasAnyPrinterPrinting(printers) &&
-                    !preferOfflineInHeader,
+                ambientPulseEnabled = hasAnyPrinterPrinting(printers) && !showStaleBanner,
                 appNameContentDescription = appNameContentDescription,
-                lastUpdatedAtMillis = lastUpdatedAtMillis,
                 isRefreshActive = isRefreshActive,
                 hasCredentials = hasCredentials,
                 isLoading = isLoading,
                 onRefresh = onRefresh,
-                isStaleCachedData = isStaleCachedData,
-                refreshError = refreshError,
-                hasCachedPrinters = cachedCount > 0,
                 showPrinterSearch = showPrinterSearch,
                 searchExpanded = searchExpanded,
                 onSearchToggle = {
@@ -310,6 +304,7 @@ private fun HomeScreenContent(
                     if (showStaleBanner) {
                         OfflineStaleBanner(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            refreshFailed = staleBannerRefreshFailed,
                         )
                     }
                     if (showHeaderMetadata) {
@@ -521,14 +516,10 @@ private fun hasAnyPrinterPrinting(printers: List<Printer>): Boolean =
 private fun HomeCompactTopBar(
     ambientPulseEnabled: Boolean,
     appNameContentDescription: String,
-    lastUpdatedAtMillis: Long?,
     isRefreshActive: Boolean,
     hasCredentials: Boolean,
     isLoading: Boolean,
     onRefresh: () -> Unit,
-    isStaleCachedData: Boolean,
-    refreshError: String?,
-    hasCachedPrinters: Boolean,
     showPrinterSearch: Boolean,
     searchExpanded: Boolean,
     onSearchToggle: () -> Unit,
@@ -555,14 +546,10 @@ private fun HomeCompactTopBar(
                 HomeTopBarTitle(
                     ambientPulseEnabled = ambientPulseEnabled,
                     appNameContentDescription = appNameContentDescription,
-                    lastUpdatedAtMillis = lastUpdatedAtMillis,
                     isRefreshActive = isRefreshActive,
                     hasCredentials = hasCredentials,
                     isLoading = isLoading,
                     onRefresh = onRefresh,
-                    isStaleCachedData = isStaleCachedData,
-                    refreshError = refreshError,
-                    hasCachedContent = hasCachedPrinters,
                     modifier = Modifier.weight(1f),
                 )
                 if (showPrinterSearch) {
@@ -585,14 +572,10 @@ private fun HomeCompactTopBar(
 private fun HomeTopBarTitle(
     ambientPulseEnabled: Boolean,
     appNameContentDescription: String,
-    lastUpdatedAtMillis: Long?,
     isRefreshActive: Boolean,
     hasCredentials: Boolean,
     isLoading: Boolean,
     onRefresh: () -> Unit,
-    isStaleCachedData: Boolean,
-    refreshError: String?,
-    hasCachedContent: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -609,13 +592,9 @@ private fun HomeTopBarTitle(
                 },
         )
         StatusLastUpdatedIndicator(
-            lastUpdatedAtMillis = lastUpdatedAtMillis,
             isRefreshing = isRefreshActive,
             enabled = hasCredentials && !isLoading,
             onRefresh = onRefresh,
-            hasCachedContent = hasCachedContent,
-            isStaleCachedData = isStaleCachedData,
-            refreshError = refreshError,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(start = HomeTitleStatusStartPadding),

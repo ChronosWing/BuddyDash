@@ -48,6 +48,7 @@ import com.chronoswing.buddydash.ui.components.FilamentColorSwatch
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
 import com.chronoswing.buddydash.util.showStaleDataBanner
+import com.chronoswing.buddydash.util.staleBannerShowsRefreshFailed
 import com.chronoswing.buddydash.ui.components.SpoolInventoryRow
 import com.chronoswing.buddydash.ui.components.SpoolListSkeleton
 import com.chronoswing.buddydash.ui.components.asImageVector
@@ -154,6 +155,11 @@ private fun SpoolsScreenContent(
         refreshError = refreshError,
         lastUpdatedAtMillis = lastUpdatedAtMillis,
     )
+    val staleBannerRefreshFailed = staleBannerShowsRefreshFailed(
+        hasCachedContent = cachedCount > 0,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+    )
     val showInitialSkeleton = ListLoadUi.showInitialSkeleton(
         hasCredentials = hasCredentials,
         cachedItemCount = cachedCount,
@@ -237,6 +243,7 @@ private fun SpoolsScreenContent(
                         if (showStaleBanner) {
                             OfflineStaleBanner(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                refreshFailed = staleBannerRefreshFailed,
                             )
                         }
                         SpoolSearchAndFilters(

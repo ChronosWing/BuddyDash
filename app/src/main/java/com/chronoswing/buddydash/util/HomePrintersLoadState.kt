@@ -68,35 +68,11 @@ fun showHomeStaleDataBanner(
     lastUpdatedAtMillis = lastUpdatedAtMillis,
 )
 
-fun showHomeOfflineInHeader(
+fun showHomeStaleBannerRefreshFailed(
     printers: List<Printer>,
     isStaleCachedData: Boolean,
     refreshError: String?,
-): Boolean = showOfflineInHeader(
-    hasCachedContent = printers.isNotEmpty(),
-    isStaleCachedData = isStaleCachedData,
-    refreshError = refreshError,
-)
-
-fun showHomeConnectionStaleInHeader(
-    printers: List<Printer>,
-    isStaleCachedData: Boolean = false,
-    refreshError: String?,
-    lastUpdatedAtMillis: Long?,
-): Boolean = showConnectionStaleInHeader(
-    hasCachedContent = printers.isNotEmpty(),
-    isStaleCachedData = isStaleCachedData,
-    refreshError = refreshError,
-    lastUpdatedAtMillis = lastUpdatedAtMillis,
-)
-
-fun resolveHomeHeaderStatusAttention(
-    isRefreshActive: Boolean,
-    printers: List<Printer>,
-    isStaleCachedData: Boolean,
-    refreshError: String?,
-): HeaderStatusAttention = resolveHeaderStatusAttention(
-    isRefreshActive = isRefreshActive,
+): Boolean = staleBannerShowsRefreshFailed(
     hasCachedContent = printers.isNotEmpty(),
     isStaleCachedData = isStaleCachedData,
     refreshError = refreshError,

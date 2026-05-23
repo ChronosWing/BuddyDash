@@ -49,6 +49,7 @@ import com.chronoswing.buddydash.ui.components.ErrorContent
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
 import com.chronoswing.buddydash.util.showStaleDataBanner
+import com.chronoswing.buddydash.util.staleBannerShowsRefreshFailed
 import com.chronoswing.buddydash.ui.components.asImageVector
 import com.chronoswing.buddydash.util.ArchivePrinterFilter
 import com.chronoswing.buddydash.util.ArchiveResultFilter
@@ -150,6 +151,11 @@ private fun ArchivesScreenContent(
         refreshError = refreshError,
         lastUpdatedAtMillis = lastUpdatedAtMillis,
     )
+    val staleBannerRefreshFailed = staleBannerShowsRefreshFailed(
+        hasCachedContent = cachedCount > 0,
+        isStaleCachedData = isStaleCachedData,
+        refreshError = refreshError,
+    )
     val showInitialSkeleton = ListLoadUi.showInitialSkeleton(
         hasCredentials = hasCredentials,
         cachedItemCount = cachedCount,
@@ -215,6 +221,7 @@ private fun ArchivesScreenContent(
                     if (showStaleBanner) {
                         OfflineStaleBanner(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            refreshFailed = staleBannerRefreshFailed,
                         )
                     }
                     PrimaryTabRow(selectedTabIndex = selectedTabIndex) {

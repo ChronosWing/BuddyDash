@@ -89,109 +89,45 @@ class HomePrintersLoadStateTest {
     }
 
     @Test
-    fun showOfflineInHeader_whenStaleCacheBeforeFirstRefresh() {
+    fun showStaleBannerRefreshFailed_whenNonOfflineRefreshError() {
         assertTrue(
-            showHomeOfflineInHeader(
-                printers = listOf(samplePrinter()),
-                isStaleCachedData = true,
-                refreshError = null,
-            ),
-        )
-    }
-
-    @Test
-    fun showOfflineInHeader_whenUnreachableRefreshFails() {
-        assertTrue(
-            showHomeOfflineInHeader(
-                printers = listOf(samplePrinter()),
-                isStaleCachedData = true,
-                refreshError = "Can't reach server. Check the URL and network.",
-            ),
-        )
-    }
-
-    @Test
-    fun resolveHeaderStatusAttention_refreshingWhileHealthy() {
-        assertEquals(
-            HeaderStatusAttention.Refreshing,
-            resolveHomeHeaderStatusAttention(
-                isRefreshActive = true,
-                printers = listOf(samplePrinter()),
-                isStaleCachedData = false,
-                refreshError = null,
-            ),
-        )
-    }
-
-    @Test
-    fun resolveHeaderStatusAttention_refreshingDuringOfflineStale() {
-        assertEquals(
-            HeaderStatusAttention.Refreshing,
-            resolveHomeHeaderStatusAttention(
-                isRefreshActive = true,
-                printers = listOf(samplePrinter()),
-                isStaleCachedData = true,
-                refreshError = null,
-            ),
-        )
-    }
-
-    @Test
-    fun resolveHeaderStatusAttention_noneWhenHealthy() {
-        assertEquals(
-            HeaderStatusAttention.None,
-            resolveHomeHeaderStatusAttention(
-                isRefreshActive = false,
-                printers = listOf(samplePrinter()),
-                isStaleCachedData = false,
-                refreshError = null,
-            ),
-        )
-    }
-
-    @Test
-    fun showConnectionStaleInHeader_whenNonOfflineRefreshError() {
-        assertTrue(
-            showHomeConnectionStaleInHeader(
+            showHomeStaleBannerRefreshFailed(
                 printers = listOf(samplePrinter()),
                 isStaleCachedData = true,
                 refreshError = "Invalid API key.",
-                lastUpdatedAtMillis = System.currentTimeMillis(),
             ),
         )
     }
 
     @Test
-    fun showConnectionStaleInHeader_falseWhenOfflineStale() {
+    fun showStaleBannerRefreshFailed_falseWhenOfflineStale() {
         assertFalse(
-            showHomeConnectionStaleInHeader(
+            showHomeStaleBannerRefreshFailed(
                 printers = listOf(samplePrinter()),
                 isStaleCachedData = true,
                 refreshError = "Can't reach server. Check the URL and network.",
-                lastUpdatedAtMillis = System.currentTimeMillis(),
             ),
         )
     }
 
     @Test
-    fun showConnectionStaleInHeader_falseWhenNoCache() {
+    fun showStaleBannerRefreshFailed_falseWhenNoCache() {
         assertFalse(
-            showHomeConnectionStaleInHeader(
+            showHomeStaleBannerRefreshFailed(
                 printers = emptyList(),
+                isStaleCachedData = true,
                 refreshError = "Could not refresh printers",
-                lastUpdatedAtMillis = null,
             ),
         )
     }
 
     @Test
-    fun showConnectionStaleInHeader_falseWhenOnlyConnectionAgeStale() {
+    fun showStaleBannerRefreshFailed_falseWhenOnlyStaleFlagWithoutError() {
         assertFalse(
-            showHomeConnectionStaleInHeader(
+            showHomeStaleBannerRefreshFailed(
                 printers = listOf(samplePrinter()),
-                isStaleCachedData = false,
+                isStaleCachedData = true,
                 refreshError = null,
-                lastUpdatedAtMillis = System.currentTimeMillis() - 120_000L,
             ),
         )
     }
