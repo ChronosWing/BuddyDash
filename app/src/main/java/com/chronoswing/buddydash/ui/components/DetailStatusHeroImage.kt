@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.ui.components
 
+import android.graphics.drawable.BitmapDrawable
 import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,7 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -35,9 +37,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import coil.compose.SubcomposeAsyncImage
+import coil.imageLoader
 import coil.request.CachePolicy
+import coil.request.ErrorResult
 import coil.request.ImageRequest
+import coil.request.SuccessResult
 import coil.size.Size as CoilSize
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.network.BambuddyApi
@@ -204,19 +208,17 @@ fun PrinterLiveCameraSnapshot(
 /**
  * Camera snapshot with smooth crossfade between frames.
  *
- * Architecture: loading and display are fully decoupled.
- * - A zero-size invisible [SubcomposeAsyncImage] drives the Coil request and fires slot
- *   composables when state changes (loading / success / error).
- * - Two overlay layers in the outer [Box] handle display:
- *     1. Back layer  — the last successfully committed frame (or a placeholder).
- *     2. Front layer — the newly loaded frame, alpha-animated 0→1 via [Animatable].
+ * Architecture: [imageLoader.execute] is called imperatively inside [LaunchedEffect] keyed on
+ * [imageCacheKey]. The coroutine owns the full load→animate→promote lifecycle. When a new key
+ * arrives (next refresh tick), Compose automatically cancels the previous coroutine, which also
+ * cancels any in-progress animation. The new coroutine resets state before starting the next load.
  *
- * When the front layer reaches alpha 1, the new frame is committed to the back layer and
- * the front layer is cleared. On error the back layer remains unchanged.
+ * Display is a plain [Box] with two layers:
+ *   1. Back layer  — [stablePainter]: the last committed frame, always at alpha 1.
+ *   2. Front layer — [incomingPainter]: the newly loaded frame, alpha 0→1 via [Animatable].
  *
- * This avoids the previous bug where [Crossfade] lived *inside* the [SubcomposeAsyncImage]
- * success slot — that slot is torn down on every request change, so Crossfade always started
- * at its target state immediately with no visible animation.
+ * [BitmapPainter] is used instead of [AsyncImagePainter] so the painter is a stable, self-contained
+ * object that is not tied to Coil's internal request lifecycle.
  */
 @Composable
 fun PrinterCameraSnapshotImage(
@@ -250,64 +252,116 @@ fun PrinterCameraSnapshotImage(
     val reducedMotion = rememberPrefersReducedMotion()
     val fadeMs = if (reducedMotion || snapshotCrossfadeMs <= 0) 0 else snapshotCrossfadeMs
 
-    // ── Persistent display state — survives request changes, resets on printer change ──────
-    // stablePainter: the last successfully committed frame. Always shown in the back layer.
+    // Persistent display state — survives request changes, resets on printer change.
     var stablePainter by remember(printerId) { mutableStateOf<Painter?>(null) }
-    // incomingPainter: the newly loaded frame currently fading in. Null when not animating.
     var incomingPainter by remember(printerId) { mutableStateOf<Painter?>(null) }
-    // incomingAlpha: drives the front-layer fade. Animates 0→1, then front is committed + cleared.
     val incomingAlpha = remember(printerId) { Animatable(0f) }
 
-    LaunchedEffect(refreshTickNumber, refreshTick, imageUrl, imageCacheKey, printerModel) {
-        if (!BuddyDashDebug.enabled) return@LaunchedEffect
-        Log.d(
-            TAG_CAMERA,
-            "Snapshot refresh model=${printerModel.orEmpty().ifEmpty { "(unknown)" }} " +
-                "tickNumber=$refreshTickNumber cacheBust=$refreshTick cacheKey=$imageCacheKey " +
-                "stableExists=${stablePainter != null} url=${redactImageToken(imageUrl)}",
-        )
-    }
-
     val context = LocalContext.current
-    // CoilSize.ORIGINAL ensures the full image loads regardless of the 0.dp display size below.
-    val request = remember(imageUrl, imageCacheKey) {
-        ImageRequest.Builder(context)
+
+    // One coroutine per imageCacheKey. Cancelled automatically when the key changes,
+    // which also stops any in-progress animation.
+    LaunchedEffect(imageCacheKey) {
+        // Clean up any interrupted crossfade from a previous key.
+        incomingAlpha.stop()
+        incomingAlpha.snapTo(0f)
+        incomingPainter = null
+
+        if (BuddyDashDebug.enabled) {
+            Log.d(
+                TAG_CAMERA,
+                "Snapshot key=$imageCacheKey tickNumber=$refreshTickNumber " +
+                    "model=${printerModel.orEmpty().ifEmpty { "(unknown)" }} " +
+                    "stableExists=${stablePainter != null}",
+            )
+        }
+
+        if (stablePainter == null) {
+            onLoadingChanged(true)
+        }
+
+        if (BuddyDashDebug.enabled) {
+            Log.d(TAG_CAMERA, "Snapshot load started key=$imageCacheKey")
+        }
+
+        val request = ImageRequest.Builder(context)
             .data(imageUrl)
             .memoryCacheKey(imageCacheKey)
             .diskCachePolicy(CachePolicy.DISABLED)
             .size(CoilSize.ORIGINAL)
-            .crossfade(false)
-            .listener(
-                onStart = {
-                    if (BuddyDashDebug.enabled) {
-                        Log.d(
-                            TAG_CAMERA,
-                            "Snapshot load start model=${printerModel.orEmpty().ifEmpty { "(unknown)" }} " +
-                                "tickNumber=$refreshTickNumber cacheKey=$imageCacheKey",
-                        )
-                    }
-                },
-                onSuccess = { _, _ ->
-                    if (BuddyDashDebug.enabled) {
-                        Log.d(
-                            TAG_CAMERA,
-                            "Snapshot load ok model=${printerModel.orEmpty().ifEmpty { "(unknown)" }} " +
-                                "tickNumber=$refreshTickNumber cacheKey=$imageCacheKey",
-                        )
-                    }
-                },
-                onError = { _, result ->
-                    if (BuddyDashDebug.enabled) {
-                        Log.d(
-                            TAG_CAMERA,
-                            "Snapshot load failed model=${printerModel.orEmpty().ifEmpty { "(unknown)" }} " +
-                                "tickNumber=$refreshTickNumber cacheKey=$imageCacheKey " +
-                                "error=${result.throwable.message}",
-                        )
-                    }
-                },
-            )
             .build()
+
+        val result = context.imageLoader.execute(request)
+
+        when (result) {
+            is SuccessResult -> {
+                val bitmap = (result.drawable as? BitmapDrawable)?.bitmap
+                if (bitmap == null) {
+                    // Non-bitmap drawable: not expected for camera snapshots, treat as error.
+                    if (BuddyDashDebug.enabled) {
+                        Log.d(TAG_CAMERA, "Snapshot load success but non-bitmap drawable key=$imageCacheKey")
+                    }
+                    onLoadingChanged(false)
+                    if (stablePainter == null) onLoadFailed()
+                    return@LaunchedEffect
+                }
+
+                // BitmapPainter is a stable, self-contained painter not tied to Coil internals.
+                val newPainter: Painter = BitmapPainter(bitmap.asImageBitmap())
+
+                if (BuddyDashDebug.enabled) {
+                    Log.d(
+                        TAG_CAMERA,
+                        "Snapshot load success key=$imageCacheKey hasPrior=${stablePainter != null}",
+                    )
+                }
+
+                onLoadingChanged(false)
+
+                if (fadeMs > 0 && stablePainter != null) {
+                    if (BuddyDashDebug.enabled) {
+                        Log.d(TAG_CAMERA, "Snapshot fade start key=$imageCacheKey fadeMs=$fadeMs")
+                    }
+                    // incomingAlpha is already at 0f from the reset above.
+                    incomingPainter = newPainter
+                    incomingAlpha.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(
+                            durationMillis = fadeMs,
+                            easing = FastOutSlowInEasing,
+                        ),
+                    )
+                    // Promote: move incoming to stable and clear the front layer.
+                    stablePainter = newPainter
+                    incomingPainter = null
+                    if (BuddyDashDebug.enabled) {
+                        Log.d(TAG_CAMERA, "Snapshot fade complete, stable promoted key=$imageCacheKey")
+                    }
+                } else {
+                    // First load or reduced motion: display immediately, no animation.
+                    stablePainter = newPainter
+                    if (BuddyDashDebug.enabled) {
+                        Log.d(TAG_CAMERA, "Snapshot stable promoted immediately key=$imageCacheKey")
+                    }
+                }
+            }
+
+            is ErrorResult -> {
+                if (BuddyDashDebug.enabled) {
+                    Log.d(
+                        TAG_CAMERA,
+                        "Snapshot load failed key=$imageCacheKey " +
+                            "hasPrior=${stablePainter != null} " +
+                            "error=${result.throwable.message}",
+                    )
+                }
+                onLoadingChanged(false)
+                // If we have a stable frame, keep it — do not blank or signal failure.
+                if (stablePainter == null) {
+                    onLoadFailed()
+                }
+            }
+        }
     }
 
     val shape = RoundedCornerShape(10.dp)
@@ -328,7 +382,7 @@ fun PrinterCameraSnapshotImage(
         contentAlignment = Alignment.Center,
     ) {
         // ── Back layer: stable committed frame ──────────────────────────────────────────────
-        // Shown permanently once the first frame loads; never blanked during refreshes.
+        // Permanently visible once the first frame loads. Never blanked during refreshes.
         if (stablePainter != null) {
             CameraSnapshotFrame(
                 painter = stablePainter!!,
@@ -340,7 +394,7 @@ fun PrinterCameraSnapshotImage(
         }
 
         // ── Front layer: incoming frame fading in ───────────────────────────────────────────
-        // Only present while an animation is in progress (incomingAlpha 0→1).
+        // Only present during an active crossfade (incomingAlpha 0→1).
         incomingPainter?.let { incoming ->
             Box(
                 modifier = Modifier
@@ -354,78 +408,6 @@ fun PrinterCameraSnapshotImage(
                 )
             }
         }
-
-        // ── Invisible loader ────────────────────────────────────────────────────────────────
-        // Zero-size: no layout footprint, no input interception.
-        // CoilSize.ORIGINAL on the request overrides this so the full image still loads.
-        SubcomposeAsyncImage(
-            model = request,
-            contentDescription = null,
-            modifier = Modifier.size(0.dp),
-            loading = {
-                // Only surface a loading signal while the very first frame is pending.
-                // Once we have a stable frame, refreshes happen silently behind the scene.
-                if (stablePainter == null) {
-                    LaunchedEffect(imageCacheKey) { onLoadingChanged(true) }
-                }
-            },
-            error = {
-                LaunchedEffect(imageCacheKey) {
-                    onLoadingChanged(false)
-                    if (stablePainter == null) {
-                        // No prior frame — surface the failure so the caller can fall back.
-                        onLoadFailed()
-                    }
-                    if (BuddyDashDebug.enabled) {
-                        Log.d(
-                            TAG_CAMERA,
-                            "Snapshot slot=error model=${printerModel.orEmpty().ifEmpty { "(unknown)" }} " +
-                                "cacheKey=$imageCacheKey hasPrior=${stablePainter != null}",
-                        )
-                    }
-                }
-            },
-            success = { state ->
-                val newPainter = state.painter
-                // LaunchedEffect is scoped to this subcomposition slot.
-                // It is automatically cancelled when the slot is disposed (i.e. when a new
-                // request starts loading), which safely aborts any in-progress animation.
-                // incomingAlpha.snapTo(0f) at the start of the next animation resets cleanly.
-                LaunchedEffect(imageCacheKey) {
-                    onLoadingChanged(false)
-                    val animationPath = when {
-                        fadeMs <= 0 -> "staticNoFade"
-                        stablePainter == null -> "firstLoad"
-                        else -> "crossfadeFromPrevious"
-                    }
-                    if (BuddyDashDebug.enabled) {
-                        Log.d(
-                            TAG_CAMERA,
-                            "Snapshot slot=success model=${printerModel.orEmpty().ifEmpty { "(unknown)" }} " +
-                                "cacheKey=$imageCacheKey animationPath=$animationPath",
-                        )
-                    }
-                    if (fadeMs > 0 && stablePainter != null) {
-                        // Crossfade: animate the incoming frame over the stable back layer.
-                        incomingAlpha.snapTo(0f)   // ensure front starts invisible
-                        incomingPainter = newPainter
-                        incomingAlpha.animateTo(
-                            targetValue = 1f,
-                            animationSpec = tween(
-                                durationMillis = fadeMs,
-                                easing = FastOutSlowInEasing,
-                            ),
-                        )
-                        // Commit: promote incoming to stable and clear the front layer.
-                        stablePainter = newPainter
-                        incomingPainter = null
-                    } else {
-                        // First load or motion disabled: immediate display, no animation.
-                        stablePainter = newPainter
-                    }
-                }
-            },
-        )
     }
 }
 
