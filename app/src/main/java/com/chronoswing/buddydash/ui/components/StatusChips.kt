@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -27,7 +26,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -106,6 +104,8 @@ fun PrinterQuickStatusRow(
 }
 
 private val HmsAmber = Color(0xFFFBBF24)
+private val CompactAlertIconSize = 16.dp
+private val CompactAlertTouchTargetSize = 44.dp
 
 /**
  * Compact bare icon indicator for active HMS health alerts on the Home card.
@@ -257,16 +257,25 @@ private fun UnifiedPrinterAlertTouchTarget(
     onClick: () -> Unit,
 ) {
     val alertsCd = stringResource(R.string.cd_printer_alerts)
-    Row(
-        modifier = Modifier
-            .sizeIn(minWidth = 48.dp, minHeight = 44.dp)
-            .buddyDashClickable(onClick = onClick)
-            .semantics { contentDescription = alertsCd },
-        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
+    val groupWidth = CompactAlertIconSize * 2 + 4.dp
+
+    Box(
+        modifier = Modifier.size(width = groupWidth, height = CompactAlertIconSize),
+        contentAlignment = Alignment.Center,
     ) {
-        HmsStatusIcon(severity = hmsAlertSeverity)
-        MaintenanceHomeIndicatorIcon(indicator = maintenanceIndicator)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            HmsStatusIcon(severity = hmsAlertSeverity)
+            MaintenanceHomeIndicatorIcon(indicator = maintenanceIndicator)
+        }
+        Box(
+            modifier = Modifier
+                .size(CompactAlertTouchTargetSize)
+                .buddyDashClickable(onClick = onClick)
+                .semantics { contentDescription = alertsCd },
+        )
     }
 }
 
@@ -279,24 +288,23 @@ private fun CompactAlertIcon(
     onClick: (() -> Unit)? = null,
 ) {
     Box(
-        modifier = modifier.compactAlertTouchTarget(onClick = onClick),
+        modifier = modifier.size(CompactAlertIconSize),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = imageVector,
-            contentDescription = contentDescription,
-            modifier = Modifier.size(16.dp),
+            contentDescription = if (onClick == null) contentDescription else null,
+            modifier = Modifier.size(CompactAlertIconSize),
             tint = tint,
         )
-    }
-}
-
-private fun Modifier.compactAlertTouchTarget(onClick: (() -> Unit)?): Modifier = composed {
-    if (onClick != null) {
-        sizeIn(minWidth = 44.dp, minHeight = 44.dp)
-            .buddyDashClickable(onClick = onClick)
-    } else {
-        size(16.dp)
+        if (onClick != null) {
+            Box(
+                modifier = Modifier
+                    .size(CompactAlertTouchTargetSize)
+                    .buddyDashClickable(onClick = onClick)
+                    .semantics { this.contentDescription = contentDescription },
+            )
+        }
     }
 }
 
