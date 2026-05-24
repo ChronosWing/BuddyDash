@@ -57,6 +57,7 @@ import com.chronoswing.buddydash.ui.components.FilamentUsageText
 import com.chronoswing.buddydash.ui.components.PrinterDetailSkeleton
 import com.chronoswing.buddydash.ui.components.LowSpoolChip
 import com.chronoswing.buddydash.ui.components.SectionHeader
+import com.chronoswing.buddydash.ui.layout.rememberBuddyDashExpandedGridColumnCount
 import com.chronoswing.buddydash.util.formatSpoolCardTitle
 import com.chronoswing.buddydash.util.formatSpoolLastUsed
 import com.chronoswing.buddydash.util.formatSpoolLocationLine
@@ -171,6 +172,9 @@ private fun SpoolDetailScreenContent(
             )
             else -> {
                 val spool = spool ?: return@AnimatedContent
+                val expandedColumns = rememberBuddyDashExpandedGridColumnCount()
+                val showUsageSection = !isLimitedFromListCache || usageDisplayItems.isNotEmpty()
+                val useTwoColumnLayout = expandedColumns > 1 && showUsageSection
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -184,16 +188,28 @@ private fun SpoolDetailScreenContent(
                             limited = isLimitedFromListCache,
                         )
                     }
-                    item(key = "hero") {
-                        SpoolDetailHero(spool = spool)
-                    }
-                    item(key = "fields") {
-                        SpoolDetailFields(spool = spool)
-                    }
-                    if (!isLimitedFromListCache || usageDisplayItems.isNotEmpty()) {
-                        item(key = "usage_section") {
-                            SpoolUsageHistorySection(
-                                items = usageDisplayItems,
+                    if (!useTwoColumnLayout) {
+                        item(key = "hero") {
+                            SpoolDetailHero(spool = spool)
+                        }
+                        item(key = "fields") {
+                            SpoolDetailFields(spool = spool)
+                        }
+                        if (showUsageSection) {
+                            item(key = "usage_section") {
+                                SpoolUsageHistorySection(
+                                    items = usageDisplayItems,
+                                    serverUrl = serverUrl,
+                                    cameraToken = cameraToken,
+                                    onArchiveClick = onArchiveClick,
+                                )
+                            }
+                        }
+                    } else {
+                        item(key = "detail_columns") {
+                            SpoolDetailExpandedColumns(
+                                spool = spool,
+                                usageDisplayItems = usageDisplayItems,
                                 serverUrl = serverUrl,
                                 cameraToken = cameraToken,
                                 onArchiveClick = onArchiveClick,
@@ -205,6 +221,40 @@ private fun SpoolDetailScreenContent(
         }
         } // AnimatedContent
         } // Box
+    }
+}
+
+@Composable
+private fun SpoolDetailExpandedColumns(
+    spool: SpoolInventoryItem,
+    usageDisplayItems: List<SpoolUsageDisplayItem>,
+    serverUrl: String,
+    cameraToken: String,
+    onArchiveClick: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            SpoolDetailHero(spool = spool)
+            SpoolDetailFields(spool = spool)
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            SpoolUsageHistorySection(
+                items = usageDisplayItems,
+                serverUrl = serverUrl,
+                cameraToken = cameraToken,
+                onArchiveClick = onArchiveClick,
+            )
+        }
     }
 }
 
