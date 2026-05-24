@@ -29,7 +29,14 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -95,6 +102,7 @@ import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterCoverImage
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
+import com.chronoswing.buddydash.ui.layout.rememberHomePrinterGridColumnCount
 import com.chronoswing.buddydash.util.HOME_PRINTER_SEARCH_MIN_COUNT
 import com.chronoswing.buddydash.util.HomePrintersLoadState
 import com.chronoswing.buddydash.util.ListLoadUi
@@ -227,6 +235,8 @@ private fun HomeScreenContent(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchFilter by rememberSaveable { mutableStateOf(HomePrinterSearchFilter.All) }
     val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+    val printerGridColumns = rememberHomePrinterGridColumnCount()
 
     if (searchExpanded) {
         BackHandler {
@@ -381,41 +391,19 @@ private fun HomeScreenContent(
                         onRefresh = onPullRefresh,
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(
-                                start = 12.dp,
-                                end = 12.dp,
-                                top = HomePrinterListTopPadding,
-                                bottom = 8.dp,
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            if (searchExpanded && filteredPrinters.isEmpty()) {
-                                item(key = "search_empty") {
-                                    EmptyContent(
-                                        message = stringResource(
-                                            homeSearchEmptyMessageRes(searchQuery, searchFilter),
-                                        ),
-                                        subtitle = stringResource(R.string.empty_hint_search),
-                                        icon = BuddyDashEmptyIcon.Search.asImageVector(),
-                                        modifier = Modifier.padding(vertical = 12.dp),
-                                    )
-                                }
-                            }
-                            items(filteredPrinters, key = { it.id }) { printer ->
-                                GlancePrinterCard(
-                                    labels = printer.toCardLabels(),
-                                    printerId = printer.id,
-                                    liveStatus = printer.liveStatus,
-                                    serverUrl = serverUrl,
-                                    cameraToken = cameraToken,
-                                    onClick = { onPrinterClick(printer) },
-                                    onClearPrinterHms = onClearPrinterHms,
-                                )
-                            }
-                        }
+                        HomePrinterCardsList(
+                            filteredPrinters = filteredPrinters,
+                            gridColumns = printerGridColumns,
+                            listState = listState,
+                            gridState = gridState,
+                            searchExpanded = searchExpanded,
+                            searchQuery = searchQuery,
+                            searchFilter = searchFilter,
+                            serverUrl = serverUrl,
+                            cameraToken = cameraToken,
+                            onPrinterClick = onPrinterClick,
+                            onClearPrinterHms = onClearPrinterHms,
+                        )
                     }
                 }
             }
@@ -423,6 +411,118 @@ private fun HomeScreenContent(
         } // AnimatedContent
         } // Box
     }
+}
+
+@Composable
+private fun HomePrinterCardsList(
+    filteredPrinters: List<Printer>,
+    gridColumns: Int,
+    listState: LazyListState,
+    gridState: LazyGridState,
+    searchExpanded: Boolean,
+    searchQuery: String,
+    searchFilter: HomePrinterSearchFilter,
+    serverUrl: String,
+    cameraToken: String,
+    onPrinterClick: (Printer) -> Unit,
+    onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
+) {
+    val contentPadding = PaddingValues(
+        start = 12.dp,
+        end = 12.dp,
+        top = HomePrinterListTopPadding,
+        bottom = 8.dp,
+    )
+    val showSearchEmpty = searchExpanded && filteredPrinters.isEmpty()
+
+    if (gridColumns <= 1) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (showSearchEmpty) {
+                item(key = "search_empty") {
+                    HomePrinterSearchEmptyContent(
+                        searchQuery = searchQuery,
+                        searchFilter = searchFilter,
+                    )
+                }
+            }
+            items(filteredPrinters, key = { it.id }) { printer ->
+                HomePrinterCardItem(
+                    printer = printer,
+                    serverUrl = serverUrl,
+                    cameraToken = cameraToken,
+                    onPrinterClick = onPrinterClick,
+                    onClearPrinterHms = onClearPrinterHms,
+                )
+            }
+        }
+    } else {
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Fixed(gridColumns),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = contentPadding,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (showSearchEmpty) {
+                item(
+                    key = "search_empty",
+                    span = { GridItemSpan(maxLineSpan) },
+                ) {
+                    HomePrinterSearchEmptyContent(
+                        searchQuery = searchQuery,
+                        searchFilter = searchFilter,
+                    )
+                }
+            }
+            items(filteredPrinters, key = { it.id }) { printer ->
+                HomePrinterCardItem(
+                    printer = printer,
+                    serverUrl = serverUrl,
+                    cameraToken = cameraToken,
+                    onPrinterClick = onPrinterClick,
+                    onClearPrinterHms = onClearPrinterHms,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomePrinterSearchEmptyContent(
+    searchQuery: String,
+    searchFilter: HomePrinterSearchFilter,
+) {
+    EmptyContent(
+        message = stringResource(homeSearchEmptyMessageRes(searchQuery, searchFilter)),
+        subtitle = stringResource(R.string.empty_hint_search),
+        icon = BuddyDashEmptyIcon.Search.asImageVector(),
+        modifier = Modifier.padding(vertical = 12.dp),
+    )
+}
+
+@Composable
+private fun HomePrinterCardItem(
+    printer: Printer,
+    serverUrl: String,
+    cameraToken: String,
+    onPrinterClick: (Printer) -> Unit,
+    onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
+) {
+    GlancePrinterCard(
+        labels = printer.toCardLabels(),
+        printerId = printer.id,
+        liveStatus = printer.liveStatus,
+        serverUrl = serverUrl,
+        cameraToken = cameraToken,
+        onClick = { onPrinterClick(printer) },
+        onClearPrinterHms = onClearPrinterHms,
+    )
 }
 
 @Composable
