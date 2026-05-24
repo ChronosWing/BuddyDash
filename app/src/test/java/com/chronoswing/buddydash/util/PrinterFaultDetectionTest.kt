@@ -163,4 +163,47 @@ class PrinterFaultDetectionTest {
         )
         assertEquals(HmsSeverity.Unknown, status.resolveHmsAlertSeverity())
     }
+
+    // ── BambuHmsLookup ──────────────────────────────────────────────────────
+
+    @Test
+    fun bambuHmsLookup_formatDisplayCode_module5_code0xc010() {
+        // module=5 → "0500", code="0xc010" → "C010"
+        assertEquals("[0500-C010]", BambuHmsLookup.formatDisplayCode(5, "0xc010"))
+    }
+
+    @Test
+    fun bambuHmsLookup_formatDisplayCode_uppercasesInput() {
+        assertEquals("[0500-C010]", BambuHmsLookup.formatDisplayCode(5, "0XC010"))
+    }
+
+    @Test
+    fun bambuHmsLookup_formatDisplayCode_module3() {
+        assertEquals("[0300-4000]", BambuHmsLookup.formatDisplayCode(3, "0x4000"))
+    }
+
+    @Test
+    fun bambuHmsLookup_lookup_microSdCard_returnsWarning() {
+        val info = BambuHmsLookup.lookup(5, "0xc010")
+        assertEquals(HmsAlertLevel.Warning, info?.alertLevel)
+    }
+
+    @Test
+    fun bambuHmsLookup_lookup_microSdCard_hasMessage() {
+        val info = BambuHmsLookup.lookup(5, "0xc010")
+        assertTrue(info?.message?.contains("MicroSD") == true)
+    }
+
+    @Test
+    fun resolveHmsAlertSeverity_lookupOverridesApiSeverity() {
+        // API sends severity=3 (which would map to Notification/Unknown),
+        // but lookup table classifies [0500-C010] as Warning.
+        val status = PrinterStatus(
+            connected = true, rawState = "IDLE",
+            fileName = null, progress = null, remainingTimeSeconds = null,
+            nozzleTemp = null, bedTemp = null,
+            hmsErrors = listOf(PrinterHmsError(code = "0xc010", module = 5, severity = 3)),
+        )
+        assertEquals(HmsSeverity.Warning, status.resolveHmsAlertSeverity())
+    }
 }

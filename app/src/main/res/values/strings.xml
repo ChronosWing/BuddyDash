@@ -203,6 +203,7 @@
     <string name="hms_sheet_severity_notification">Notification</string>
     <string name="hms_sheet_severity_unknown">Unknown severity</string>
     <string name="hms_sheet_no_entries">No HMS alert details available.</string>
+    <string name="hms_sheet_wiki_link">View on Bambu Lab Wiki</string>
     <string name="cd_hms_chip_warning">HMS warning active — tap for details</string>
     <string name="cd_hms_chip_error">HMS error active — tap for details</string>
     <string name="cd_hms_chip_unknown">HMS alert active — tap for details</string>

@@ -112,13 +112,17 @@ fun PrinterStatus.resolveHmsAlertSeverity(): HmsSeverity {
     var hasWarning = false
 
     for (entry in hmsErrors) {
-        val level = entry.alertLevel()
+        // Lookup table takes priority — BambuBuddy's raw severity integer does not reliably
+        // map to Warning/Error for all codes; the lookup carries the correct classification.
+        val lookupInfo = BambuHmsLookup.lookup(entry)
+        val level = lookupInfo?.alertLevel ?: entry.alertLevel()
         if (DEBUG_LOG_STATUS_MAP) {
+            val source = if (lookupInfo != null) "lookup" else "api-field"
             Log.d(
                 TAG_STATUS_MAP,
                 "resolveHmsAlertSeverity: entry code='${entry.code}' severity=${entry.severity} " +
                     "module=${entry.module} attr=${entry.attr} " +
-                    "→ alertLevel=$level reason=${hmsAlertLevelReason(entry, level)}",
+                    "→ alertLevel=$level source=$source reason=${hmsAlertLevelReason(entry, level)}",
             )
         }
         when (level) {
