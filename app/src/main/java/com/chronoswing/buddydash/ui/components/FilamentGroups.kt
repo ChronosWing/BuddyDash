@@ -19,6 +19,8 @@ import com.chronoswing.buddydash.util.FilamentSlotDisplay
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -144,17 +146,20 @@ private fun FilamentHomeSourceSection(
 }
 
 /** Grouped filament layout for the detail Filament tab. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FilamentDetailGroups(
     slotDisplays: List<FilamentSlotDisplay>,
     cardMicroMotion: CardMicroMotion,
     onSlotClick: (FilamentSlotDisplay) -> Unit,
     modifier: Modifier = Modifier,
+    gridColumns: Int = 1,
 ) {
     if (slotDisplays.isEmpty()) return
     val groups = slotDisplays.map { it.slot }.groupByFilamentSource()
     val displayBySlot = slotDisplays.associateBy { it.slot }
     val glowMotion = remember(cardMicroMotion) { cardMicroMotion.toFilamentGlowMotion() }
+    val columns = gridColumns.coerceAtLeast(1)
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -172,14 +177,34 @@ fun FilamentDetailGroups(
                     fontWeight = FontWeight.Medium,
                     color = muted,
                 )
-                group.slots.forEach { slot ->
-                    val display = displayBySlot[slot] ?: return@forEach
-                    FilamentDetailSlotCard(
-                        display = display,
-                        isExternal = group.isExternal,
-                        glowMotion = glowMotion,
-                        onSlotClick = onSlotClick,
-                    )
+                if (columns <= 1) {
+                    group.slots.forEach { slot ->
+                        val display = displayBySlot[slot] ?: return@forEach
+                        FilamentDetailSlotCard(
+                            display = display,
+                            isExternal = group.isExternal,
+                            glowMotion = glowMotion,
+                            onSlotClick = onSlotClick,
+                        )
+                    }
+                } else {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        maxItemsInEachRow = columns,
+                    ) {
+                        group.slots.forEach { slot ->
+                            val display = displayBySlot[slot] ?: return@forEach
+                            FilamentDetailSlotCard(
+                                modifier = Modifier.fillMaxWidth(0.48f),
+                                display = display,
+                                isExternal = group.isExternal,
+                                glowMotion = glowMotion,
+                                onSlotClick = onSlotClick,
+                            )
+                        }
+                    }
                 }
             }
         }

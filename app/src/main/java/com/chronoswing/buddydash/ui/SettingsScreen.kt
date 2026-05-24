@@ -41,6 +41,8 @@ import com.chronoswing.buddydash.SettingsUiState
 import com.chronoswing.buddydash.SettingsViewModel
 import com.chronoswing.buddydash.util.BuddyDashDebug
 import com.chronoswing.buddydash.util.HomeLogoGlowTuning
+import com.chronoswing.buddydash.ui.layout.BuddyDashExpandedFormContainer
+import com.chronoswing.buddydash.ui.layout.rememberBuddyDashExpandedGridColumnCount
 
 @Composable
 fun SettingsScreen(
@@ -80,6 +82,7 @@ private fun SettingsScreenContent(
     onDebugShowLogoGlowBoundsChange: (Boolean) -> Unit,
     onBack: (() -> Unit)?,
 ) {
+    val gridColumns = rememberBuddyDashExpandedGridColumnCount()
     Scaffold(
         topBar = {
             Box {
@@ -106,14 +109,19 @@ private fun SettingsScreenContent(
     ) { innerPadding ->
         Box(Modifier.fillMaxSize()) {
             HomeAtmosphericFade(Modifier.padding(top = innerPadding.calculateTopPadding()))
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+            BuddyDashExpandedFormContainer(
+                gridColumns = gridColumns,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
             OutlinedTextField(
                 value = uiState.serverUrl,
                 onValueChange = onServerUrlChange,
@@ -188,6 +196,7 @@ private fun SettingsScreenContent(
 
             if (BuddyDashDebug.enabled) {
                 HomeHeaderVisualDebugSection(
+                    gridColumns = gridColumns,
                     idleGlowMultiplier = uiState.idleGlowMultiplier,
                     headerAmbientMultiplier = uiState.headerAmbientMultiplier,
                     printGlowMultiplier = uiState.printGlowMultiplier,
@@ -200,13 +209,15 @@ private fun SettingsScreenContent(
                     onDebugShowLogoGlowBoundsChange = onDebugShowLogoGlowBoundsChange,
                 )
             }
-        }
+                }
+            }
         } // Box
     }
 }
 
 @Composable
 private fun HomeHeaderVisualDebugSection(
+    gridColumns: Int,
     idleGlowMultiplier: Float,
     headerAmbientMultiplier: Float,
     printGlowMultiplier: Float,
@@ -229,72 +240,152 @@ private fun HomeHeaderVisualDebugSection(
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(
-            text = stringResource(R.string.debug_idle_glow_multiplier_label),
-            style = MaterialTheme.typography.labelMedium,
-        )
-        VisualMultiplierChipRow(
-            selected = idleGlowMultiplier,
-            onSelected = onIdleGlowMultiplierSelected,
-        )
-        Text(
-            text = stringResource(R.string.debug_header_ambient_multiplier_label),
-            style = MaterialTheme.typography.labelMedium,
-        )
-        VisualMultiplierChipRow(
-            selected = headerAmbientMultiplier,
-            onSelected = onHeaderAmbientMultiplierSelected,
-        )
-        Text(
-            text = stringResource(R.string.debug_print_glow_multiplier_label),
-            style = MaterialTheme.typography.labelMedium,
-        )
-        VisualMultiplierChipRow(
-            selected = printGlowMultiplier,
-            onSelected = onPrintGlowMultiplierSelected,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.debug_force_print_glow_label),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                Text(
-                    text = stringResource(R.string.debug_force_print_glow_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        if (gridColumns <= 1) {
+            HomeHeaderVisualDebugCompactContent(
+                idleGlowMultiplier = idleGlowMultiplier,
+                headerAmbientMultiplier = headerAmbientMultiplier,
+                printGlowMultiplier = printGlowMultiplier,
+                debugForcePrintGlow = debugForcePrintGlow,
+                debugShowLogoGlowBounds = debugShowLogoGlowBounds,
+                onIdleGlowMultiplierSelected = onIdleGlowMultiplierSelected,
+                onHeaderAmbientMultiplierSelected = onHeaderAmbientMultiplierSelected,
+                onPrintGlowMultiplierSelected = onPrintGlowMultiplierSelected,
+                onDebugForcePrintGlowChange = onDebugForcePrintGlowChange,
+                onDebugShowLogoGlowBoundsChange = onDebugShowLogoGlowBoundsChange,
+            )
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    DebugMultiplierField(
+                        label = stringResource(R.string.debug_idle_glow_multiplier_label),
+                        selected = idleGlowMultiplier,
+                        onSelected = onIdleGlowMultiplierSelected,
+                    )
+                    DebugMultiplierField(
+                        label = stringResource(R.string.debug_header_ambient_multiplier_label),
+                        selected = headerAmbientMultiplier,
+                        onSelected = onHeaderAmbientMultiplierSelected,
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    DebugMultiplierField(
+                        label = stringResource(R.string.debug_print_glow_multiplier_label),
+                        selected = printGlowMultiplier,
+                        onSelected = onPrintGlowMultiplierSelected,
+                    )
+                    DebugToggleRow(
+                        label = stringResource(R.string.debug_force_print_glow_label),
+                        hint = stringResource(R.string.debug_force_print_glow_hint),
+                        checked = debugForcePrintGlow,
+                        onCheckedChange = onDebugForcePrintGlowChange,
+                    )
+                    DebugToggleRow(
+                        label = stringResource(R.string.debug_show_logo_glow_bounds_label),
+                        hint = stringResource(R.string.debug_show_logo_glow_bounds_hint),
+                        checked = debugShowLogoGlowBounds,
+                        onCheckedChange = onDebugShowLogoGlowBoundsChange,
+                    )
+                }
             }
-            Switch(
-                checked = debugForcePrintGlow,
-                onCheckedChange = onDebugForcePrintGlowChange,
+        }
+    }
+}
+
+@Composable
+private fun HomeHeaderVisualDebugCompactContent(
+    idleGlowMultiplier: Float,
+    headerAmbientMultiplier: Float,
+    printGlowMultiplier: Float,
+    debugForcePrintGlow: Boolean,
+    debugShowLogoGlowBounds: Boolean,
+    onIdleGlowMultiplierSelected: (Float) -> Unit,
+    onHeaderAmbientMultiplierSelected: (Float) -> Unit,
+    onPrintGlowMultiplierSelected: (Float) -> Unit,
+    onDebugForcePrintGlowChange: (Boolean) -> Unit,
+    onDebugShowLogoGlowBoundsChange: (Boolean) -> Unit,
+) {
+    DebugMultiplierField(
+        label = stringResource(R.string.debug_idle_glow_multiplier_label),
+        selected = idleGlowMultiplier,
+        onSelected = onIdleGlowMultiplierSelected,
+    )
+    DebugMultiplierField(
+        label = stringResource(R.string.debug_header_ambient_multiplier_label),
+        selected = headerAmbientMultiplier,
+        onSelected = onHeaderAmbientMultiplierSelected,
+    )
+    DebugMultiplierField(
+        label = stringResource(R.string.debug_print_glow_multiplier_label),
+        selected = printGlowMultiplier,
+        onSelected = onPrintGlowMultiplierSelected,
+    )
+    DebugToggleRow(
+        label = stringResource(R.string.debug_force_print_glow_label),
+        hint = stringResource(R.string.debug_force_print_glow_hint),
+        checked = debugForcePrintGlow,
+        onCheckedChange = onDebugForcePrintGlowChange,
+    )
+    DebugToggleRow(
+        label = stringResource(R.string.debug_show_logo_glow_bounds_label),
+        hint = stringResource(R.string.debug_show_logo_glow_bounds_hint),
+        checked = debugShowLogoGlowBounds,
+        onCheckedChange = onDebugShowLogoGlowBoundsChange,
+    )
+}
+
+@Composable
+private fun DebugMultiplierField(
+    label: String,
+    selected: Float,
+    onSelected: (Float) -> Unit,
+) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelMedium,
+    )
+    VisualMultiplierChipRow(
+        selected = selected,
+        onSelected = onSelected,
+    )
+}
+
+@Composable
+private fun DebugToggleRow(
+    label: String,
+    hint: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+            )
+            Text(
+                text = hint,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.debug_show_logo_glow_bounds_label),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                Text(
-                    text = stringResource(R.string.debug_show_logo_glow_bounds_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Switch(
-                checked = debugShowLogoGlowBounds,
-                onCheckedChange = onDebugShowLogoGlowBoundsChange,
-            )
-        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
     }
 }
 

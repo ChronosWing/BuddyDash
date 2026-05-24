@@ -62,6 +62,7 @@ import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
 import com.chronoswing.buddydash.ui.motion.SecondaryScreenHeader
 import com.chronoswing.buddydash.ui.motion.rememberBuddyDashInteractionSource
 import com.chronoswing.buddydash.ui.motion.successPulseOn
+import com.chronoswing.buddydash.ui.layout.rememberIsBuddyDashExpandedWidth
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
@@ -155,6 +156,10 @@ private fun ArchiveDetailScreenContent(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var queueSuccessPulse by remember { mutableIntStateOf(0) }
+    val isExpandedWidth = rememberIsBuddyDashExpandedWidth()
+    val queueAgainEnabled = archive != null && hasCredentials && !isLoading &&
+        !reprintSheet.isSubmitting &&
+        !isShowingStaleCachedContent(isStaleCachedData, null)
     val queuedMessage = stringResource(R.string.archive_reprint_success)
     val startedMessage = stringResource(R.string.archive_reprint_started)
     val queuedStartFailedMessage = stringResource(R.string.archive_reprint_queued_start_failed)
@@ -215,22 +220,15 @@ private fun ArchiveDetailScreenContent(
             }
         },
         bottomBar = {
-            if (archive != null && hasCredentials) {
-                val queueAgainInteraction = rememberBuddyDashInteractionSource()
-                val queueAgainEnabled = !isLoading && !reprintSheet.isSubmitting &&
-                    !isShowingStaleCachedContent(isStaleCachedData, null)
-                Button(
-                    onClick = onQueueAgain,
+            if (!isExpandedWidth && archive != null && hasCredentials) {
+                ArchiveQueueAgainButton(
                     enabled = queueAgainEnabled,
-                    interactionSource = queueAgainInteraction,
+                    successPulse = queueSuccessPulse,
+                    onClick = onQueueAgain,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
-                        .successPulseOn(queueSuccessPulse)
-                        .buddyDashButtonPress(queueAgainEnabled, queueAgainInteraction),
-                ) {
-                    Text(stringResource(R.string.archive_reprint_queue_again))
-                }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                )
             }
         },
     ) { innerPadding ->
@@ -290,6 +288,10 @@ private fun ArchiveDetailScreenContent(
                     )
                     ArchiveDetailBody(
                         archive = archive,
+                        isExpandedWidth = isExpandedWidth,
+                        queueAgainEnabled = queueAgainEnabled,
+                        queueSuccessPulse = queueSuccessPulse,
+                        onQueueAgain = onQueueAgain,
                         serverUrl = serverUrl,
                         cameraToken = cameraToken,
                         hasCredentials = hasCredentials,
@@ -316,7 +318,87 @@ private fun ArchiveDetailScreenContent(
 }
 
 @Composable
+private fun ArchiveQueueAgainButton(
+    enabled: Boolean,
+    successPulse: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val queueAgainInteraction = rememberBuddyDashInteractionSource()
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        interactionSource = queueAgainInteraction,
+        modifier = modifier
+            .successPulseOn(successPulse)
+            .buddyDashButtonPress(enabled, queueAgainInteraction),
+    ) {
+        Text(stringResource(R.string.archive_reprint_queue_again))
+    }
+}
+
+@Composable
 private fun ArchiveDetailBody(
+    archive: PrintArchive,
+    isExpandedWidth: Boolean,
+    queueAgainEnabled: Boolean,
+    queueSuccessPulse: Int,
+    onQueueAgain: () -> Unit,
+    serverUrl: String,
+    cameraToken: String,
+    hasCredentials: Boolean,
+    onMaterialTap: (onNavigate: (ArchiveMaterialNavigation) -> Unit) -> Unit,
+    onMaterialNavigation: (ArchiveMaterialNavigation) -> Unit,
+) {
+    if (!isExpandedWidth) {
+        ArchiveDetailCompactBody(
+            archive = archive,
+            serverUrl = serverUrl,
+            cameraToken = cameraToken,
+            hasCredentials = hasCredentials,
+            onMaterialTap = onMaterialTap,
+            onMaterialNavigation = onMaterialNavigation,
+        )
+        return
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column(
+            modifier = Modifier.weight(0.6f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ArchiveDetailPrimaryCard(
+                archive = archive,
+                serverUrl = serverUrl,
+                cameraToken = cameraToken,
+                hasCredentials = hasCredentials,
+                onMaterialTap = onMaterialTap,
+                onMaterialNavigation = onMaterialNavigation,
+            )
+        }
+        Column(
+            modifier = Modifier.weight(0.4f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (hasCredentials) {
+                ArchiveQueueAgainButton(
+                    enabled = queueAgainEnabled,
+                    successPulse = queueSuccessPulse,
+                    onClick = onQueueAgain,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            ArchiveDetailStatsCard(archive = archive)
+        }
+    }
+}
+
+@Composable
+private fun ArchiveDetailCompactBody(
     archive: PrintArchive,
     serverUrl: String,
     cameraToken: String,
@@ -324,35 +406,90 @@ private fun ArchiveDetailBody(
     onMaterialTap: (onNavigate: (ArchiveMaterialNavigation) -> Unit) -> Unit,
     onMaterialNavigation: (ArchiveMaterialNavigation) -> Unit,
 ) {
-    val displayName = if (archive.displayName == ARCHIVE_DISPLAY_NAME_FALLBACK) {
-        stringResource(R.string.archive_unnamed_print)
-    } else {
-        archive.displayName
-    }
-    val statusLabel = formatArchiveStatusLabel(archive.resultKind, archive.statusRaw)
-    val showMaterial = archiveHasMaterialDisplay(archive)
-
     DetailInfoCard {
         ArchiveDetailHeroImage(
             archiveId = archive.id,
             serverUrl = serverUrl,
             cameraToken = cameraToken,
         )
-        PrintFileNameText(
-            fileName = displayName,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+        ArchiveDetailTitleAndStatus(archive = archive)
+        ArchiveDetailPrimaryFields(
+            archive = archive,
+            hasCredentials = hasCredentials,
+            onMaterialTap = onMaterialTap,
+            onMaterialNavigation = onMaterialNavigation,
+            includeStatsFields = true,
         )
-        ArchiveResultBadge(
-            label = statusLabel,
-            resultKind = archive.resultKind,
+    }
+}
+
+@Composable
+private fun ArchiveDetailPrimaryCard(
+    archive: PrintArchive,
+    serverUrl: String,
+    cameraToken: String,
+    hasCredentials: Boolean,
+    onMaterialTap: (onNavigate: (ArchiveMaterialNavigation) -> Unit) -> Unit,
+    onMaterialNavigation: (ArchiveMaterialNavigation) -> Unit,
+) {
+    DetailInfoCard {
+        ArchiveDetailHeroImage(
+            archiveId = archive.id,
+            serverUrl = serverUrl,
+            cameraToken = cameraToken,
         )
-        formatArchivePrinterLine(archive)?.let { printer ->
-            CompactLabelValue(
-                label = stringResource(R.string.archive_label_printer),
-                value = printer,
-            )
-        }
+        ArchiveDetailTitleAndStatus(archive = archive)
+        ArchiveDetailPrimaryFields(
+            archive = archive,
+            hasCredentials = hasCredentials,
+            onMaterialTap = onMaterialTap,
+            onMaterialNavigation = onMaterialNavigation,
+            includeStatsFields = false,
+        )
+    }
+}
+
+@Composable
+private fun ArchiveDetailStatsCard(archive: PrintArchive) {
+    DetailInfoCard {
+        ArchiveDetailStatsFields(archive = archive)
+    }
+}
+
+@Composable
+private fun ArchiveDetailTitleAndStatus(archive: PrintArchive) {
+    val displayName = if (archive.displayName == ARCHIVE_DISPLAY_NAME_FALLBACK) {
+        stringResource(R.string.archive_unnamed_print)
+    } else {
+        archive.displayName
+    }
+    val statusLabel = formatArchiveStatusLabel(archive.resultKind, archive.statusRaw)
+    PrintFileNameText(
+        fileName = displayName,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+    ArchiveResultBadge(
+        label = statusLabel,
+        resultKind = archive.resultKind,
+    )
+}
+
+@Composable
+private fun ArchiveDetailPrimaryFields(
+    archive: PrintArchive,
+    hasCredentials: Boolean,
+    onMaterialTap: (onNavigate: (ArchiveMaterialNavigation) -> Unit) -> Unit,
+    onMaterialNavigation: (ArchiveMaterialNavigation) -> Unit,
+    includeStatsFields: Boolean,
+) {
+    formatArchivePrinterLine(archive)?.let { printer ->
+        CompactLabelValue(
+            label = stringResource(R.string.archive_label_printer),
+            value = printer,
+        )
+    }
+    if (includeStatsFields) {
         formatArchiveDuration(archive.durationSeconds)?.let { duration ->
             CompactLabelValue(
                 label = stringResource(R.string.archive_label_duration),
@@ -365,39 +502,64 @@ private fun ArchiveDetailBody(
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
-        if (showMaterial) {
-            ArchiveDetailMaterialRow(
-                archive = archive,
-                tappable = hasCredentials,
-                onMaterialClick = {
-                    onMaterialTap(onMaterialNavigation)
-                },
-            )
-        }
+    }
+    val showMaterial = archiveHasMaterialDisplay(archive)
+    if (showMaterial) {
+        ArchiveDetailMaterialRow(
+            archive = archive,
+            tappable = hasCredentials,
+            onMaterialClick = {
+                onMaterialTap(onMaterialNavigation)
+            },
+        )
+    }
+    if (includeStatsFields) {
         formatArchivePlateLine(archive)?.let { plate ->
             CompactLabelValue(
                 label = stringResource(R.string.archive_label_plate),
                 value = plate,
             )
         }
-        if (shouldShowArchiveFailureReason(archive)) {
-            CompactLabelValue(
-                label = stringResource(R.string.archive_label_failure),
-                value = archive.failureReason.orEmpty(),
-            )
-        }
-        archive.projectName?.takeIf { isMeaningfulArchiveField(it) }?.let { project ->
-            CompactLabelValue(
-                label = stringResource(R.string.archive_label_project),
-                value = project,
-            )
-        }
-        archive.notes?.takeIf { isMeaningfulArchiveField(it) }?.let { notes ->
-            CompactLabelValue(
-                label = stringResource(R.string.archive_label_notes),
-                value = notes,
-            )
-        }
+    }
+    if (shouldShowArchiveFailureReason(archive)) {
+        CompactLabelValue(
+            label = stringResource(R.string.archive_label_failure),
+            value = archive.failureReason.orEmpty(),
+        )
+    }
+    archive.projectName?.takeIf { isMeaningfulArchiveField(it) }?.let { project ->
+        CompactLabelValue(
+            label = stringResource(R.string.archive_label_project),
+            value = project,
+        )
+    }
+    archive.notes?.takeIf { isMeaningfulArchiveField(it) }?.let { notes ->
+        CompactLabelValue(
+            label = stringResource(R.string.archive_label_notes),
+            value = notes,
+        )
+    }
+}
+
+@Composable
+private fun ArchiveDetailStatsFields(archive: PrintArchive) {
+    formatArchiveDuration(archive.durationSeconds)?.let { duration ->
+        CompactLabelValue(
+            label = stringResource(R.string.archive_label_duration),
+            value = duration,
+        )
+    }
+    formatFilamentUsageCompact(archive.filamentUsage)?.let { usage ->
+        FilamentUsageText(
+            text = usage,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+    }
+    formatArchivePlateLine(archive)?.let { plate ->
+        CompactLabelValue(
+            label = stringResource(R.string.archive_label_plate),
+            value = plate,
+        )
     }
 }
 

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -34,11 +35,14 @@ import com.chronoswing.buddydash.ui.components.MotionControlsSection
 import com.chronoswing.buddydash.ui.components.PrinterCameraFullscreenDialog
 import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.ui.components.SmartPlugPowerCard
+import com.chronoswing.buddydash.ui.layout.rememberIsBuddyDashExpandedWidth
 import com.chronoswing.buddydash.util.BED_JOG_STEP_OPTIONS_MM
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildMachineInfoRows
 import com.chronoswing.buddydash.util.machineTabCapabilities
+import com.chronoswing.buddydash.util.MachineTabCapabilities
 import com.chronoswing.buddydash.util.requiresActivePowerOffConfirmation
+import androidx.compose.ui.Alignment
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -68,6 +72,9 @@ fun MachineTab(
     onStopCameraStream: () -> Unit = {},
 ) {
     val caps = labels.machineTabCapabilities(cameraTokenConfigured = cameraToken.isNotBlank())
+    val isExpandedWidth = rememberIsBuddyDashExpandedWidth()
+    val useDashboardRow = isExpandedWidth &&
+        (caps.showMotionSection || caps.showUtilitiesSection)
     var showCameraFullscreen by rememberSaveable { mutableStateOf(false) }
     var showHomeConfirm by remember { mutableStateOf(false) }
     var showPowerOffConfirm by remember { mutableStateOf(false) }
@@ -153,63 +160,58 @@ fun MachineTab(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (caps.showMotionSection) {
-            DetailInfoCard {
-                SectionHeader(stringResource(R.string.machine_section_motion))
-                BedJogStepSelector(
-                    selectedStepMm = bedJogStepMm,
-                    enabled = !isControlBusy,
-                    onSelect = onBedJogStepChange,
-                )
-                MotionControlsSection(
-                    layout = labels.motionLayout,
-                    canUseMotion = caps.motionEnabled,
-                    actionsEnabled = !isControlBusy && caps.motionEnabled,
-                    stepMm = bedJogStepMm,
-                    onJogUp = onJogBedUp,
-                    onJogDown = onJogBedDown,
-                    compactButtons = true,
-                )
-                caps.motionDisabledReason?.let { reason ->
-                    MachineDisabledHint(reasonCode = reason)
+        if (useDashboardRow) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                if (caps.showMotionSection) {
+                    Box(modifier = Modifier.weight(0.5f)) {
+                        MachineMotionCard(
+                            labels = labels,
+                            caps = caps,
+                            bedJogStepMm = bedJogStepMm,
+                            isControlBusy = isControlBusy,
+                            onBedJogStepChange = onBedJogStepChange,
+                            onJogBedUp = onJogBedUp,
+                            onJogBedDown = onJogBedDown,
+                        )
+                    }
+                }
+                if (caps.showUtilitiesSection) {
+                    Box(modifier = Modifier.weight(0.5f)) {
+                        MachineUtilitiesCard(
+                            caps = caps,
+                            isControlBusy = isControlBusy,
+                            onShowCamera = { showCameraFullscreen = true },
+                            onShowHomeConfirm = { showHomeConfirm = true },
+                            onOpenPrinterArchives = onOpenPrinterArchives,
+                        )
+                    }
                 }
             }
-        }
+        } else {
+            if (caps.showMotionSection) {
+                MachineMotionCard(
+                    labels = labels,
+                    caps = caps,
+                    bedJogStepMm = bedJogStepMm,
+                    isControlBusy = isControlBusy,
+                    onBedJogStepChange = onBedJogStepChange,
+                    onJogBedUp = onJogBedUp,
+                    onJogBedDown = onJogBedDown,
+                )
+            }
 
-        if (caps.showUtilitiesSection) {
-            DetailInfoCard {
-                SectionHeader(stringResource(R.string.machine_section_utilities))
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (caps.showCamera) {
-                        MachineUtilityButton(
-                            label = stringResource(R.string.camera_view),
-                            icon = Icons.Default.Videocam,
-                            enabled = caps.cameraEnabled && !isControlBusy,
-                            onClick = { showCameraFullscreen = true },
-                        )
-                    }
-                    if (caps.showHome) {
-                        MachineUtilityButton(
-                            label = stringResource(R.string.machine_home),
-                            icon = Icons.Default.Home,
-                            enabled = caps.homeEnabled && !isControlBusy,
-                            onClick = { showHomeConfirm = true },
-                        )
-                    }
-                    if (caps.showFiles) {
-                        MachineUtilityButton(
-                            label = stringResource(R.string.machine_files),
-                            icon = Icons.Default.Folder,
-                            enabled = caps.filesEnabled,
-                            onClick = onOpenPrinterArchives,
-                        )
-                    }
-                }
-                if (!caps.utilitiesEnabled) {
-                    caps.utilitiesDisabledReason?.let { reason ->
-                        MachineDisabledHint(reasonCode = reason)
-                    }
-                }
+            if (caps.showUtilitiesSection) {
+                MachineUtilitiesCard(
+                    caps = caps,
+                    isControlBusy = isControlBusy,
+                    onShowCamera = { showCameraFullscreen = true },
+                    onShowHomeConfirm = { showHomeConfirm = true },
+                    onOpenPrinterArchives = onOpenPrinterArchives,
+                )
             }
         }
 
@@ -231,6 +233,82 @@ fun MachineTab(
             printerModel = printerModel,
             statusUpdatedAtMillis = statusUpdatedAtMillis,
         )
+    }
+}
+
+@Composable
+private fun MachineMotionCard(
+    labels: PrinterDetailLabels,
+    caps: MachineTabCapabilities,
+    bedJogStepMm: Float,
+    isControlBusy: Boolean,
+    onBedJogStepChange: (Float) -> Unit,
+    onJogBedUp: () -> Unit,
+    onJogBedDown: () -> Unit,
+) {
+    DetailInfoCard {
+        SectionHeader(stringResource(R.string.machine_section_motion))
+        BedJogStepSelector(
+            selectedStepMm = bedJogStepMm,
+            enabled = !isControlBusy,
+            onSelect = onBedJogStepChange,
+        )
+        MotionControlsSection(
+            layout = labels.motionLayout,
+            canUseMotion = caps.motionEnabled,
+            actionsEnabled = !isControlBusy && caps.motionEnabled,
+            stepMm = bedJogStepMm,
+            onJogUp = onJogBedUp,
+            onJogDown = onJogBedDown,
+            compactButtons = true,
+        )
+        caps.motionDisabledReason?.let { reason ->
+            MachineDisabledHint(reasonCode = reason)
+        }
+    }
+}
+
+@Composable
+private fun MachineUtilitiesCard(
+    caps: MachineTabCapabilities,
+    isControlBusy: Boolean,
+    onShowCamera: () -> Unit,
+    onShowHomeConfirm: () -> Unit,
+    onOpenPrinterArchives: () -> Unit,
+) {
+    DetailInfoCard {
+        SectionHeader(stringResource(R.string.machine_section_utilities))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (caps.showCamera) {
+                MachineUtilityButton(
+                    label = stringResource(R.string.camera_view),
+                    icon = Icons.Default.Videocam,
+                    enabled = caps.cameraEnabled && !isControlBusy,
+                    onClick = onShowCamera,
+                )
+            }
+            if (caps.showHome) {
+                MachineUtilityButton(
+                    label = stringResource(R.string.machine_home),
+                    icon = Icons.Default.Home,
+                    enabled = caps.homeEnabled && !isControlBusy,
+                    onClick = onShowHomeConfirm,
+                )
+            }
+            if (caps.showFiles) {
+                MachineUtilityButton(
+                    label = stringResource(R.string.machine_files),
+                    icon = Icons.Default.Folder,
+                    enabled = caps.filesEnabled,
+                    onClick = onOpenPrinterArchives,
+                )
+            }
+        }
+        if (!caps.utilitiesEnabled) {
+            caps.utilitiesDisabledReason?.let { reason ->
+                MachineDisabledHint(reasonCode = reason)
+            }
+        }
     }
 }
 
