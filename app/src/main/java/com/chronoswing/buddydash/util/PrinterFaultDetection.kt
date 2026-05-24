@@ -96,9 +96,14 @@ fun PrinterHmsError.isFault(): Boolean {
 /**
  * Aggregate HMS health severity across all HMS entries.
  *
- * Error wins over Warning wins over Unknown wins over Ok.
- * Notification-only entries resolve to Ok (informational, not actionable).
- * Entries with undetectable alert level resolve to Unknown — never silently Ok.
+ * Rule: Ok only when hmsErrors is empty.
+ * Error > Warning > Unknown > Ok.
+ *
+ * Notification entries are treated as Unknown, not Ok.
+ * Rationale: BambuBuddy surfaces every HMS entry in its own UI regardless of level.
+ * Any entry that exists should be visible in BuddyDash — only an empty list is Ok.
+ * Notification entries that are genuinely benign will read as "HMS" (amber Unknown chip)
+ * which the user can tap to inspect; the detail sheet shows the actual severity.
  */
 fun PrinterStatus.resolveHmsAlertSeverity(): HmsSeverity {
     if (hmsErrors.isEmpty()) return HmsSeverity.Ok
@@ -107,18 +112,46 @@ fun PrinterStatus.resolveHmsAlertSeverity(): HmsSeverity {
     var hasWarning = false
 
     for (entry in hmsErrors) {
-        when (entry.alertLevel()) {
-            HmsAlertLevel.Error -> return HmsSeverity.Error      // short-circuit
+        val level = entry.alertLevel()
+        if (DEBUG_LOG_STATUS_MAP) {
+            Log.d(
+                TAG_STATUS_MAP,
+                "resolveHmsAlertSeverity: entry code='${entry.code}' severity=${entry.severity} " +
+                    "module=${entry.module} attr=${entry.attr} " +
+                    "→ alertLevel=$level reason=${hmsAlertLevelReason(entry, level)}",
+            )
+        }
+        when (level) {
+            HmsAlertLevel.Error -> {
+                if (DEBUG_LOG_STATUS_MAP) Log.d(TAG_STATUS_MAP, "  → resolved Error (short-circuit)")
+                return HmsSeverity.Error
+            }
             HmsAlertLevel.Warning -> hasWarning = true
-            HmsAlertLevel.Notification -> Unit                   // informational only
-            null -> hasUnknown = true                            // level undetectable
+            // Notification exists but is still an active HMS entry — treat as Unknown,
+            // not Ok. Ok is reserved for an empty hms_errors list.
+            HmsAlertLevel.Notification -> hasUnknown = true
+            // Level undetectable (no parseable code segment, no recognized severity) → Unknown.
+            null -> hasUnknown = true
         }
     }
 
     return when {
         hasWarning -> HmsSeverity.Warning
         hasUnknown -> HmsSeverity.Unknown
-        else -> HmsSeverity.Ok
+        else -> HmsSeverity.Ok     // only reachable if hmsErrors is empty (already guarded above)
+    }.also { result ->
+        if (DEBUG_LOG_STATUS_MAP) {
+            Log.d(TAG_STATUS_MAP, "resolveHmsAlertSeverity → $result (hasWarning=$hasWarning hasUnknown=$hasUnknown)")
+        }
+    }
+}
+
+private fun hmsAlertLevelReason(entry: PrinterHmsError, level: HmsAlertLevel?): String {
+    val codeLevel = parseHmsCodeAlertLevel(entry.code)
+    return when {
+        codeLevel != null -> "code-segment-3 parsed '$codeLevel'"
+        entry.severity != null -> "severity-fallback=${entry.severity} → $level"
+        else -> "no-code-no-severity → Unknown"
     }
 }
 

@@ -77,4 +77,90 @@ class PrinterFaultDetectionTest {
         )
         assertEquals(1, status.hmsErrorCount)
     }
+
+    // ---- resolveHmsAlertSeverity tests ----
+
+    @Test
+    fun resolveHmsAlertSeverity_emptyList_isOk() {
+        val status = PrinterStatus(
+            connected = true, rawState = "IDLE",
+            fileName = null, progress = null, remainingTimeSeconds = null,
+            nozzleTemp = null, bedTemp = null,
+        )
+        assertEquals(HmsSeverity.Ok, status.resolveHmsAlertSeverity())
+    }
+
+    @Test
+    fun resolveHmsAlertSeverity_notificationOnly_isUnknown_neverOk() {
+        // Notification-level entries exist → must NOT return Ok.
+        // Ok is reserved for an empty hms_errors list.
+        val status = PrinterStatus(
+            connected = true, rawState = "IDLE",
+            fileName = null, progress = null, remainingTimeSeconds = null,
+            nozzleTemp = null, bedTemp = null,
+            hmsErrors = listOf(PrinterHmsError(code = "0300-0C00-0003-0001")),
+        )
+        assertEquals(HmsSeverity.Unknown, status.resolveHmsAlertSeverity())
+    }
+
+    @Test
+    fun resolveHmsAlertSeverity_warningEntry_isWarning() {
+        val status = PrinterStatus(
+            connected = true, rawState = "IDLE",
+            fileName = null, progress = null, remainingTimeSeconds = null,
+            nozzleTemp = null, bedTemp = null,
+            hmsErrors = listOf(PrinterHmsError(code = "0300-0C00-0002-0001")),
+        )
+        assertEquals(HmsSeverity.Warning, status.resolveHmsAlertSeverity())
+    }
+
+    @Test
+    fun resolveHmsAlertSeverity_errorEntry_isError() {
+        val status = PrinterStatus(
+            connected = true, rawState = "IDLE",
+            fileName = null, progress = null, remainingTimeSeconds = null,
+            nozzleTemp = null, bedTemp = null,
+            hmsErrors = listOf(PrinterHmsError(code = "0300-0C00-0001-0007")),
+        )
+        assertEquals(HmsSeverity.Error, status.resolveHmsAlertSeverity())
+    }
+
+    @Test
+    fun resolveHmsAlertSeverity_mixedEntries_errorWins() {
+        val status = PrinterStatus(
+            connected = true, rawState = "IDLE",
+            fileName = null, progress = null, remainingTimeSeconds = null,
+            nozzleTemp = null, bedTemp = null,
+            hmsErrors = listOf(
+                PrinterHmsError(code = "0300-0C00-0003-0001"),  // notification
+                PrinterHmsError(code = "0300-0C00-0002-0001"),  // warning
+                PrinterHmsError(code = "0300-0C00-0001-0007"),  // error
+            ),
+        )
+        assertEquals(HmsSeverity.Error, status.resolveHmsAlertSeverity())
+    }
+
+    @Test
+    fun resolveHmsAlertSeverity_unknownCode_noSeverity_isUnknown() {
+        // Entry with unparseable code and null severity → Unknown, never Ok.
+        val status = PrinterStatus(
+            connected = true, rawState = "IDLE",
+            fileName = null, progress = null, remainingTimeSeconds = null,
+            nozzleTemp = null, bedTemp = null,
+            hmsErrors = listOf(PrinterHmsError(code = "SHORT", severity = null)),
+        )
+        assertEquals(HmsSeverity.Unknown, status.resolveHmsAlertSeverity())
+    }
+
+    @Test
+    fun resolveHmsAlertSeverity_severityFallback_3_isUnknown() {
+        // severity=3 (Notification via int fallback) → Unknown (not Ok).
+        val status = PrinterStatus(
+            connected = true, rawState = "IDLE",
+            fileName = null, progress = null, remainingTimeSeconds = null,
+            nozzleTemp = null, bedTemp = null,
+            hmsErrors = listOf(PrinterHmsError(code = "SHORT", severity = 3)),
+        )
+        assertEquals(HmsSeverity.Unknown, status.resolveHmsAlertSeverity())
+    }
 }
