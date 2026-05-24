@@ -2,9 +2,11 @@ package com.chronoswing.buddydash.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -25,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -56,7 +59,13 @@ fun PrinterQuickStatusRow(
     hmsAlertSeverity: HmsSeverity = HmsSeverity.Ok,
     onErrorChipClick: (() -> Unit)? = null,
     onHmsChipClick: (() -> Unit)? = null,
+    onMaintenanceChipClick: (() -> Unit)? = null,
+    onUnifiedAlertsClick: (() -> Unit)? = null,
 ) {
+    val hasHms = hmsAlertSeverity != HmsSeverity.Ok
+    val hasMaintenance = maintenanceIndicator != MaintenanceHomeIndicator.None
+    val useUnifiedAlerts = hasHms && hasMaintenance && onUnifiedAlertsClick != null
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -72,9 +81,26 @@ fun PrinterQuickStatusRow(
             },
         )
         plateKind?.let { PlateStatusChip(kind = it) }
-        // Compact HMS health icon — placed near maintenance indicator, visually distinct from it
-        HmsStatusIcon(severity = hmsAlertSeverity, onClick = onHmsChipClick)
-        MaintenanceHomeIndicatorIcon(indicator = maintenanceIndicator)
+        when {
+            useUnifiedAlerts -> {
+                UnifiedPrinterAlertTouchTarget(
+                    hmsAlertSeverity = hmsAlertSeverity,
+                    maintenanceIndicator = maintenanceIndicator,
+                    onClick = onUnifiedAlertsClick!!,
+                )
+            }
+            else -> {
+                if (hasHms) {
+                    HmsStatusIcon(severity = hmsAlertSeverity, onClick = onHmsChipClick)
+                }
+                if (hasMaintenance) {
+                    MaintenanceHomeIndicatorIcon(
+                        indicator = maintenanceIndicator,
+                        onClick = onMaintenanceChipClick,
+                    )
+                }
+            }
+        }
         QueueCountChip(count = pendingQueueCount)
     }
 }
@@ -108,19 +134,12 @@ fun HmsStatusIcon(
         else -> stringResource(R.string.cd_hms_chip_unknown)
     }
 
-    Icon(
+    CompactAlertIcon(
         imageVector = Icons.Outlined.MonitorHeart,
         contentDescription = cd,
-        modifier = modifier
-            .size(16.dp)
-            .then(
-                if (onClick != null) {
-                    Modifier.buddyDashClickable(onClick = onClick)
-                } else {
-                    Modifier
-                },
-            ),
         tint = accent.copy(alpha = alpha),
+        modifier = modifier,
+        onClick = onClick,
     )
 }
 
@@ -203,28 +222,81 @@ fun QueueCountChip(
 fun MaintenanceHomeIndicatorIcon(
     indicator: MaintenanceHomeIndicator,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     when (indicator) {
         MaintenanceHomeIndicator.None -> Unit
         MaintenanceHomeIndicator.DueSoon -> {
             val pulse = rememberAttentionPulse(enabled = true, periodMillis = 2_800)
             val amber = Color(0xFFFBBF24)
-            Icon(
+            CompactAlertIcon(
                 imageVector = Icons.Filled.Warning,
                 contentDescription = stringResource(R.string.cd_maintenance_due_soon_home),
-                modifier = modifier.size(16.dp),
                 tint = amber.copy(alpha = 0.82f + pulse * 0.14f),
+                modifier = modifier,
+                onClick = onClick,
             )
         }
         MaintenanceHomeIndicator.Due -> {
             val pulse = rememberAttentionPulse(enabled = true, periodMillis = 4_000)
-            Icon(
+            CompactAlertIcon(
                 imageVector = Icons.Filled.Warning,
                 contentDescription = stringResource(R.string.cd_maintenance_due_home),
-                modifier = modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.error.copy(alpha = 0.82f + pulse * 0.12f),
+                modifier = modifier,
+                onClick = onClick,
             )
         }
+    }
+}
+
+@Composable
+private fun UnifiedPrinterAlertTouchTarget(
+    hmsAlertSeverity: HmsSeverity,
+    maintenanceIndicator: MaintenanceHomeIndicator,
+    onClick: () -> Unit,
+) {
+    val alertsCd = stringResource(R.string.cd_printer_alerts)
+    Row(
+        modifier = Modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 44.dp)
+            .buddyDashClickable(onClick = onClick)
+            .semantics { contentDescription = alertsCd },
+        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HmsStatusIcon(severity = hmsAlertSeverity)
+        MaintenanceHomeIndicatorIcon(indicator = maintenanceIndicator)
+    }
+}
+
+@Composable
+private fun CompactAlertIcon(
+    imageVector: ImageVector,
+    contentDescription: String,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
+    Box(
+        modifier = modifier.compactAlertTouchTarget(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(16.dp),
+            tint = tint,
+        )
+    }
+}
+
+private fun Modifier.compactAlertTouchTarget(onClick: (() -> Unit)?): Modifier = composed {
+    if (onClick != null) {
+        sizeIn(minWidth = 44.dp, minHeight = 44.dp)
+            .buddyDashClickable(onClick = onClick)
+    } else {
+        size(16.dp)
     }
 }
 

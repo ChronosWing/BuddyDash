@@ -252,15 +252,15 @@ class BambuddyApiClient {
             printerId = printer.id,
             inventoryBySlot = inventoryBySlot,
         )
-        val maintenanceIndicator = if (BambuddyApi.hasMaintenanceEndpoint) {
-            fetchMaintenance(serverUrl, apiKey, printer.id)
-                .getOrNull()
-                ?.items
-                ?.let { resolveMaintenanceHomeIndicator(it) }
-                ?: MaintenanceHomeIndicator.None
+        val maintenanceOverview = if (BambuddyApi.hasMaintenanceEndpoint) {
+            fetchMaintenance(serverUrl, apiKey, printer.id).getOrNull()
         } else {
-            MaintenanceHomeIndicator.None
+            null
         }
+        val maintenanceIndicator = maintenanceOverview
+            ?.items
+            ?.let { resolveMaintenanceHomeIndicator(it) }
+            ?: MaintenanceHomeIndicator.None
         val pendingQueueCount = if (BambuddyApi.hasQueueEndpoint) {
             fetchPrintQueue(serverUrl, apiKey, printer.id)
                 .getOrNull()
@@ -272,6 +272,8 @@ class BambuddyApiClient {
         return printer.copy(
             liveStatus = statusResult.getOrNull(),
             maintenanceIndicator = maintenanceIndicator,
+            maintenanceItems = maintenanceOverview?.items.orEmpty(),
+            maintenanceTotalPrintHours = maintenanceOverview?.totalPrintHours,
             pendingQueueCount = pendingQueueCount,
         )
     }

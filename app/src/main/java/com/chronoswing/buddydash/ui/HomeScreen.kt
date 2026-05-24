@@ -53,7 +53,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.chronoswing.buddydash.ui.components.HmsDetailSheet
+import com.chronoswing.buddydash.ui.components.MaintenanceDetailSheet
+import com.chronoswing.buddydash.ui.components.PrinterAlertsSheet
 import com.chronoswing.buddydash.util.HmsSeverity
+import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -430,15 +433,42 @@ private fun GlancePrinterCard(
         status = liveStatus,
         fileName = labels.fileLine,
     )
-    var showHmsSheet by remember { mutableStateOf(false) }
+    var alertSheet by remember { mutableStateOf<HomePrinterAlertSheet?>(null) }
+    val hasHms = labels.hmsAlertSeverity != HmsSeverity.Ok
+    val hasMaintenance = labels.maintenanceIndicator != MaintenanceHomeIndicator.None
 
-    if (showHmsSheet && labels.hmsAlertSeverity != HmsSeverity.Ok) {
-        HmsDetailSheet(
-            printerName = labels.title,
-            hmsErrors = labels.hmsErrors,
-            hmsAlertSeverity = labels.hmsAlertSeverity,
-            onDismiss = { showHmsSheet = false },
-        )
+    when (val sheet = alertSheet) {
+        HomePrinterAlertSheet.Hms -> if (hasHms) {
+            HmsDetailSheet(
+                printerName = labels.title,
+                printerModel = labels.printerModel,
+                hmsErrors = labels.hmsErrors,
+                hmsAlertSeverity = labels.hmsAlertSeverity,
+                onDismiss = { alertSheet = null },
+            )
+        }
+        HomePrinterAlertSheet.Maintenance -> if (hasMaintenance) {
+            MaintenanceDetailSheet(
+                printerName = labels.title,
+                maintenanceItems = labels.maintenanceItems,
+                maintenanceIndicator = labels.maintenanceIndicator,
+                totalPrintHours = labels.maintenanceTotalPrintHours,
+                onDismiss = { alertSheet = null },
+            )
+        }
+        HomePrinterAlertSheet.Unified -> if (hasHms && hasMaintenance) {
+            PrinterAlertsSheet(
+                printerName = labels.title,
+                printerModel = labels.printerModel,
+                hmsErrors = labels.hmsErrors,
+                hmsAlertSeverity = labels.hmsAlertSeverity,
+                maintenanceItems = labels.maintenanceItems,
+                maintenanceIndicator = labels.maintenanceIndicator,
+                maintenanceTotalPrintHours = labels.maintenanceTotalPrintHours,
+                onDismiss = { alertSheet = null },
+            )
+        }
+        null -> Unit
     }
 
     HomeCardMicroMotionFrame(
@@ -485,9 +515,21 @@ private fun GlancePrinterCard(
                 maintenanceIndicator = labels.maintenanceIndicator,
                 pendingQueueCount = labels.pendingQueueCount,
                 hmsAlertSeverity = labels.hmsAlertSeverity,
-                onHmsChipClick = if (labels.hmsAlertSeverity != HmsSeverity.Ok) {
-                    { showHmsSheet = true }
-                } else null,
+                onHmsChipClick = if (hasHms && !hasMaintenance) {
+                    { alertSheet = HomePrinterAlertSheet.Hms }
+                } else {
+                    null
+                },
+                onMaintenanceChipClick = if (hasMaintenance && !hasHms) {
+                    { alertSheet = HomePrinterAlertSheet.Maintenance }
+                } else {
+                    null
+                },
+                onUnifiedAlertsClick = if (hasHms && hasMaintenance) {
+                    { alertSheet = HomePrinterAlertSheet.Unified }
+                } else {
+                    null
+                },
             )
 
             if (labels.isActivePrint) {
@@ -587,6 +629,12 @@ private val HomePrinterListTopPadding = 1.dp
 private val HomeHeaderRefreshIdleAlpha = 0.48f
 private val HomeHeaderRefreshActiveAlpha = 0.62f
 private val HomeHeaderRefreshWarningTint = Color(0xFFF59E0B)
+
+private enum class HomePrinterAlertSheet {
+    Hms,
+    Maintenance,
+    Unified,
+}
 
 private fun hasAnyPrinterPrinting(printers: List<Printer>): Boolean =
     printers.any { printer ->

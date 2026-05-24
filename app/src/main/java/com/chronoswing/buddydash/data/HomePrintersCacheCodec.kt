@@ -3,6 +3,7 @@ package com.chronoswing.buddydash.data
 import com.chronoswing.buddydash.data.model.AmsUnitInfo
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.FilamentUsage
+import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.PrinterHmsError
 import com.chronoswing.buddydash.data.model.PrinterStatus
@@ -68,6 +69,8 @@ object HomePrintersCacheCodec {
             .putOptString("model", printer.model)
             .put("pending_queue_count", printer.pendingQueueCount)
             .put("maintenance_indicator", printer.maintenanceIndicator.name)
+            .put("maintenance_items", encodeMaintenanceItems(printer.maintenanceItems))
+            .putOptDouble("maintenance_total_print_hours", printer.maintenanceTotalPrintHours)
             .putOptObject("live_status", printer.liveStatus?.let { encodeStatus(it) })
 
     private fun decodePrinter(obj: JSONObject): Printer? {
@@ -83,8 +86,52 @@ object HomePrintersCacheCodec {
             model = obj.optString("model").takeIf { it.isNotBlank() },
             liveStatus = obj.optJSONObject("live_status")?.let { decodeStatus(it) },
             maintenanceIndicator = maintenance,
+            maintenanceItems = decodeMaintenanceItems(obj.optJSONArray("maintenance_items")),
+            maintenanceTotalPrintHours = obj.optNullableDouble("maintenance_total_print_hours"),
             pendingQueueCount = obj.optInt("pending_queue_count", 0),
         )
+    }
+
+    private fun encodeMaintenanceItems(items: List<MaintenanceItem>): JSONArray =
+        JSONArray().apply {
+            items.forEach { item ->
+                put(
+                    JSONObject()
+                        .put("id", item.id)
+                        .put("name", item.name)
+                        .put("is_due", item.isDue)
+                        .put("is_warning", item.isWarning)
+                        .put("enabled", item.enabled)
+                        .putOptDouble("hours_until_due", item.hoursUntilDue)
+                        .putOptDouble("days_until_due", item.daysUntilDue)
+                        .putOptDouble("interval_hours", item.intervalHours)
+                        .putOptDouble("hours_since_maintenance", item.hoursSinceMaintenance)
+                        .putOptString("interval_type", item.intervalType),
+                )
+            }
+        }
+
+    private fun decodeMaintenanceItems(array: JSONArray?): List<MaintenanceItem> {
+        if (array == null) return emptyList()
+        return buildList {
+            for (i in 0 until array.length()) {
+                val obj = array.optJSONObject(i) ?: continue
+                add(
+                    MaintenanceItem(
+                        id = obj.optInt("id", 0),
+                        name = obj.optString("name", ""),
+                        isDue = obj.optBoolean("is_due", false),
+                        isWarning = obj.optBoolean("is_warning", false),
+                        enabled = obj.optBoolean("enabled", true),
+                        hoursUntilDue = obj.optNullableDouble("hours_until_due"),
+                        daysUntilDue = obj.optNullableDouble("days_until_due"),
+                        intervalHours = obj.optNullableDouble("interval_hours"),
+                        hoursSinceMaintenance = obj.optNullableDouble("hours_since_maintenance"),
+                        intervalType = obj.optString("interval_type").takeIf { it.isNotBlank() },
+                    ),
+                )
+            }
+        }
     }
 
     private fun encodeStatus(status: PrinterStatus): JSONObject =
