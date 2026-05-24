@@ -132,6 +132,37 @@ fun DetailInfoCard(
     }
 }
 
+/** Pairs of label/value rows in a responsive two-column grid (expanded machine info, etc.). */
+@Composable
+fun CompactInfoGrid(
+    rows: List<Pair<String, String>>,
+    modifier: Modifier = Modifier,
+) {
+    if (rows.isEmpty()) return
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        rows.chunked(2).forEach { pair ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                pair.forEach { (label, value) ->
+                    CompactLabelValue(
+                        label = label,
+                        value = value,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (pair.size == 1) {
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun ComingSoonActionButton(
     label: String,

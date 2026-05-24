@@ -63,6 +63,7 @@ fun SmartPlugPowerCard(
     onTurnOff: () -> Unit,
     onRequiresConnectionTap: () -> Unit,
     modifier: Modifier = Modifier,
+    dashboardCompact: Boolean = false,
 ) {
     val energy = plug.energy
     val powerState = plug.displayPowerState
@@ -73,6 +74,9 @@ fun SmartPlugPowerCard(
     val powerFactor = formatSmartPlugPowerFactor(energy)
     val showGraph = powerHistory.size >= 2
     val cardAlpha = if (powerControlsEnabled) 1f else 0.88f
+    val outletSize = if (dashboardCompact) 56.dp else 72.dp
+    val heroFontSize = if (dashboardCompact) 26.sp else 32.sp
+    val sparklineHeight = if (dashboardCompact) 48.dp else 72.dp
 
     DetailInfoCard(modifier = modifier.alpha(cardAlpha)) {
         PowerCardHeader(
@@ -86,7 +90,7 @@ fun SmartPlugPowerCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PowerOutletGlowIcon(
-                modifier = Modifier.size(72.dp),
+                modifier = Modifier.size(outletSize),
                 tint = primary,
                 isOn = powerState == SmartOutletPowerState.On,
             )
@@ -102,7 +106,7 @@ fun SmartPlugPowerCard(
                 Text(
                     text = heroWatts ?: "—",
                     style = MaterialTheme.typography.headlineMedium.copy(
-                        fontSize = 32.sp,
+                        fontSize = heroFontSize,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = (-0.5).sp,
                     ),
@@ -152,7 +156,7 @@ fun SmartPlugPowerCard(
                 lineColor = primary,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp),
+                    .height(sparklineHeight),
             )
         }
 

@@ -801,6 +801,8 @@ private fun StatusTab(
                 errorCardScrollOffset = errorCardScrollOffset,
                 density = density,
                 isExpandedWidth = isExpandedWidth,
+                isMaintenanceResetBusy = isMaintenanceResetBusy,
+                onPerformMaintenanceReset = onPerformMaintenanceReset,
             )
         } else {
             IdleStatusTab(
@@ -820,6 +822,8 @@ private fun StatusTab(
                 errorCardScrollOffset = errorCardScrollOffset,
                 density = density,
                 isExpandedWidth = isExpandedWidth,
+                isMaintenanceResetBusy = isMaintenanceResetBusy,
+                onPerformMaintenanceReset = onPerformMaintenanceReset,
             )
         }
         if (queueUpcoming.isNotEmpty()) {
@@ -830,12 +834,13 @@ private fun StatusTab(
                 onViewFullQueue = onViewFullQueue,
             )
         }
-        DetailOperationalStats(
-            labels = labels,
-            isMaintenanceResetBusy = isMaintenanceResetBusy,
-            onPerformMaintenanceReset = onPerformMaintenanceReset,
-            isExpandedWidth = isExpandedWidth,
-        )
+        if (!isExpandedWidth) {
+            DetailOperationalStats(
+                labels = labels,
+                isMaintenanceResetBusy = isMaintenanceResetBusy,
+                onPerformMaintenanceReset = onPerformMaintenanceReset,
+            )
+        }
     }
 }
 
@@ -844,49 +849,15 @@ private fun DetailOperationalStats(
     labels: PrinterDetailLabels,
     isMaintenanceResetBusy: Boolean,
     onPerformMaintenanceReset: (Int) -> Unit,
-    isExpandedWidth: Boolean,
 ) {
-    if (!isExpandedWidth) {
-        DetailConnectivityCard(labels)
-        DetailFansCard(labels)
-        DetailPrintSpeedCard(labels)
-        DetailMaintenanceCard(
-            labels = labels,
-            resetBusy = isMaintenanceResetBusy,
-            onPerformReset = onPerformMaintenanceReset,
-        )
-        return
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                DetailConnectivityCard(labels)
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                DetailFansCard(labels)
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                DetailPrintSpeedCard(labels)
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                DetailMaintenanceCard(
-                    labels = labels,
-                    resetBusy = isMaintenanceResetBusy,
-                    onPerformReset = onPerformMaintenanceReset,
-                )
-            }
-        }
-    }
+    DetailConnectivityCard(labels)
+    DetailFansCard(labels)
+    DetailPrintSpeedCard(labels)
+    DetailMaintenanceCard(
+        labels = labels,
+        resetBusy = isMaintenanceResetBusy,
+        onPerformReset = onPerformMaintenanceReset,
+    )
 }
 
 @Composable
@@ -907,6 +878,8 @@ private fun ActivePrintStatusTab(
     errorCardScrollOffset: androidx.compose.runtime.MutableIntState,
     density: androidx.compose.ui.unit.Density,
     isExpandedWidth: Boolean,
+    isMaintenanceResetBusy: Boolean,
+    onPerformMaintenanceReset: (Int) -> Unit,
 ) {
     if (isExpandedWidth) {
         ActivePrintStatusTabExpanded(
@@ -925,6 +898,8 @@ private fun ActivePrintStatusTab(
             onErrorChipClick = onErrorChipClick,
             errorCardScrollOffset = errorCardScrollOffset,
             density = density,
+            isMaintenanceResetBusy = isMaintenanceResetBusy,
+            onPerformMaintenanceReset = onPerformMaintenanceReset,
         )
         return
     }
@@ -1037,6 +1012,8 @@ private fun IdleStatusTab(
     errorCardScrollOffset: androidx.compose.runtime.MutableIntState,
     density: androidx.compose.ui.unit.Density,
     isExpandedWidth: Boolean,
+    isMaintenanceResetBusy: Boolean,
+    onPerformMaintenanceReset: (Int) -> Unit,
 ) {
     if (isExpandedWidth) {
         IdleStatusTabExpanded(
@@ -1055,6 +1032,8 @@ private fun IdleStatusTab(
             onErrorChipClick = onErrorChipClick,
             errorCardScrollOffset = errorCardScrollOffset,
             density = density,
+            isMaintenanceResetBusy = isMaintenanceResetBusy,
+            onPerformMaintenanceReset = onPerformMaintenanceReset,
         )
         return
     }
@@ -1219,7 +1198,8 @@ private fun FilamentTab(
         )
     }
     FilamentAmsEnvironmentSection(labels)
-    val filamentGridColumns = rememberBuddyDashExpandedGridColumnCount()
+    val isExpandedWidth = rememberIsBuddyDashExpandedWidth()
+    val filamentGridColumns = if (isExpandedWidth) 2 else 1
     FilamentDetailGroups(
         slotDisplays = displays,
         cardMicroMotion = labels.cardMicroMotion,
