@@ -1,0 +1,16 @@
+---
+description: Commit code changes automatically after completing implementation work
+alwaysApply: true
+---
+
+# Auto-commit after code changes
+
+After making code changes in this project, create a git commit automatically when the work is complete.
+
+- Do not wait for an explicit "commit" request unless the user says not to commit.
+- Stage only files related to the task; exclude unrelated changes.
+- Write a concise commit message focused on why the change was made.
+- Do not push unless the user explicitly asks to push.
+- Follow the git safety protocol: never amend pushed commits, never skip hooks, never commit secrets.
+
+If there are no changes to commit, skip silently.
