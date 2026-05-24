@@ -17,8 +17,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -57,6 +57,7 @@ import com.chronoswing.buddydash.ui.components.FilamentUsageText
 import com.chronoswing.buddydash.ui.components.PrinterDetailSkeleton
 import com.chronoswing.buddydash.ui.components.LowSpoolChip
 import com.chronoswing.buddydash.ui.components.SectionHeader
+import com.chronoswing.buddydash.ui.layout.BuddyDashExpandedDetailContainer
 import com.chronoswing.buddydash.ui.layout.rememberBuddyDashExpandedGridColumnCount
 import com.chronoswing.buddydash.util.formatSpoolCardTitle
 import com.chronoswing.buddydash.util.formatSpoolLastUsed
@@ -175,45 +176,47 @@ private fun SpoolDetailScreenContent(
                 val expandedColumns = rememberBuddyDashExpandedGridColumnCount()
                 val showUsageSection = !isLimitedFromListCache || usageDisplayItems.isNotEmpty()
                 val useTwoColumnLayout = expandedColumns > 1 && showUsageSection
-                LazyColumn(
+                val isExpandedWidth = expandedColumns > 1
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding)
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                        .padding(innerPadding),
                 ) {
-                    item(key = "offline_banner") {
-                        OfflineStaleBanner(
-                            visible = showStaleBanner,
-                            limited = isLimitedFromListCache,
-                        )
-                    }
-                    if (!useTwoColumnLayout) {
-                        item(key = "hero") {
-                            SpoolDetailHero(spool = spool)
-                        }
-                        item(key = "fields") {
-                            SpoolDetailFields(spool = spool)
-                        }
-                        if (showUsageSection) {
-                            item(key = "usage_section") {
-                                SpoolUsageHistorySection(
-                                    items = usageDisplayItems,
+                    BuddyDashExpandedDetailContainer(
+                        isExpandedWidth = isExpandedWidth,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            OfflineStaleBanner(
+                                visible = showStaleBanner,
+                                limited = isLimitedFromListCache,
+                            )
+                            if (!useTwoColumnLayout) {
+                                SpoolDetailHero(spool = spool)
+                                SpoolDetailFields(spool = spool)
+                                if (showUsageSection) {
+                                    SpoolUsageHistorySection(
+                                        items = usageDisplayItems,
+                                        serverUrl = serverUrl,
+                                        cameraToken = cameraToken,
+                                        onArchiveClick = onArchiveClick,
+                                    )
+                                }
+                            } else {
+                                SpoolDetailExpandedColumns(
+                                    spool = spool,
+                                    usageDisplayItems = usageDisplayItems,
                                     serverUrl = serverUrl,
                                     cameraToken = cameraToken,
                                     onArchiveClick = onArchiveClick,
                                 )
                             }
-                        }
-                    } else {
-                        item(key = "detail_columns") {
-                            SpoolDetailExpandedColumns(
-                                spool = spool,
-                                usageDisplayItems = usageDisplayItems,
-                                serverUrl = serverUrl,
-                                cameraToken = cameraToken,
-                                onArchiveClick = onArchiveClick,
-                            )
                         }
                     }
                 }

@@ -62,6 +62,7 @@ import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
 import com.chronoswing.buddydash.ui.motion.SecondaryScreenHeader
 import com.chronoswing.buddydash.ui.motion.rememberBuddyDashInteractionSource
 import com.chronoswing.buddydash.ui.motion.successPulseOn
+import com.chronoswing.buddydash.ui.layout.BuddyDashExpandedDetailContainer
 import com.chronoswing.buddydash.ui.layout.rememberIsBuddyDashExpandedWidth
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
@@ -277,27 +278,37 @@ private fun ArchiveDetailScreenContent(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding)
-                        .verticalScroll(rememberScrollState())
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                        .padding(innerPadding),
                 ) {
-                    OfflineStaleBanner(
-                        visible = isStaleCachedData && hasAttemptedNetworkLoad,
-                        limited = isLimitedFromListCache,
-                    )
-                    ArchiveDetailBody(
-                        archive = archive,
+                    BuddyDashExpandedDetailContainer(
                         isExpandedWidth = isExpandedWidth,
-                        queueAgainEnabled = queueAgainEnabled,
-                        queueSuccessPulse = queueSuccessPulse,
-                        onQueueAgain = onQueueAgain,
-                        serverUrl = serverUrl,
-                        cameraToken = cameraToken,
-                        hasCredentials = hasCredentials,
-                        onMaterialTap = onMaterialTap,
-                        onMaterialNavigation = onMaterialNavigation,
-                    )
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            OfflineStaleBanner(
+                                visible = isStaleCachedData && hasAttemptedNetworkLoad,
+                                limited = isLimitedFromListCache,
+                            )
+                            ArchiveDetailBody(
+                                archive = archive,
+                                isExpandedWidth = isExpandedWidth,
+                                queueAgainEnabled = queueAgainEnabled,
+                                queueSuccessPulse = queueSuccessPulse,
+                                onQueueAgain = onQueueAgain,
+                                serverUrl = serverUrl,
+                                cameraToken = cameraToken,
+                                hasCredentials = hasCredentials,
+                                onMaterialTap = onMaterialTap,
+                                onMaterialNavigation = onMaterialNavigation,
+                            )
+                        }
+                    }
                 }
                 ArchiveReprintSheet(
                     archive = archive,

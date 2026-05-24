@@ -127,7 +127,14 @@ internal fun ActivePrintStatusTabExpanded(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            val showEnvironment = labels.tempsLine != null
+            Column(
+                modifier = if (showEnvironment) {
+                    Modifier.weight(1f)
+                } else {
+                    Modifier.fillMaxWidth()
+                },
+            ) {
                 DetailInfoCard {
                     SectionHeader(stringResource(R.string.section_print))
                     HighlightValue(
@@ -297,7 +304,13 @@ internal fun IdleStatusTabExpanded(
                     }
                 }
             }
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = if (hasPrintSection) {
+                    Modifier.weight(1f)
+                } else {
+                    Modifier.fillMaxWidth()
+                },
+            ) {
                 DetailInfoCard {
                     SectionHeader(stringResource(R.string.section_environment))
                     CompactLabelValue(
