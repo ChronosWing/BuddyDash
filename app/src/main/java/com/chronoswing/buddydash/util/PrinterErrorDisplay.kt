@@ -41,9 +41,11 @@ fun PrinterStatus.buildPrinterErrorLines(): List<String> =
         .distinct()
 
 fun PrinterHmsError.toDisplayLine(): String {
-    // Prefer lookup message → API detail → formatted code as one-liner fallback
-    BambuHmsLookup.lookup(this)?.message?.let { return it }
+    // Runtime API message is most specific — always prefer it when present
     detail?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
+    // Fall back to lookup-table message for known codes
+    BambuHmsLookup.lookup(this)?.message?.let { return it }
+    // Last resort: formatted code or raw code string
     return BambuHmsLookup.formatDisplayCode(this) ?: code.trim().takeIf { it.isNotBlank() } ?: "HMS alert"
 }
 
