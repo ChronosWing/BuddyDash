@@ -250,6 +250,25 @@ fun maintenanceDisplayLines(items: List<MaintenanceItem>): List<MaintenanceLine>
             line
         }
 
+fun maintenanceAttentionLines(items: List<MaintenanceItem>): List<MaintenanceLine> =
+    maintenanceDisplayLines(items).filter { it.kind != MaintenanceLineKind.Ok }
+
+/** Extra detail for maintenance sheets: elapsed time, interval, interval type. */
+fun formatMaintenanceDetailMeta(item: MaintenanceItem, kind: MaintenanceLineKind): String? {
+    val parts = mutableListOf<String>()
+    if (kind == MaintenanceLineKind.Due) {
+        parts.add("Overdue")
+    }
+    item.hoursSinceMaintenance?.let { since ->
+        formatMaintenanceDuration(since)?.let { parts.add("$it since last service") }
+    }
+    item.intervalHours?.let { interval ->
+        formatMaintenanceDuration(interval)?.let { parts.add("Interval $it") }
+    }
+    item.intervalType?.trim()?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+}
+
 fun PrinterStatus.hasPrintSpeedSection(): Boolean =
     formatPrintSpeedLevel(speedLevel) != null
 

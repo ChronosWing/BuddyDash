@@ -552,4 +552,41 @@ object BambuHmsLookup {
             alertLevel = HmsAlertLevel.Warning,
         ),
     )
+
+    private const val SHARED_HMS_WIKI_URL = "https://wiki.bambulab.com/en/hms/error-code"
+    private val LONG_HMS_CODE_PATTERN = Regex("""^[0-9A-Fa-f]{4}([_-][0-9A-Fa-f]{4}){3}$""")
+
+    /**
+     * Resolves a wiki URL for [entry].
+     * Priority: verified lookup URL → model-specific 16-digit page → shared error-code page.
+     */
+    fun resolveWikiUrl(entry: PrinterHmsError, printerModel: String?): String? {
+        lookup(entry)?.wikiUrl?.let { return it }
+        val rawCode = entry.code.trim()
+        if (rawCode.isBlank()) return SHARED_HMS_WIKI_URL
+        if (isLongHmsCode(rawCode)) {
+            val slug = resolvePrinterModelWikiSlug(printerModel) ?: return SHARED_HMS_WIKI_URL
+            return "https://wiki.bambulab.com/en/$slug/troubleshooting/hmscode/$rawCode"
+        }
+        return SHARED_HMS_WIKI_URL
+    }
+
+    /** 16-digit HMS codes such as 0300-8001-0001-0001 (dashes or underscores preserved). */
+    fun isLongHmsCode(code: String): Boolean = LONG_HMS_CODE_PATTERN.matches(code.trim())
+
+    /**
+     * Maps a Bambuddy printer model string to a Bambu wiki slug.
+     * Returns null for unknown models — callers should fall back to [SHARED_HMS_WIKI_URL].
+     */
+    fun resolvePrinterModelWikiSlug(model: String?): String? {
+        if (model.isNullOrBlank()) return null
+        val upper = model.uppercase()
+        return when {
+            upper.contains("H2D") -> "h2d"
+            upper.contains("A1") -> "a1"
+            upper.contains("P1") -> "p1"
+            upper.contains("X1") -> "x1"
+            else -> null
+        }
+    }
 }

@@ -10,6 +10,9 @@ data class Printer(
     val model: String?,
     val liveStatus: PrinterStatus? = null,
     val maintenanceIndicator: MaintenanceHomeIndicator = MaintenanceHomeIndicator.None,
+    /** Attention-worthy maintenance rows from the last home enrich fetch. */
+    val maintenanceItems: List<MaintenanceItem> = emptyList(),
+    val maintenanceTotalPrintHours: Double? = null,
     /** Count of pending queue jobs from GET /api/v1/queue (excludes currently printing). */
     val pendingQueueCount: Int = 0,
 )

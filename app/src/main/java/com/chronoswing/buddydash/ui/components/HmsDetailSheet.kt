@@ -33,9 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,6 +49,7 @@ private val HmsAmberSheet = Color(0xFFFBBF24)
 @Composable
 fun HmsDetailSheet(
     printerName: String,
+    printerModel: String?,
     hmsErrors: List<PrinterHmsError>,
     hmsAlertSeverity: HmsSeverity,
     onDismiss: () -> Unit,
@@ -70,53 +68,82 @@ fun HmsDetailSheet(
                 .navigationBarsPadding()
                 .padding(bottom = 24.dp),
         ) {
-            // Header
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(bottom = 4.dp),
-            ) {
-                val headerColor = if (hmsAlertSeverity == HmsSeverity.Error) OfflineRed else HmsAmberSheet
-                Icon(
-                    imageVector = if (hmsAlertSeverity == HmsSeverity.Error) {
-                        Icons.Filled.Error
-                    } else {
-                        Icons.Outlined.Warning
-                    },
-                    contentDescription = null,
-                    tint = headerColor,
-                    modifier = Modifier.size(22.dp),
-                )
-                Column {
-                    Text(
-                        text = stringResource(R.string.hms_sheet_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = printerName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
+            HmsSheetHeader(
+                printerName = printerName,
+                hmsAlertSeverity = hmsAlertSeverity,
+            )
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = 12.dp),
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
             )
+            HmsAlertsListContent(
+                hmsErrors = hmsErrors,
+                hmsAlertSeverity = hmsAlertSeverity,
+                printerModel = printerModel,
+            )
+        }
+    }
+}
 
-            if (hmsErrors.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.hms_sheet_no_entries),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+@Composable
+fun HmsSheetHeader(
+    printerName: String,
+    hmsAlertSeverity: HmsSeverity,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.padding(bottom = 4.dp),
+    ) {
+        val headerColor = if (hmsAlertSeverity == HmsSeverity.Error) OfflineRed else HmsAmberSheet
+        Icon(
+            imageVector = if (hmsAlertSeverity == HmsSeverity.Error) {
+                Icons.Filled.Error
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    hmsErrors.forEachIndexed { index, entry ->
-                        HmsEntryRow(entry = entry, index = index, total = hmsErrors.size)
-                    }
+                Icons.Outlined.Warning
+            },
+            contentDescription = null,
+            tint = headerColor,
+            modifier = Modifier.size(22.dp),
+        )
+        Column {
+            Text(
+                text = stringResource(R.string.hms_sheet_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = printerName,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+fun HmsAlertsListContent(
+    hmsErrors: List<PrinterHmsError>,
+    hmsAlertSeverity: HmsSeverity,
+    printerModel: String?,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        if (hmsErrors.isEmpty()) {
+            Text(
+                text = stringResource(R.string.hms_sheet_no_entries),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                hmsErrors.forEachIndexed { index, entry ->
+                    HmsEntryRow(
+                        entry = entry,
+                        index = index,
+                        total = hmsErrors.size,
+                        printerModel = printerModel,
+                    )
                 }
             }
         }
@@ -128,11 +155,11 @@ private fun HmsEntryRow(
     entry: PrinterHmsError,
     index: Int,
     total: Int,
+    printerModel: String?,
 ) {
     val context = LocalContext.current
     val lookupInfo = BambuHmsLookup.lookup(entry)
 
-    // Prefer lookup-table level (authoritative); fall back to API-derived level
     val level: HmsAlertLevel? = lookupInfo?.alertLevel ?: when (entry.severity) {
         1 -> HmsAlertLevel.Error
         2 -> HmsAlertLevel.Warning
@@ -149,12 +176,9 @@ private fun HmsEntryRow(
     }
 
     val formattedCode = BambuHmsLookup.formatDisplayCode(entry)
-    // Runtime API detail takes priority — it's more specific than the generic lookup message
     val message: String? = entry.detail?.trim()?.takeIf { it.isNotBlank() }
         ?: lookupInfo?.message
-    // Only show wiki link when an explicit, verified URL is stored in the lookup table.
-    // Auto-generated URLs are not used — they may lead to 404 pages.
-    val wikiUrl: String? = lookupInfo?.wikiUrl
+    val wikiUrl = BambuHmsLookup.resolveWikiUrl(entry, printerModel)
 
     Surface(
         shape = RoundedCornerShape(8.dp),
@@ -165,7 +189,6 @@ private fun HmsEntryRow(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            // Code + severity on one line
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -200,7 +223,6 @@ private fun HmsEntryRow(
                 }
             }
 
-            // Message
             if (message != null) {
                 Text(
                     text = message,
@@ -215,15 +237,14 @@ private fun HmsEntryRow(
                 )
             }
 
-            // Wiki link
-            if (wikiUrl != null) {
+            wikiUrl?.let { url ->
                 Spacer(modifier = Modifier.height(2.dp))
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable {
                         context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse(wikiUrl))
+                            Intent(Intent.ACTION_VIEW, Uri.parse(url)),
                         )
                     },
                 ) {
