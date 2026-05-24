@@ -3,7 +3,9 @@ package com.chronoswing.buddydash.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -69,11 +71,10 @@ internal fun ActivePrintStatusTabExpanded(
         verticalArrangement = Arrangement.spacedBy(DashboardGutter),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
             horizontalArrangement = Arrangement.spacedBy(DashboardGutter),
-            verticalAlignment = Alignment.Top,
         ) {
-            Box(modifier = Modifier.weight(0.52f)) {
+            Box(modifier = Modifier.weight(0.52f).fillMaxHeight()) {
                 DetailStatusHeroImage(
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
@@ -86,7 +87,7 @@ internal fun ActivePrintStatusTabExpanded(
                     onCameraHeroActive = { cameraHeroActive = it },
                 )
             }
-            Box(modifier = Modifier.weight(0.48f)) {
+            Box(modifier = Modifier.weight(0.48f).fillMaxHeight()) {
                 StatusOverviewDashboardCard(
                     labels = labels,
                     headerTrailing = headerTrailing,
@@ -98,6 +99,7 @@ internal fun ActivePrintStatusTabExpanded(
                     isClearingPlate = isClearingPlate,
                     onMarkPlateClear = onMarkPlateClear,
                     showConnection = false,
+                    modifier = Modifier.fillMaxHeight(),
                 )
             }
         }
@@ -147,11 +149,10 @@ internal fun IdleStatusTabExpanded(
         verticalArrangement = Arrangement.spacedBy(DashboardGutter),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
             horizontalArrangement = Arrangement.spacedBy(DashboardGutter),
-            verticalAlignment = Alignment.Top,
         ) {
-            Box(modifier = Modifier.weight(0.52f)) {
+            Box(modifier = Modifier.weight(0.52f).fillMaxHeight()) {
                 DetailStatusHeroImage(
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
@@ -163,7 +164,7 @@ internal fun IdleStatusTabExpanded(
                     onCameraHeroActive = { cameraHeroActive = it },
                 )
             }
-            Box(modifier = Modifier.weight(0.48f)) {
+            Box(modifier = Modifier.weight(0.48f).fillMaxHeight()) {
                 StatusOverviewDashboardCard(
                     labels = labels,
                     headerTrailing = headerTrailing,
@@ -175,6 +176,7 @@ internal fun IdleStatusTabExpanded(
                     isClearingPlate = isClearingPlate,
                     onMarkPlateClear = onMarkPlateClear,
                     showConnection = false,
+                    modifier = Modifier.fillMaxHeight(),
                 )
             }
         }
@@ -222,8 +224,9 @@ private fun StatusOverviewDashboardCard(
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
     showConnection: Boolean,
+    modifier: Modifier = Modifier,
 ) {
-    DetailInfoCard {
+    DetailInfoCard(modifier = modifier) {
         SectionHeaderRow(
             title = stringResource(R.string.section_overview),
             trailing = headerTrailing,
