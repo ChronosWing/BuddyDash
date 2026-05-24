@@ -67,11 +67,18 @@ fun parseHmsCodeAlertLevel(code: String): HmsAlertLevel? {
 /**
  * Alert level for a single HMS entry.
  *
- * Returns null when neither the code segment nor the severity field can determine the level.
+ * Resolution order (highest confidence first):
+ * 1. Full 4-segment code (e.g. "0300-0100-0001-0003") — segment 3 encodes the level
+ * 2. 2-segment error-code hex prefix (e.g. "0xC010"):
+ *    4xxx → Error, 8xxx → Warning, Cxxx → Warning (Bambu Notification, shown as Warning)
+ * 3. API severity integer (last resort; encoding not always reliable)
+ *
+ * Returns null when no level can be determined.
  * Callers must treat null as "unknown" — never silently treat as OK.
  */
 fun PrinterHmsError.alertLevel(): HmsAlertLevel? {
     parseHmsCodeAlertLevel(code)?.let { return it }
+    BambuHmsLookup.inferAlertLevelFromCodeHex(code)?.let { return it }
     return when (severity) {
         1 -> HmsAlertLevel.Error
         2 -> HmsAlertLevel.Warning

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -70,8 +71,9 @@ fun PrinterQuickStatusRow(
                 null
             },
         )
-        HmsAlertChip(severity = hmsAlertSeverity, onClick = onHmsChipClick)
         plateKind?.let { PlateStatusChip(kind = it) }
+        // Compact HMS health icon — placed near maintenance indicator, visually distinct from it
+        HmsStatusIcon(severity = hmsAlertSeverity, onClick = onHmsChipClick)
         MaintenanceHomeIndicatorIcon(indicator = maintenanceIndicator)
         QueueCountChip(count = pendingQueueCount)
     }
@@ -80,9 +82,51 @@ fun PrinterQuickStatusRow(
 private val HmsAmber = Color(0xFFFBBF24)
 
 /**
- * Compact tappable chip shown when a printer has active HMS warnings or errors.
- * Visually distinct from the [MaintenanceHomeIndicatorIcon] (bare icon) — this is a full
- * bordered chip with text, using a different icon shape.
+ * Compact bare icon indicator for active HMS health alerts on the Home card.
+ *
+ * Uses [Icons.Outlined.MonitorHeart] (diagnostic/EKG icon) to be visually distinct
+ * from [MaintenanceHomeIndicatorIcon] which uses [Icons.Filled.Warning] (triangle).
+ * Size matches the maintenance icon (16 dp). Tappable — opens the HMS detail sheet.
+ */
+@Composable
+fun HmsStatusIcon(
+    severity: HmsSeverity,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
+    if (severity == HmsSeverity.Ok) return
+
+    val accent = if (severity == HmsSeverity.Error) OfflineRed else HmsAmber
+    val pulse = rememberAttentionPulse(
+        enabled = severity == HmsSeverity.Error,
+        periodMillis = 4_000,
+    )
+    val alpha = if (severity == HmsSeverity.Error) 0.82f + pulse * 0.14f else 1f
+    val cd = when (severity) {
+        HmsSeverity.Error -> stringResource(R.string.cd_hms_chip_error)
+        HmsSeverity.Warning -> stringResource(R.string.cd_hms_chip_warning)
+        else -> stringResource(R.string.cd_hms_chip_unknown)
+    }
+
+    Icon(
+        imageVector = Icons.Outlined.MonitorHeart,
+        contentDescription = cd,
+        modifier = modifier
+            .size(16.dp)
+            .then(
+                if (onClick != null) {
+                    Modifier.buddyDashClickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            ),
+        tint = accent.copy(alpha = alpha),
+    )
+}
+
+/**
+ * Full bordered chip for HMS alerts — kept for use outside the Home card
+ * (e.g. detail screens or future contexts that prefer a labelled chip).
  */
 @Composable
 fun HmsAlertChip(

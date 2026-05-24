@@ -33,6 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -146,9 +149,12 @@ private fun HmsEntryRow(
     }
 
     val formattedCode = BambuHmsLookup.formatDisplayCode(entry)
-    val message: String? = lookupInfo?.message
-        ?: entry.detail?.trim()?.takeIf { it.isNotBlank() }
-    val wikiUrl = BambuHmsLookup.wikiUrl(entry)
+    // Runtime API detail takes priority — it's more specific than the generic lookup message
+    val message: String? = entry.detail?.trim()?.takeIf { it.isNotBlank() }
+        ?: lookupInfo?.message
+    // Only show wiki link when an explicit, verified URL is stored in the lookup table.
+    // Auto-generated URLs are not used — they may lead to 404 pages.
+    val wikiUrl: String? = lookupInfo?.wikiUrl
 
     Surface(
         shape = RoundedCornerShape(8.dp),
