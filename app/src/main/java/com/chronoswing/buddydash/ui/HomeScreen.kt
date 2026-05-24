@@ -89,6 +89,7 @@ import com.chronoswing.buddydash.ui.components.HomeCardMicroMotionFrame
 import com.chronoswing.buddydash.ui.components.MicroMotionProgressBar
 import com.chronoswing.buddydash.ui.components.MicroMotionThumbnailFrame
 import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
+import com.chronoswing.buddydash.ui.components.rememberDelayedOfflineBannerVisible
 import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterCoverImage
@@ -219,6 +220,8 @@ private fun HomeScreenContent(
         isStaleCachedData = isStaleCachedData,
         refreshError = refreshError,
     )
+    val showStaleBannerDelayed = rememberDelayedOfflineBannerVisible(showStaleBanner)
+    val staleBannerRefreshFailedDelayed = rememberDelayedOfflineBannerVisible(staleBannerRefreshFailed)
     val showPrinterSearch = printers.size >= HOME_PRINTER_SEARCH_MIN_COUNT
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -251,8 +254,8 @@ private fun HomeScreenContent(
                 hasCredentials = hasCredentials,
                 isLoading = isLoading,
                 onRefresh = onRefresh,
-                refreshFailed = staleBannerRefreshFailed,
-                offlineStale = showStaleBanner && !staleBannerRefreshFailed,
+                refreshFailed = staleBannerRefreshFailedDelayed,
+                offlineStale = showStaleBannerDelayed && !staleBannerRefreshFailedDelayed,
                 idleGlowMultiplier = idleGlowMultiplier,
                 headerAmbientMultiplier = headerAmbientMultiplier,
                 printGlowMultiplier = printGlowMultiplier,
