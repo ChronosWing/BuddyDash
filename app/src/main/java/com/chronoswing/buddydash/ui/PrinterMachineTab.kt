@@ -27,6 +27,7 @@ import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.PrinterMachineInfo
 import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
 import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.ui.components.CompactInfoGrid
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.MachineStepFilterChip
@@ -159,15 +160,15 @@ fun MachineTab(
         )
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (useDashboardRow) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 if (caps.showMotionSection) {
-                    Box(modifier = Modifier.weight(0.5f)) {
+                    Box(modifier = Modifier.weight(1f)) {
                         MachineMotionCard(
                             labels = labels,
                             caps = caps,
@@ -180,7 +181,7 @@ fun MachineTab(
                     }
                 }
                 if (caps.showUtilitiesSection) {
-                    Box(modifier = Modifier.weight(0.5f)) {
+                    Box(modifier = Modifier.weight(1f)) {
                         MachineUtilitiesCard(
                             caps = caps,
                             isControlBusy = isControlBusy,
@@ -215,24 +216,79 @@ fun MachineTab(
             }
         }
 
-        smartPlugState?.let { plug ->
-            SmartPlugPowerCard(
-                plug = plug,
-                powerHistory = smartPlugPowerHistory,
-                actionsEnabled = !isControlBusy,
-                powerControlsEnabled = powerControlsEnabled,
-                onTurnOn = onPowerOn,
-                onTurnOff = { showPowerOffConfirm = true },
-                onRequiresConnectionTap = onRequiresConnectionTap,
+        val infoRows = buildMachineInfoRows(labels, machineInfo, printerModel, statusUpdatedAtMillis)
+        if (isExpandedWidth) {
+            when {
+                smartPlugState != null && infoRows.isNotEmpty() -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        SmartPlugPowerCard(
+                            plug = smartPlugState,
+                            powerHistory = smartPlugPowerHistory,
+                            actionsEnabled = !isControlBusy,
+                            powerControlsEnabled = powerControlsEnabled,
+                            onTurnOn = onPowerOn,
+                            onTurnOff = { showPowerOffConfirm = true },
+                            onRequiresConnectionTap = onRequiresConnectionTap,
+                            modifier = Modifier.weight(1f),
+                            dashboardCompact = true,
+                        )
+                        MachinePrinterInfoCard(
+                            labels = labels,
+                            machineInfo = machineInfo,
+                            printerModel = printerModel,
+                            statusUpdatedAtMillis = statusUpdatedAtMillis,
+                            useInfoGrid = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                smartPlugState != null -> {
+                    SmartPlugPowerCard(
+                        plug = smartPlugState,
+                        powerHistory = smartPlugPowerHistory,
+                        actionsEnabled = !isControlBusy,
+                        powerControlsEnabled = powerControlsEnabled,
+                        onTurnOn = onPowerOn,
+                        onTurnOff = { showPowerOffConfirm = true },
+                        onRequiresConnectionTap = onRequiresConnectionTap,
+                        dashboardCompact = true,
+                    )
+                }
+                infoRows.isNotEmpty() -> {
+                    MachinePrinterInfoCard(
+                        labels = labels,
+                        machineInfo = machineInfo,
+                        printerModel = printerModel,
+                        statusUpdatedAtMillis = statusUpdatedAtMillis,
+                        useInfoGrid = true,
+                    )
+                }
+            }
+        } else {
+            smartPlugState?.let { plug ->
+                SmartPlugPowerCard(
+                    plug = plug,
+                    powerHistory = smartPlugPowerHistory,
+                    actionsEnabled = !isControlBusy,
+                    powerControlsEnabled = powerControlsEnabled,
+                    onTurnOn = onPowerOn,
+                    onTurnOff = { showPowerOffConfirm = true },
+                    onRequiresConnectionTap = onRequiresConnectionTap,
+                )
+            }
+
+            MachinePrinterInfoCard(
+                labels = labels,
+                machineInfo = machineInfo,
+                printerModel = printerModel,
+                statusUpdatedAtMillis = statusUpdatedAtMillis,
+                useInfoGrid = false,
             )
         }
-
-        MachinePrinterInfoCard(
-            labels = labels,
-            machineInfo = machineInfo,
-            printerModel = printerModel,
-            statusUpdatedAtMillis = statusUpdatedAtMillis,
-        )
     }
 }
 
@@ -357,29 +413,38 @@ private fun MachinePrinterInfoCard(
     machineInfo: PrinterMachineInfo?,
     printerModel: String?,
     statusUpdatedAtMillis: Long?,
+    useInfoGrid: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val rows = buildMachineInfoRows(labels, machineInfo, printerModel, statusUpdatedAtMillis)
     if (rows.isEmpty()) return
-    DetailInfoCard {
+    val labeledRows = rows.map { (key, value) ->
+        val label = when (key) {
+            "connection" -> stringResource(R.string.connection)
+            "state" -> stringResource(R.string.machine_info_state)
+            "model" -> stringResource(R.string.machine_info_model)
+            "firmware" -> stringResource(R.string.firmware)
+            "ip" -> stringResource(R.string.machine_info_ip)
+            "wifi_signal" -> stringResource(R.string.machine_info_wifi_signal)
+            "lan_mode" -> stringResource(R.string.machine_info_lan_mode)
+            "serial" -> stringResource(R.string.machine_info_serial)
+            "nozzle_count" -> stringResource(R.string.machine_info_nozzle_count)
+            "developer_mode" -> stringResource(R.string.machine_info_developer_mode)
+            "print_hours" -> stringResource(R.string.machine_info_print_hours)
+            "auto_archive" -> stringResource(R.string.machine_info_auto_archive)
+            else -> key
+        }
+        label to value
+    }
+    DetailInfoCard(modifier = modifier) {
         SectionHeader(stringResource(R.string.machine_section_printer_info))
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            rows.forEach { (key, value) ->
-                val label = when (key) {
-                    "connection" -> stringResource(R.string.connection)
-                    "state" -> stringResource(R.string.machine_info_state)
-                    "model" -> stringResource(R.string.machine_info_model)
-                    "firmware" -> stringResource(R.string.firmware)
-                    "ip" -> stringResource(R.string.machine_info_ip)
-                    "wifi_signal" -> stringResource(R.string.machine_info_wifi_signal)
-                    "lan_mode" -> stringResource(R.string.machine_info_lan_mode)
-                    "serial" -> stringResource(R.string.machine_info_serial)
-                    "nozzle_count" -> stringResource(R.string.machine_info_nozzle_count)
-                    "developer_mode" -> stringResource(R.string.machine_info_developer_mode)
-                    "print_hours" -> stringResource(R.string.machine_info_print_hours)
-                    "auto_archive" -> stringResource(R.string.machine_info_auto_archive)
-                    else -> key
+        if (useInfoGrid) {
+            CompactInfoGrid(rows = labeledRows)
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                labeledRows.forEach { (label, value) ->
+                    CompactLabelValue(label = label, value = value)
                 }
-                CompactLabelValue(label = label, value = value)
             }
         }
     }

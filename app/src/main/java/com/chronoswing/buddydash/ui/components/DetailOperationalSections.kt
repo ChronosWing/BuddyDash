@@ -65,6 +65,8 @@ import com.chronoswing.buddydash.util.PrintSpeedMode
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.formatAmsHumidityCompact
 import com.chronoswing.buddydash.util.formatAmsTempCompact
+import com.chronoswing.buddydash.ui.components.PrintTempsRow
+import com.chronoswing.buddydash.util.HmsSeverity
 import com.chronoswing.buddydash.util.PrinterMotionLayout
 import com.chronoswing.buddydash.util.formatFanPercentCompact
 import com.chronoswing.buddydash.util.maintenanceDisplayLines
@@ -385,6 +387,134 @@ private fun AmsEnvironmentUnitRow(unit: AmsUnitInfo) {
                     contentDescription = stringResource(R.string.cd_ams_humidity, unit.label, value),
                 )
             }
+        }
+    }
+}
+
+/** Expanded Status tab: environment/health beside connectivity; fans beside maintenance. */
+@Composable
+fun DetailOperationalStatsDashboard(
+    labels: PrinterDetailLabels,
+    resetBusy: Boolean,
+    onPerformReset: (Int) -> Unit,
+    includeHealthMetrics: Boolean,
+) {
+    val gutter = 8.dp
+    val showEnvironment = includeHealthMetrics && (
+        labels.tempsLine != null ||
+            labels.nozzleTemp.isNotBlank() ||
+            labels.bedTemp.isNotBlank() ||
+            labels.hmsHealth.isNotBlank()
+        )
+    val showConnectivity = labels.showConnectivitySection
+    val showFans = labels.showFansSection
+    val showMaintenance = maintenanceDisplayLines(labels.maintenanceItems).isNotEmpty()
+    val showSpeed = labels.printSpeedLabel != null
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(gutter),
+    ) {
+        if (showEnvironment || showConnectivity || showSpeed) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(gutter),
+                verticalAlignment = Alignment.Top,
+            ) {
+                if (showEnvironment) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        StatusEnvironmentDashboardCard(
+                            labels = labels,
+                            includeHealthMetrics = includeHealthMetrics,
+                        )
+                    }
+                }
+                if (showConnectivity || showSpeed) {
+                    Column(
+                        modifier = if (showEnvironment) {
+                            Modifier.weight(1f)
+                        } else {
+                            Modifier.fillMaxWidth()
+                        },
+                    ) {
+                        DetailConnectivityCard(labels)
+                        DetailPrintSpeedCard(labels)
+                    }
+                }
+            }
+        }
+        if (showFans || showMaintenance) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(gutter),
+                verticalAlignment = Alignment.Top,
+            ) {
+                if (showFans) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        DetailFansCard(labels)
+                    }
+                }
+                if (showMaintenance) {
+                    Column(
+                        modifier = if (showFans) {
+                            Modifier.weight(1f)
+                        } else {
+                            Modifier.fillMaxWidth()
+                        },
+                    ) {
+                        DetailMaintenanceCard(
+                            labels = labels,
+                            resetBusy = resetBusy,
+                            onPerformReset = onPerformReset,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusEnvironmentDashboardCard(
+    labels: PrinterDetailLabels,
+    includeHealthMetrics: Boolean,
+) {
+    val hasTemps = labels.tempsLine != null ||
+        labels.nozzleTemp.isNotBlank() ||
+        labels.bedTemp.isNotBlank()
+    val hasHealth = includeHealthMetrics && labels.hmsHealth.isNotBlank()
+    if (!hasTemps && !hasHealth) return
+
+    DetailInfoCard {
+        SectionHeader(stringResource(R.string.section_environment))
+        if (hasTemps) {
+            if (labels.tempsLine != null) {
+                PrintTempsRow(
+                    nozzleTemp = labels.nozzleTemp,
+                    bedTemp = labels.bedTemp,
+                    valueStyle = MaterialTheme.typography.titleMedium,
+                )
+            } else {
+                CompactLabelValue(
+                    label = stringResource(R.string.nozzle_temp),
+                    value = labels.nozzleTemp,
+                )
+                CompactLabelValue(
+                    label = stringResource(R.string.bed_temp),
+                    value = labels.bedTemp,
+                )
+            }
+        }
+        if (hasHealth) {
+            CompactLabelValue(
+                label = stringResource(R.string.hms_health),
+                value = labels.hmsHealth,
+                valueColor = when (labels.hmsAlertSeverity) {
+                    HmsSeverity.Error -> MaterialTheme.colorScheme.error
+                    HmsSeverity.Warning, HmsSeverity.Unknown -> Color(0xFFFBBF24)
+                    HmsSeverity.Ok -> MaterialTheme.colorScheme.primary
+                },
+            )
         }
     }
 }

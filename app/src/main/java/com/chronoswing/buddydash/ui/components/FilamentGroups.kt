@@ -189,22 +189,55 @@ fun FilamentDetailGroups(
                         )
                     }
                 } else {
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(BUDDYDASH_GRID_GUTTER_DP.dp),
-                        verticalArrangement = Arrangement.spacedBy(BUDDYDASH_GRID_GUTTER_DP.dp),
-                        maxItemsInEachRow = columns,
-                    ) {
-                        group.slots.forEach { slot ->
-                            val display = displayBySlot[slot] ?: return@forEach
-                            FilamentDetailSlotCard(
-                                modifier = Modifier.fillMaxWidth(1f / columns),
-                                display = display,
-                                isExternal = group.isExternal,
-                                glowMotion = glowMotion,
-                                onSlotClick = onSlotClick,
-                            )
-                        }
+                    FilamentDetailSlotGrid(
+                        slots = group.slots,
+                        displayBySlot = displayBySlot,
+                        isExternal = group.isExternal,
+                        glowMotion = glowMotion,
+                        onSlotClick = onSlotClick,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilamentDetailSlotGrid(
+    slots: List<FilamentSlot>,
+    displayBySlot: Map<FilamentSlot, FilamentSlotDisplay>,
+    isExternal: Boolean,
+    glowMotion: FilamentGlowMotion,
+    onSlotClick: (FilamentSlotDisplay) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(BUDDYDASH_GRID_GUTTER_DP.dp),
+    ) {
+        slots.chunked(2).forEach { rowSlots ->
+            if (rowSlots.size == 1) {
+                val display = displayBySlot[rowSlots.first()] ?: return@forEach
+                FilamentDetailSlotCard(
+                    display = display,
+                    isExternal = isExternal,
+                    glowMotion = glowMotion,
+                    onSlotClick = onSlotClick,
+                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(BUDDYDASH_GRID_GUTTER_DP.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    rowSlots.forEach { slot ->
+                        val display = displayBySlot[slot] ?: return@forEach
+                        FilamentDetailSlotCard(
+                            modifier = Modifier.weight(1f),
+                            display = display,
+                            isExternal = isExternal,
+                            glowMotion = glowMotion,
+                            onSlotClick = onSlotClick,
+                        )
                     }
                 }
             }
