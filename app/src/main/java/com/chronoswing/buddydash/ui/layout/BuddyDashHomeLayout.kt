@@ -63,3 +63,7 @@ fun BuddyDashExpandedFormContainer(
         }
     }
 }
+
+@Composable
+fun rememberIsBuddyDashExpandedWidth(): Boolean =
+    rememberBuddyDashExpandedGridColumnCount() > 1

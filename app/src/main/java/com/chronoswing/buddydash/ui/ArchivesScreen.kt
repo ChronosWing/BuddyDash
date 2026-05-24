@@ -18,7 +18,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -61,6 +68,8 @@ import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
 import com.chronoswing.buddydash.util.showStaleDataBanner
 import com.chronoswing.buddydash.util.staleBannerShowsRefreshFailed
 import com.chronoswing.buddydash.ui.components.asImageVector
+import com.chronoswing.buddydash.ui.layout.BuddyDashExpandedFormContainer
+import com.chronoswing.buddydash.ui.layout.rememberBuddyDashExpandedGridColumnCount
 import com.chronoswing.buddydash.util.ArchivePrinterFilter
 import com.chronoswing.buddydash.util.ArchiveResultFilter
 import com.chronoswing.buddydash.util.ArchiveStatsSnapshot
@@ -316,6 +325,7 @@ private fun ArchivesHistoryContent(
     onArchiveClick: (PrintArchive) -> Unit,
     onClearPrinterFilter: () -> Unit,
 ) {
+    val archiveGridColumns = rememberBuddyDashExpandedGridColumnCount()
     Column(modifier = Modifier.fillMaxSize()) {
         printerFilter?.let { activePrinterFilter ->
             ArchivesPrinterFilterBanner(
@@ -329,6 +339,7 @@ private fun ArchivesHistoryContent(
         ArchiveSearchAndFilters(
             searchQuery = searchQuery,
             filter = filter,
+            gridColumns = archiveGridColumns,
             onSearchQueryChange = onSearchQueryChange,
             onFilterChange = onFilterChange,
             modifier = Modifier
@@ -355,33 +366,115 @@ private fun ArchivesHistoryContent(
                     .padding(16.dp),
             )
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
-                    bottom = 12.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(
-                    items = archives,
-                    key = { it.id },
-                ) { archive ->
-                    ArchiveListRow(
-                        archive = archive,
-                        serverUrl = serverUrl,
-                        cameraToken = cameraToken,
-                        modifier = Modifier.buddyDashClickable { onArchiveClick(archive) },
-                    )
-                }
+            val listState = rememberLazyListState()
+            val gridState = rememberLazyGridState()
+            ArchiveHistoryList(
+                archives = archives,
+                gridColumns = archiveGridColumns,
+                listState = listState,
+                gridState = gridState,
+                serverUrl = serverUrl,
+                cameraToken = cameraToken,
+                onArchiveClick = onArchiveClick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ArchiveHistoryList(
+    archives: List<PrintArchive>,
+    gridColumns: Int,
+    listState: LazyListState,
+    gridState: LazyGridState,
+    serverUrl: String,
+    cameraToken: String,
+    onArchiveClick: (PrintArchive) -> Unit,
+) {
+    val contentPadding = PaddingValues(
+        start = 12.dp,
+        end = 12.dp,
+        bottom = 12.dp,
+    )
+    if (gridColumns <= 1) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(
+                items = archives,
+                key = { it.id },
+            ) { archive ->
+                ArchiveHistoryListItem(
+                    archive = archive,
+                    serverUrl = serverUrl,
+                    cameraToken = cameraToken,
+                    onArchiveClick = onArchiveClick,
+                )
+            }
+        }
+    } else {
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Fixed(gridColumns),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = contentPadding,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(
+                items = archives,
+                key = { it.id },
+            ) { archive ->
+                ArchiveHistoryListItem(
+                    archive = archive,
+                    serverUrl = serverUrl,
+                    cameraToken = cameraToken,
+                    onArchiveClick = onArchiveClick,
+                )
             }
         }
     }
 }
 
 @Composable
+private fun ArchiveHistoryListItem(
+    archive: PrintArchive,
+    serverUrl: String,
+    cameraToken: String,
+    onArchiveClick: (PrintArchive) -> Unit,
+) {
+    ArchiveListRow(
+        archive = archive,
+        serverUrl = serverUrl,
+        cameraToken = cameraToken,
+        modifier = Modifier.buddyDashClickable { onArchiveClick(archive) },
+    )
+}
+
+@Composable
 private fun ArchiveSearchAndFilters(
+    searchQuery: String,
+    filter: ArchiveResultFilter,
+    gridColumns: Int,
+    onSearchQueryChange: (String) -> Unit,
+    onFilterChange: (ArchiveResultFilter) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BuddyDashExpandedFormContainer(gridColumns = gridColumns, modifier = modifier) {
+        ArchiveSearchAndFiltersContent(
+            searchQuery = searchQuery,
+            filter = filter,
+            onSearchQueryChange = onSearchQueryChange,
+            onFilterChange = onFilterChange,
+        )
+    }
+}
+
+@Composable
+private fun ArchiveSearchAndFiltersContent(
     searchQuery: String,
     filter: ArchiveResultFilter,
     onSearchQueryChange: (String) -> Unit,

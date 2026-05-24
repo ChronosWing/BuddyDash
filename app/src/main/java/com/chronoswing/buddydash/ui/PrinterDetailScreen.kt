@@ -104,6 +104,8 @@ import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.motion.BuddyDashTabFadeContainer
 import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
 import com.chronoswing.buddydash.ui.motion.SecondaryScreenHeader
+import com.chronoswing.buddydash.ui.layout.rememberBuddyDashExpandedGridColumnCount
+import com.chronoswing.buddydash.ui.layout.rememberIsBuddyDashExpandedWidth
 import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
@@ -753,6 +755,7 @@ private fun StatusTab(
     onStopPrint: () -> Unit,
     isControlBusy: Boolean,
 ) {
+    val isExpandedWidth = rememberIsBuddyDashExpandedWidth()
     val quickActions: @Composable () -> Unit = {
         PrinterStatusQuickActions(
             labels = labels,
@@ -790,6 +793,7 @@ private fun StatusTab(
                 onErrorChipClick = onErrorChipClick,
                 errorCardScrollOffset = errorCardScrollOffset,
                 density = density,
+                isExpandedWidth = isExpandedWidth,
             )
         } else {
             IdleStatusTab(
@@ -808,6 +812,7 @@ private fun StatusTab(
                 onErrorChipClick = onErrorChipClick,
                 errorCardScrollOffset = errorCardScrollOffset,
                 density = density,
+                isExpandedWidth = isExpandedWidth,
             )
         }
         if (queueUpcoming.isNotEmpty()) {
@@ -859,7 +864,28 @@ private fun ActivePrintStatusTab(
     onErrorChipClick: () -> Unit,
     errorCardScrollOffset: androidx.compose.runtime.MutableIntState,
     density: androidx.compose.ui.unit.Density,
+    isExpandedWidth: Boolean,
 ) {
+    if (isExpandedWidth) {
+        ActivePrintStatusTabExpanded(
+            labels = labels,
+            printerModel = printerModel,
+            printerStatus = printerStatus,
+            printingQueueJobId = printingQueueJobId,
+            printerId = printerId,
+            serverUrl = serverUrl,
+            cameraToken = cameraToken,
+            isClearingPlate = isClearingPlate,
+            onMarkPlateClear = onMarkPlateClear,
+            headerTrailing = headerTrailing,
+            errorDetailsExpanded = errorDetailsExpanded,
+            onExpandErrorDetails = onExpandErrorDetails,
+            onErrorChipClick = onErrorChipClick,
+            errorCardScrollOffset = errorCardScrollOffset,
+            density = density,
+        )
+        return
+    }
     var cameraHeroActive by remember { mutableStateOf(false) }
     DetailStatusHeroImage(
         serverUrl = serverUrl,
@@ -968,7 +994,28 @@ private fun IdleStatusTab(
     onErrorChipClick: () -> Unit,
     errorCardScrollOffset: androidx.compose.runtime.MutableIntState,
     density: androidx.compose.ui.unit.Density,
+    isExpandedWidth: Boolean,
 ) {
+    if (isExpandedWidth) {
+        IdleStatusTabExpanded(
+            labels = labels,
+            printerModel = printerModel,
+            printerStatus = printerStatus,
+            printingQueueJobId = printingQueueJobId,
+            printerId = printerId,
+            serverUrl = serverUrl,
+            cameraToken = cameraToken,
+            isClearingPlate = isClearingPlate,
+            onMarkPlateClear = onMarkPlateClear,
+            headerTrailing = headerTrailing,
+            errorDetailsExpanded = errorDetailsExpanded,
+            onExpandErrorDetails = onExpandErrorDetails,
+            onErrorChipClick = onErrorChipClick,
+            errorCardScrollOffset = errorCardScrollOffset,
+            density = density,
+        )
+        return
+    }
     var cameraHeroActive by remember { mutableStateOf(false) }
     DetailStatusHeroImage(
         serverUrl = serverUrl,
@@ -1130,16 +1177,18 @@ private fun FilamentTab(
         )
     }
     FilamentAmsEnvironmentSection(labels)
+    val filamentGridColumns = rememberBuddyDashExpandedGridColumnCount()
     FilamentDetailGroups(
         slotDisplays = displays,
         cardMicroMotion = labels.cardMicroMotion,
         onSlotClick = onOpenFilamentSlot,
         modifier = Modifier.fillMaxWidth(),
+        gridColumns = filamentGridColumns,
     )
 }
 
 @Composable
-private fun PlateClearButton(
+internal fun PlateClearButton(
     labels: PrinterDetailLabels,
     isClearingPlate: Boolean,
     onClick: () -> Unit,
