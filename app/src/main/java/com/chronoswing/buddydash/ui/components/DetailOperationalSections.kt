@@ -2,6 +2,8 @@ package com.chronoswing.buddydash.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Column
@@ -72,9 +74,9 @@ import com.chronoswing.buddydash.util.formatFanPercentCompact
 import com.chronoswing.buddydash.util.maintenanceDisplayLines
 
 @Composable
-fun DetailConnectivityCard(labels: PrinterDetailLabels) {
+fun DetailConnectivityCard(labels: PrinterDetailLabels, modifier: Modifier = Modifier) {
     if (!labels.showConnectivitySection) return
-    DetailInfoCard {
+    DetailInfoCard(modifier = modifier) {
         SectionHeader(stringResource(R.string.section_connectivity))
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             CompactIconStatsFlowRow {
@@ -131,9 +133,9 @@ fun DetailConnectivityCard(labels: PrinterDetailLabels) {
 }
 
 @Composable
-fun DetailFansCard(labels: PrinterDetailLabels) {
+fun DetailFansCard(labels: PrinterDetailLabels, modifier: Modifier = Modifier) {
     if (!labels.showFansSection) return
-    DetailInfoCard {
+    DetailInfoCard(modifier = modifier) {
         SectionHeader(stringResource(R.string.section_fans))
         CompactIconStatsFlowRow {
             labels.partFanPercent?.let { percent ->
@@ -310,6 +312,7 @@ fun DetailMaintenanceCard(
     labels: PrinterDetailLabels,
     resetBusy: Boolean,
     onPerformReset: (itemId: Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val lines = maintenanceDisplayLines(labels.maintenanceItems)
     if (lines.isEmpty()) return
@@ -338,7 +341,7 @@ fun DetailMaintenanceCard(
         )
     }
 
-    DetailInfoCard {
+    DetailInfoCard(modifier = modifier) {
         SectionHeader(stringResource(R.string.section_maintenance))
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             lines.forEach { line ->
@@ -417,22 +420,22 @@ fun DetailOperationalStatsDashboard(
     ) {
         if (showEnvironment || showConnectivity || showSpeed) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
                 horizontalArrangement = Arrangement.spacedBy(gutter),
-                verticalAlignment = Alignment.Top,
             ) {
                 if (showEnvironment) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
                         StatusEnvironmentDashboardCard(
                             labels = labels,
                             includeHealthMetrics = includeHealthMetrics,
+                            modifier = Modifier.fillMaxHeight(),
                         )
                     }
                 }
                 if (showConnectivity || showSpeed) {
                     Column(
                         modifier = if (showEnvironment) {
-                            Modifier.weight(1f)
+                            Modifier.weight(1f).fillMaxHeight()
                         } else {
                             Modifier.fillMaxWidth()
                         },
@@ -445,19 +448,18 @@ fun DetailOperationalStatsDashboard(
         }
         if (showFans || showMaintenance) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
                 horizontalArrangement = Arrangement.spacedBy(gutter),
-                verticalAlignment = Alignment.Top,
             ) {
                 if (showFans) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        DetailFansCard(labels)
+                    Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        DetailFansCard(labels, modifier = Modifier.fillMaxHeight())
                     }
                 }
                 if (showMaintenance) {
                     Column(
                         modifier = if (showFans) {
-                            Modifier.weight(1f)
+                            Modifier.weight(1f).fillMaxHeight()
                         } else {
                             Modifier.fillMaxWidth()
                         },
@@ -466,6 +468,7 @@ fun DetailOperationalStatsDashboard(
                             labels = labels,
                             resetBusy = resetBusy,
                             onPerformReset = onPerformReset,
+                            modifier = Modifier.fillMaxHeight(),
                         )
                     }
                 }
@@ -478,6 +481,7 @@ fun DetailOperationalStatsDashboard(
 private fun StatusEnvironmentDashboardCard(
     labels: PrinterDetailLabels,
     includeHealthMetrics: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val hasTemps = labels.tempsLine != null ||
         labels.nozzleTemp.isNotBlank() ||
@@ -485,7 +489,7 @@ private fun StatusEnvironmentDashboardCard(
     val hasHealth = includeHealthMetrics && labels.hmsHealth.isNotBlank()
     if (!hasTemps && !hasHealth) return
 
-    DetailInfoCard {
+    DetailInfoCard(modifier = modifier) {
         SectionHeader(stringResource(R.string.section_environment))
         if (hasTemps) {
             if (labels.tempsLine != null) {

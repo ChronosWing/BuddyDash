@@ -4,9 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
@@ -163,33 +166,30 @@ fun MachineTab(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (useDashboardRow) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Top,
             ) {
                 if (caps.showMotionSection) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        MachineMotionCard(
-                            labels = labels,
-                            caps = caps,
-                            bedJogStepMm = bedJogStepMm,
-                            isControlBusy = isControlBusy,
-                            onBedJogStepChange = onBedJogStepChange,
-                            onJogBedUp = onJogBedUp,
-                            onJogBedDown = onJogBedDown,
-                        )
-                    }
+                    MachineMotionCard(
+                        labels = labels,
+                        caps = caps,
+                        bedJogStepMm = bedJogStepMm,
+                        isControlBusy = isControlBusy,
+                        onBedJogStepChange = onBedJogStepChange,
+                        onJogBedUp = onJogBedUp,
+                        onJogBedDown = onJogBedDown,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
                 }
                 if (caps.showUtilitiesSection) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        MachineUtilitiesCard(
-                            caps = caps,
-                            isControlBusy = isControlBusy,
-                            onShowCamera = { showCameraFullscreen = true },
-                            onShowHomeConfirm = { showHomeConfirm = true },
-                            onOpenPrinterArchives = onOpenPrinterArchives,
-                        )
-                    }
+                    MachineUtilitiesCard(
+                        caps = caps,
+                        isControlBusy = isControlBusy,
+                        onShowCamera = { showCameraFullscreen = true },
+                        onShowHomeConfirm = { showHomeConfirm = true },
+                        onOpenPrinterArchives = onOpenPrinterArchives,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
                 }
             }
         } else {
@@ -221,9 +221,8 @@ fun MachineTab(
             when {
                 smartPlugState != null && infoRows.isNotEmpty() -> {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.Top,
                     ) {
                         SmartPlugPowerCard(
                             plug = smartPlugState,
@@ -233,7 +232,7 @@ fun MachineTab(
                             onTurnOn = onPowerOn,
                             onTurnOff = { showPowerOffConfirm = true },
                             onRequiresConnectionTap = onRequiresConnectionTap,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
                             dashboardCompact = true,
                         )
                         MachinePrinterInfoCard(
@@ -242,7 +241,7 @@ fun MachineTab(
                             printerModel = printerModel,
                             statusUpdatedAtMillis = statusUpdatedAtMillis,
                             useInfoGrid = true,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
                         )
                     }
                 }
@@ -301,8 +300,9 @@ private fun MachineMotionCard(
     onBedJogStepChange: (Float) -> Unit,
     onJogBedUp: () -> Unit,
     onJogBedDown: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    DetailInfoCard {
+    DetailInfoCard(modifier = modifier) {
         SectionHeader(stringResource(R.string.machine_section_motion))
         BedJogStepSelector(
             selectedStepMm = bedJogStepMm,
@@ -331,8 +331,9 @@ private fun MachineUtilitiesCard(
     onShowCamera: () -> Unit,
     onShowHomeConfirm: () -> Unit,
     onOpenPrinterArchives: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    DetailInfoCard {
+    DetailInfoCard(modifier = modifier) {
         SectionHeader(stringResource(R.string.machine_section_utilities))
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (caps.showCamera) {
