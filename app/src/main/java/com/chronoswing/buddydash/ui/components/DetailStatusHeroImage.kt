@@ -86,6 +86,7 @@ fun DetailStatusHeroImage(
     motion: CardMicroMotion = CardMicroMotion.None,
     modifier: Modifier = Modifier,
     height: Dp = 160.dp,
+    fillContainer: Boolean = false,
     onCameraHeroActive: (Boolean) -> Unit = {},
 ) {
     val coverThumbnailIdentity = rememberCurrentPrintThumbnailIdentity(
@@ -138,7 +139,7 @@ fun DetailStatusHeroImage(
                     refreshTick = refreshTick,
                     refreshTickNumber = refreshTickNumber,
                     height = height,
-                    fillMaxSize = false,
+                    fillMaxSize = fillContainer,
                     frameModifier = Modifier,
                     onLoadFailed = { cameraFailed = true },
                 )
@@ -148,7 +149,9 @@ fun DetailStatusHeroImage(
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
                     thumbnailIdentity = coverThumbnailIdentity,
-                    height = height,
+                    modifier = Modifier,
+                    height = if (fillContainer) null else height,
+                    fillContainer = fillContainer,
                 )
             }
         }
@@ -156,7 +159,11 @@ fun DetailStatusHeroImage(
 
     if (!showCamera && !coverAvailable) return
 
-    val frameModifier = modifier.fillMaxWidth()
+    val frameModifier = if (fillContainer) {
+        modifier
+    } else {
+        modifier.fillMaxWidth()
+    }
     if (motion == CardMicroMotion.Printing) {
         MicroMotionThumbnailFrame(motion = motion, modifier = frameModifier) {
             heroContent()

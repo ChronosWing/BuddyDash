@@ -50,8 +50,9 @@ fun PrinterCoverImage(
     size: Dp? = null,
     height: Dp? = null,
     cornerRadius: Dp = 10.dp,
+    fillContainer: Boolean = false,
 ) {
-    if (size == null && height == null) return
+    if (size == null && height == null && !fillContainer) return
     val imageUrl = remember(serverUrl, cameraToken, thumbnailIdentity) {
         resolveCurrentPrintThumbnailUrl(serverUrl, cameraToken, thumbnailIdentity)
     }
@@ -101,19 +102,33 @@ fun PrinterCoverImage(
     SubcomposeAsyncImage(
         model = request,
         contentDescription = null,
-        modifier = modifier,
+        modifier = if (fillContainer) modifier.fillMaxSize() else modifier,
         loading = {
             if (canRetainPrevious && lastPainter != null) {
-                CoverImageFrame(size, height, shape, lastPainter!!)
+                CoverImageFrame(
+                    size = size,
+                    height = height,
+                    shape = shape,
+                    painter = lastPainter!!,
+                    fillContainer = fillContainer,
+                    modifier = modifier,
+                )
             } else {
-                CoverPlaceholderFrame(size, height, shape)
+                CoverPlaceholderFrame(size, height, shape, fillContainer, modifier)
             }
         },
         error = {
             if (canRetainPrevious && lastPainter != null) {
-                CoverImageFrame(size, height, shape, lastPainter!!)
+                CoverImageFrame(
+                    size = size,
+                    height = height,
+                    shape = shape,
+                    painter = lastPainter!!,
+                    fillContainer = fillContainer,
+                    modifier = modifier,
+                )
             } else {
-                CoverPlaceholderFrame(size, height, shape)
+                CoverPlaceholderFrame(size, height, shape, fillContainer, modifier)
             }
         },
         success = { state ->
@@ -125,6 +140,8 @@ fun PrinterCoverImage(
                 shape = shape,
                 painter = state.painter,
                 showScrim = true,
+                fillContainer = fillContainer,
+                modifier = modifier,
             )
         },
     )
@@ -135,8 +152,10 @@ private fun CoverPlaceholderFrame(
     size: Dp?,
     height: Dp?,
     shape: RoundedCornerShape,
+    fillContainer: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
-    val frameModifier = coverFrameModifier(size, height)
+    val frameModifier = coverFrameModifier(size, height, fillContainer, modifier)
     ThumbnailPlaceholder(modifier = frameModifier.clip(shape))
 }
 
@@ -147,8 +166,10 @@ private fun CoverImageFrame(
     shape: RoundedCornerShape,
     painter: Painter,
     showScrim: Boolean = false,
+    fillContainer: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
-    val frameModifier = coverFrameModifier(size, height)
+    val frameModifier = coverFrameModifier(size, height, fillContainer, modifier)
     Box(modifier = frameModifier.clip(shape)) {
         Image(
             painter = painter,
@@ -166,9 +187,13 @@ private fun CoverImageFrame(
     }
 }
 
-private fun coverFrameModifier(size: Dp?, height: Dp?): Modifier = when {
-    height != null -> Modifier
-        .fillMaxWidth()
-        .height(height)
-    else -> Modifier.size(size!!)
+private fun coverFrameModifier(
+    size: Dp?,
+    height: Dp?,
+    fillContainer: Boolean = false,
+    modifier: Modifier = Modifier,
+): Modifier = when {
+    fillContainer -> modifier.fillMaxSize()
+    height != null -> modifier.fillMaxWidth().height(height)
+    else -> modifier.size(size!!)
 }
