@@ -32,6 +32,15 @@ import kotlinx.coroutines.launch
 
 private const val TAG_HOME_VM = "BuddyDash/HomeVM"
 
+/**
+ * After app resume, suppress the connected=false flash for this many ms.
+ *
+ * The Bambulab API can transiently return connected=false for 1–3 s right after
+ * the device wakes from sleep or a Fold is opened. This window covers that gap while
+ * still showing real offline quickly on the next poll cycle (~15 s later).
+ */
+private const val RESUME_OFFLINE_FLASH_GUARD_MS = 8_000L
+
 data class HomeUiState(
     val printers: List<Printer> = emptyList(),
     val isLoading: Boolean = false,
@@ -79,6 +88,13 @@ class HomeViewModel(
     private val manualRefreshGuard = RefreshGuard()
     private var pendingRefreshSource: RefreshSource? = null
     private var lastNetworkLoadServerKey: String? = null
+
+    /**
+     * Epoch-ms timestamp of the most recent [refreshOnAppResume] call, or null if the app
+     * has not been resumed since this ViewModel was created. Used to extend the offline-flash
+     * guard beyond first launch — see [enrichPrinters].
+     */
+    private var lastAppResumedAtMillis: Long? = null
 
     init {
         viewModelScope.launch {
@@ -173,6 +189,13 @@ class HomeViewModel(
         val snapshot = homePrintersCacheRepository.load(serverUrl)
         val newKey = HomePrintersCacheRepository.cacheServerKey(serverUrl)
         val currentKey = HomePrintersCacheRepository.cacheServerKey(_uiState.value.serverUrl)
+        if (BuddyDashDebug.enabled) {
+            Log.d(
+                TAG_HOME_VM,
+                "HomeVM: cache loaded=${snapshot != null} count=${snapshot?.printers?.size ?: 0} " +
+                    "lastUpdatedAtMillis=${snapshot?.lastUpdatedAtMillis}",
+            )
+        }
         _uiState.update { state ->
             when {
                 snapshot != null -> {
@@ -249,6 +272,10 @@ class HomeViewModel(
     }
 
     fun refreshOnAppResume(currentRoute: String? = null) {
+        lastAppResumedAtMillis = System.currentTimeMillis()
+        if (BuddyDashDebug.enabled) {
+            Log.d(TAG_HOME_VM, "HomeVM: app resumed route=$currentRoute")
+        }
         requestRefresh(RefreshSource.APP_RESUME, force = true, currentRoute = currentRoute)
     }
 
@@ -349,8 +376,9 @@ class HomeViewModel(
         if (BuddyDashDebug.enabled) {
             Log.d(
                 TAG_HOME_VM,
-                "loadPrinters source=$refreshSource showLoading=$showLoading fromPull=$fromPull " +
-                    "fromUser=$fromUser immediateRefresh=$immediateRefresh hadPrinters=$hadPrinters",
+                "HomeVM: refresh started source=$refreshSource showLoading=$showLoading " +
+                    "fromPull=$fromPull fromUser=$fromUser immediateRefresh=$immediateRefresh " +
+                    "hadPrinters=$hadPrinters",
             )
         }
 
@@ -495,27 +523,78 @@ class HomeViewModel(
                     val updatedAt = System.currentTimeMillis()
                     homePrintersCacheRepository.save(serverUrl, enriched, updatedAt)
                     _uiState.update { current ->
-                        // On the very first enrichment (hasAttemptedNetworkLoad still false),
-                        // preserve the cached liveStatus for any printer where the fresh status
-                        // has connected=false but the cached status had connected=true.
-                        // The Bambulab API can momentarily report connected=false at server
-                        // startup before the connection is established, causing a brief
-                        // Offline flash. Once hasAttemptedNetworkLoad is true, fresh status
-                        // always wins so real confirmed-offline states still show correctly.
-                        val finalPrinters = if (!current.hasAttemptedNetworkLoad) {
-                            val cachedById = current.printers.associateBy { it.id }
-                            enriched.map { printer ->
-                                val fresh = printer.liveStatus
+                        // Offline-flash guard: preserve the last-known online state for any
+                        // printer where the API transiently reports connected=false right after
+                        // the device wakes up (typically 1–3 s at server startup).
+                        //
+                        // The guard activates in two situations:
+                        //   1. First network load of the session (!hasAttemptedNetworkLoad) —
+                        //      the app just launched and the cached state is the best truth.
+                        //   2. First enrich within RESUME_OFFLINE_FLASH_GUARD_MS after an app
+                        //      resume event (fold/unfold, background→foreground) — the API
+                        //      connection may not be fully re-established yet.
+                        //
+                        // Once the guard window expires, fresh connected=false always wins so
+                        // real confirmed-offline state still appears on the next poll (~15 s).
+                        val resumedAt = lastAppResumedAtMillis
+                        val msSinceResume = if (resumedAt != null) updatedAt - resumedAt else Long.MAX_VALUE
+                        val isWithinResumeGuardWindow = msSinceResume in 0..RESUME_OFFLINE_FLASH_GUARD_MS
+                        val useFlashGuard = !current.hasAttemptedNetworkLoad || isWithinResumeGuardWindow
+
+                        if (BuddyDashDebug.enabled) {
+                            val reason = when {
+                                !current.hasAttemptedNetworkLoad -> "firstLoad"
+                                isWithinResumeGuardWindow -> "resumeWindow(${msSinceResume}ms)"
+                                else -> "none"
+                            }
+                            Log.d(
+                                TAG_HOME_VM,
+                                "HomeVM: refresh success flashGuard=$useFlashGuard reason=$reason " +
+                                    "enrichedCount=${enriched.size}",
+                            )
+                        }
+
+                        val cachedById = if (useFlashGuard) {
+                            current.printers.associateBy { it.id }
+                        } else {
+                            emptyMap()
+                        }
+
+                        val finalPrinters = enriched.map { printer ->
+                            val fresh = printer.liveStatus
+                            if (useFlashGuard) {
                                 val cached = cachedById[printer.id]?.liveStatus
                                 if (cached?.connected == true && fresh?.connected != true) {
+                                    if (BuddyDashDebug.enabled) {
+                                        Log.d(
+                                            TAG_HOME_VM,
+                                            "HomeVM: offline suppressed printerId=${printer.id} " +
+                                                "(cached=online fresh=offline guardActive)",
+                                        )
+                                    }
                                     printer.copy(liveStatus = cached)
                                 } else {
+                                    if (BuddyDashDebug.enabled && fresh?.connected == false) {
+                                        Log.d(
+                                            TAG_HOME_VM,
+                                            "HomeVM: offline CONFIRMED printerId=${printer.id} " +
+                                                "(cached was not online; showing offline)",
+                                        )
+                                    }
                                     printer
                                 }
+                            } else {
+                                if (BuddyDashDebug.enabled && fresh?.connected == false) {
+                                    Log.d(
+                                        TAG_HOME_VM,
+                                        "HomeVM: offline CONFIRMED printerId=${printer.id} " +
+                                            "(guard not active; showing offline)",
+                                    )
+                                }
+                                printer
                             }
-                        } else {
-                            enriched
                         }
+
                         current.copy(
                             printers = finalPrinters,
                             isEnriching = false,
@@ -533,7 +612,7 @@ class HomeViewModel(
                 },
                 onFailure = { error ->
                     if (BuddyDashDebug.enabled) {
-                        Log.w(TAG_HOME_VM, "enrichPrinters failed source=$refreshSource", error)
+                        Log.d(TAG_HOME_VM, "HomeVM: refresh failed source=$refreshSource error=${error.message}")
                     }
                     refreshLoadedSpoolCount()
                     _uiState.update { current ->
