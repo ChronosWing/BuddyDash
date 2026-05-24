@@ -5,10 +5,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -17,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
@@ -43,7 +47,70 @@ import com.chronoswing.buddydash.util.buildPrintHeadline
 import kotlin.math.roundToInt
 
 private val DashboardGutter = 8.dp
-private val ExpandedHeroHeight = 128.dp
+private val ExpandedCameraCornerRadius = 8.dp
+/** Stable 16:9 preview tile — avoids ultra-wide crop on expanded-width layouts. */
+private const val ExpandedCameraAspectRatio = 16f / 9f
+
+@Composable
+private fun StatusDashboardTopRow(
+    labels: PrinterDetailLabels,
+    printerModel: String?,
+    printerStatus: PrinterStatus?,
+    printingQueueJobId: Int?,
+    printerId: Int,
+    serverUrl: String,
+    cameraToken: String,
+    isClearingPlate: Boolean,
+    onMarkPlateClear: () -> Unit,
+    headerTrailing: @Composable () -> Unit,
+    errorDetailsExpanded: Boolean,
+    onExpandErrorDetails: () -> Unit,
+    onErrorChipClick: () -> Unit,
+    errorCardScrollOffset: androidx.compose.runtime.MutableIntState,
+    density: Density,
+    onCameraHeroActive: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+        horizontalArrangement = Arrangement.spacedBy(DashboardGutter),
+    ) {
+        DetailInfoCard(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                DetailStatusHeroImage(
+                    serverUrl = serverUrl,
+                    cameraToken = cameraToken,
+                    printerId = printerId,
+                    printerModel = printerModel,
+                    status = printerStatus,
+                    printingQueueJobId = printingQueueJobId,
+                    motion = labels.cardMicroMotion,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(ExpandedCameraAspectRatio)
+                        .clip(RoundedCornerShape(ExpandedCameraCornerRadius)),
+                    fillContainer = true,
+                    onCameraHeroActive = onCameraHeroActive,
+                )
+            }
+        }
+        StatusOverviewDashboardCard(
+            labels = labels,
+            headerTrailing = headerTrailing,
+            errorDetailsExpanded = errorDetailsExpanded,
+            onExpandErrorDetails = onExpandErrorDetails,
+            onErrorChipClick = onErrorChipClick,
+            errorCardScrollOffset = errorCardScrollOffset,
+            density = density,
+            isClearingPlate = isClearingPlate,
+            onMarkPlateClear = onMarkPlateClear,
+            showConnection = false,
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
+    }
+}
 
 @Composable
 internal fun ActivePrintStatusTabExpanded(
@@ -70,39 +137,24 @@ internal fun ActivePrintStatusTabExpanded(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(DashboardGutter),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
-            horizontalArrangement = Arrangement.spacedBy(DashboardGutter),
-        ) {
-            Box(modifier = Modifier.weight(0.52f).fillMaxHeight()) {
-                DetailStatusHeroImage(
-                    serverUrl = serverUrl,
-                    cameraToken = cameraToken,
-                    printerId = printerId,
-                    printerModel = printerModel,
-                    status = printerStatus,
-                    printingQueueJobId = printingQueueJobId,
-                    motion = labels.cardMicroMotion,
-                    height = ExpandedHeroHeight,
-                    onCameraHeroActive = { cameraHeroActive = it },
-                )
-            }
-            Box(modifier = Modifier.weight(0.48f).fillMaxHeight()) {
-                StatusOverviewDashboardCard(
-                    labels = labels,
-                    headerTrailing = headerTrailing,
-                    errorDetailsExpanded = errorDetailsExpanded,
-                    onExpandErrorDetails = onExpandErrorDetails,
-                    onErrorChipClick = onErrorChipClick,
-                    errorCardScrollOffset = errorCardScrollOffset,
-                    density = density,
-                    isClearingPlate = isClearingPlate,
-                    onMarkPlateClear = onMarkPlateClear,
-                    showConnection = false,
-                    modifier = Modifier.fillMaxHeight(),
-                )
-            }
-        }
+        StatusDashboardTopRow(
+            labels = labels,
+            printerModel = printerModel,
+            printerStatus = printerStatus,
+            printingQueueJobId = printingQueueJobId,
+            printerId = printerId,
+            serverUrl = serverUrl,
+            cameraToken = cameraToken,
+            isClearingPlate = isClearingPlate,
+            onMarkPlateClear = onMarkPlateClear,
+            headerTrailing = headerTrailing,
+            errorDetailsExpanded = errorDetailsExpanded,
+            onExpandErrorDetails = onExpandErrorDetails,
+            onErrorChipClick = onErrorChipClick,
+            errorCardScrollOffset = errorCardScrollOffset,
+            density = density,
+            onCameraHeroActive = { cameraHeroActive = it },
+        )
         ActivePrintProgressDashboardCard(
             labels = labels,
             printerId = printerId,
@@ -148,38 +200,24 @@ internal fun IdleStatusTabExpanded(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(DashboardGutter),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
-            horizontalArrangement = Arrangement.spacedBy(DashboardGutter),
-        ) {
-            Box(modifier = Modifier.weight(0.52f).fillMaxHeight()) {
-                DetailStatusHeroImage(
-                    serverUrl = serverUrl,
-                    cameraToken = cameraToken,
-                    printerId = printerId,
-                    printerModel = printerModel,
-                    status = printerStatus,
-                    printingQueueJobId = printingQueueJobId,
-                    height = ExpandedHeroHeight,
-                    onCameraHeroActive = { cameraHeroActive = it },
-                )
-            }
-            Box(modifier = Modifier.weight(0.48f).fillMaxHeight()) {
-                StatusOverviewDashboardCard(
-                    labels = labels,
-                    headerTrailing = headerTrailing,
-                    errorDetailsExpanded = errorDetailsExpanded,
-                    onExpandErrorDetails = onExpandErrorDetails,
-                    onErrorChipClick = onErrorChipClick,
-                    errorCardScrollOffset = errorCardScrollOffset,
-                    density = density,
-                    isClearingPlate = isClearingPlate,
-                    onMarkPlateClear = onMarkPlateClear,
-                    showConnection = false,
-                    modifier = Modifier.fillMaxHeight(),
-                )
-            }
-        }
+        StatusDashboardTopRow(
+            labels = labels,
+            printerModel = printerModel,
+            printerStatus = printerStatus,
+            printingQueueJobId = printingQueueJobId,
+            printerId = printerId,
+            serverUrl = serverUrl,
+            cameraToken = cameraToken,
+            isClearingPlate = isClearingPlate,
+            onMarkPlateClear = onMarkPlateClear,
+            headerTrailing = headerTrailing,
+            errorDetailsExpanded = errorDetailsExpanded,
+            onExpandErrorDetails = onExpandErrorDetails,
+            onErrorChipClick = onErrorChipClick,
+            errorCardScrollOffset = errorCardScrollOffset,
+            density = density,
+            onCameraHeroActive = { cameraHeroActive = it },
+        )
         if (hasPrintSection) {
             DetailInfoCard {
                 SectionHeader(stringResource(R.string.section_print))
