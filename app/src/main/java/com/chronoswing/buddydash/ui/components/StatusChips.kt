@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -26,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
@@ -36,6 +39,7 @@ import com.chronoswing.buddydash.ui.theme.TextSecondary
 import com.chronoswing.buddydash.ui.motion.FadeValueText
 import com.chronoswing.buddydash.ui.motion.rememberAttentionPulse
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
+import com.chronoswing.buddydash.util.HmsSeverity
 import com.chronoswing.buddydash.util.PlateIndicatorKind
 import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
 import com.chronoswing.buddydash.util.PrinterActivityKind
@@ -48,7 +52,9 @@ fun PrinterQuickStatusRow(
     modifier: Modifier = Modifier,
     maintenanceIndicator: MaintenanceHomeIndicator = MaintenanceHomeIndicator.None,
     pendingQueueCount: Int = 0,
+    hmsAlertSeverity: HmsSeverity = HmsSeverity.Ok,
     onErrorChipClick: (() -> Unit)? = null,
+    onHmsChipClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier,
@@ -64,10 +70,65 @@ fun PrinterQuickStatusRow(
                 null
             },
         )
+        HmsAlertChip(severity = hmsAlertSeverity, onClick = onHmsChipClick)
         plateKind?.let { PlateStatusChip(kind = it) }
         MaintenanceHomeIndicatorIcon(indicator = maintenanceIndicator)
         QueueCountChip(count = pendingQueueCount)
     }
+}
+
+private val HmsAmber = Color(0xFFFBBF24)
+
+/**
+ * Compact tappable chip shown when a printer has active HMS warnings or errors.
+ * Visually distinct from the [MaintenanceHomeIndicatorIcon] (bare icon) — this is a full
+ * bordered chip with text, using a different icon shape.
+ */
+@Composable
+fun HmsAlertChip(
+    severity: HmsSeverity,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
+    if (severity == HmsSeverity.Ok) return
+
+    val (accent, label, cd) = when (severity) {
+        HmsSeverity.Error -> Triple(
+            OfflineRed,
+            stringResource(R.string.hms_chip_error),
+            stringResource(R.string.cd_hms_chip_error),
+        )
+        HmsSeverity.Warning -> Triple(
+            HmsAmber,
+            stringResource(R.string.hms_chip_warning),
+            stringResource(R.string.cd_hms_chip_warning),
+        )
+        HmsSeverity.Unknown -> Triple(
+            HmsAmber,
+            stringResource(R.string.hms_chip_unknown),
+            stringResource(R.string.cd_hms_chip_unknown),
+        )
+        HmsSeverity.Ok -> return
+    }
+
+    val pulse = rememberAttentionPulse(
+        enabled = severity == HmsSeverity.Error,
+        periodMillis = 4_000,
+    )
+    val borderAlpha = if (severity == HmsSeverity.Error) 0.5f + pulse * 0.16f else 0.55f
+    val containerAlpha = if (severity == HmsSeverity.Error) 0.14f + pulse * 0.05f else 0.14f
+
+    StatusPill(
+        label = label,
+        icon = Icons.Outlined.Warning,
+        iconTint = accent.copy(alpha = if (severity == HmsSeverity.Error) 0.88f + pulse * 0.1f else 1f),
+        containerColor = accent.copy(alpha = containerAlpha),
+        contentColor = accent,
+        borderColor = accent.copy(alpha = borderAlpha),
+        contentDescription = cd,
+        modifier = modifier,
+        onClick = onClick,
+    )
 }
 
 @Composable
@@ -215,6 +276,7 @@ private fun StatusPill(
     contentColor: Color,
     borderColor: Color,
     modifier: Modifier = Modifier,
+    contentDescription: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
     Surface(
@@ -224,9 +286,18 @@ private fun StatusPill(
         shape = RoundedCornerShape(8.dp),
         color = containerColor,
         border = BorderStroke(1.dp, borderColor),
+        contentColor = contentColor,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .then(
+                    if (contentDescription != null) {
+                        Modifier.semantics { this.contentDescription = contentDescription }
+                    } else {
+                        Modifier
+                    }
+                ),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

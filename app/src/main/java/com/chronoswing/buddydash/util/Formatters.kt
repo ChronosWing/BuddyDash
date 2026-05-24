@@ -83,6 +83,14 @@ fun formatPrintTempsLine(nozzle: Double?, bed: Double?): String {
     return "$nozzleText / $bedText"
 }
 
+fun formatHmsSummary(severity: HmsSeverity): String = when (severity) {
+    HmsSeverity.Ok -> "HMS OK"
+    HmsSeverity.Warning -> "HMS Warning"
+    HmsSeverity.Error -> "HMS Error"
+    HmsSeverity.Unknown -> "HMS Unknown"
+}
+
+@Deprecated("Pass HmsSeverity instead of error count", ReplaceWith("formatHmsSummary(severity)"))
 fun formatHmsSummary(errorCount: Int): String =
     if (errorCount == 0) "HMS OK" else "HMS $errorCount"
 
@@ -98,5 +106,13 @@ fun formatProgress(progress: Float?): String {
 fun formatConnection(connected: Boolean): String =
     if (connected) "Connected" else "Disconnected"
 
+fun formatHmsHealth(severity: HmsSeverity): String = when (severity) {
+    HmsSeverity.Ok -> "OK"
+    HmsSeverity.Warning -> "Warning"
+    HmsSeverity.Error -> "Error"
+    HmsSeverity.Unknown -> "Unknown"
+}
+
+@Deprecated("Pass HmsSeverity instead of error count", ReplaceWith("formatHmsHealth(severity)"))
 fun formatHmsHealth(errorCount: Int): String =
     if (errorCount == 0) "OK" else "$errorCount active error${if (errorCount == 1) "" else "s"}"

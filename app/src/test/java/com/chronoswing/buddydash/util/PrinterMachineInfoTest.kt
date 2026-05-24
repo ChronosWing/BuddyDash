@@ -49,6 +49,7 @@ class PrinterMachineInfoTest {
             bedTemp = "—",
             hmsHealth = "OK",
             hmsHasErrors = false,
+            hmsAlertSeverity = HmsSeverity.Ok,
             printerErrorDisplay = PrinterErrorDisplay(showCard = false, lines = emptyList(), hasKnownDetails = false),
             filamentSlots = emptyList(),
             printerRawState = "IDLE",

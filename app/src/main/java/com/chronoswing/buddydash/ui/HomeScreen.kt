@@ -52,6 +52,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import com.chronoswing.buddydash.ui.components.HmsDetailSheet
+import com.chronoswing.buddydash.util.HmsSeverity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -428,6 +430,17 @@ private fun GlancePrinterCard(
         status = liveStatus,
         fileName = labels.fileLine,
     )
+    var showHmsSheet by remember { mutableStateOf(false) }
+
+    if (showHmsSheet && labels.hmsAlertSeverity != HmsSeverity.Ok) {
+        HmsDetailSheet(
+            printerName = labels.title,
+            hmsErrors = labels.hmsErrors,
+            hmsAlertSeverity = labels.hmsAlertSeverity,
+            onDismiss = { showHmsSheet = false },
+        )
+    }
+
     HomeCardMicroMotionFrame(
         animateIdleBreath = false,
         motion = labels.cardMicroMotion,
@@ -471,6 +484,10 @@ private fun GlancePrinterCard(
                 plateKind = labels.plateKind,
                 maintenanceIndicator = labels.maintenanceIndicator,
                 pendingQueueCount = labels.pendingQueueCount,
+                hmsAlertSeverity = labels.hmsAlertSeverity,
+                onHmsChipClick = if (labels.hmsAlertSeverity != HmsSeverity.Ok) {
+                    { showHmsSheet = true }
+                } else null,
             )
 
             if (labels.isActivePrint) {
