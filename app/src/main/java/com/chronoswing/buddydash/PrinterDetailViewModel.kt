@@ -15,6 +15,7 @@ import com.chronoswing.buddydash.util.logPrinterDetailCacheWrite
 import com.chronoswing.buddydash.util.isShowingStaleCachedContent
 import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.PrinterMachineInfo
+import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
 import com.chronoswing.buddydash.data.model.PrinterMaintenanceOverview
 import com.chronoswing.buddydash.data.model.FilamentUsage
 import com.chronoswing.buddydash.data.model.PrintQueueJob
@@ -98,6 +99,7 @@ data class PrinterDetailUiState(
     /** Filament for active print: status JSON, else queue job with status=printing. */
     val activePrintFilamentUsage: FilamentUsage? = null,
     val machineInfo: PrinterMachineInfo? = null,
+    val smartPlugState: PrinterSmartPlugState? = null,
     val bedJogStepMm: Float = BED_JOG_STEP_OPTIONS_MM[1],
     val filamentSlotDisplays: List<FilamentSlotDisplay> = emptyList(),
     val inventorySpools: List<SpoolInventoryItem> = emptyList(),
@@ -293,6 +295,7 @@ class PrinterDetailViewModel(
                 maintenanceItems = snapshot.maintenanceItems,
                 totalPrintHours = snapshot.totalPrintHours,
                 machineInfo = snapshot.machineInfo,
+                smartPlugState = snapshot.smartPlugState,
                 queueUpcoming = snapshot.queueUpcoming,
                 printingQueueJobId = snapshot.printingQueueJobId,
                 lastStatusUpdatedAtMillis = snapshot.lastUpdatedAtMillis,
@@ -385,11 +388,16 @@ class PrinterDetailViewModel(
                     apiClient.fetchPrinterMachineInfo(state.serverUrl, state.apiKey, printerId)
                         .getOrNull()
                 }
+                val smartPlugDeferred = async {
+                    apiClient.fetchPrinterSmartPlugState(state.serverUrl, state.apiKey, printerId)
+                        .getOrNull()
+                }
                 StatusFetchBundle(
                     status = statusDeferred.await(),
                     maintenance = maintenanceDeferred.await(),
                     queue = queueDeferred.await(),
                     machineInfo = machineInfoDeferred.await(),
+                    smartPlugState = smartPlugDeferred.await(),
                 )
             }
 
@@ -495,6 +503,7 @@ class PrinterDetailViewModel(
                 queueUpcoming = upcoming,
                 machineInfo = bundle.machineInfo,
                 printingQueueJobId = queueSnapshot.printing?.id,
+                smartPlugState = bundle.smartPlugState,
             ),
         )
         logPrinterDetailCacheWrite(printerId, writeOk)
@@ -506,6 +515,7 @@ class PrinterDetailViewModel(
                 maintenanceItems = bundle.maintenance?.items.orEmpty(),
                 totalPrintHours = bundle.maintenance?.totalPrintHours,
                 machineInfo = bundle.machineInfo,
+                smartPlugState = bundle.smartPlugState,
                 queueUpcoming = upcoming,
                 startNextQueuedPrintReadiness = evaluateStartNextQueuedPrintReadiness(
                     status = status,
@@ -922,6 +932,18 @@ class PrinterDetailViewModel(
         apiClient.homeAxes(it.serverUrl, it.apiKey, printerId)
     }
 
+    fun powerOnSmartPlug() = runControl(ControlAction.SmartPlugOn) {
+        val plugId = it.smartPlugState?.config?.id
+            ?: return@runControl Result.failure(IllegalStateException("Smart plug not configured"))
+        apiClient.controlSmartPlug(it.serverUrl, it.apiKey, plugId, action = "on")
+    }
+
+    fun powerOffSmartPlug() = runControl(ControlAction.SmartPlugOff) {
+        val plugId = it.smartPlugState?.config?.id
+            ?: return@runControl Result.failure(IllegalStateException("Smart plug not configured"))
+        apiClient.controlSmartPlug(it.serverUrl, it.apiKey, plugId, action = "off")
+    }
+
     private fun jogBed(distanceMm: Float, action: String) = runControl(ControlAction.BedJog) {
         motionDebugLog(action, printerId, distanceMm)
         apiClient.bedJog(it.serverUrl, it.apiKey, printerId, distanceMm)
@@ -952,6 +974,9 @@ class PrinterDetailViewModel(
                         ControlAction.HomeAxes,
                         ControlAction.BedJog,
                         -> refreshStatusAfterControl()
+                        ControlAction.SmartPlugOn,
+                        ControlAction.SmartPlugOff,
+                        -> loadStatus(showLoading = false)
                         else -> loadStatus(showLoading = false)
                     }
                 },
@@ -1074,4 +1099,5 @@ private data class StatusFetchBundle(
     val maintenance: PrinterMaintenanceOverview?,
     val queue: PrinterQueueSnapshot,
     val machineInfo: PrinterMachineInfo?,
+    val smartPlugState: PrinterSmartPlugState?,
 )

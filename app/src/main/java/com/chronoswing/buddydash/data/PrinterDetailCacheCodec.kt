@@ -4,7 +4,13 @@ import com.chronoswing.buddydash.data.model.FilamentUsage
 import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.data.model.PrintQueueJob
 import com.chronoswing.buddydash.data.model.PrinterMachineInfo
+import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
 import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.data.model.SmartPlugConfig
+import com.chronoswing.buddydash.data.model.SmartPlugEnergyReading
+import com.chronoswing.buddydash.data.model.SmartPlugLiveStatus
+import com.chronoswing.buddydash.data.model.SmartOutletPowerState
+import com.chronoswing.buddydash.data.model.parseSmartOutletPowerState
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -19,6 +25,7 @@ data class PrinterDetailCacheSnapshot(
     val totalPrintHours: Double?,
     val queueUpcoming: List<PrintQueueJob>,
     val machineInfo: PrinterMachineInfo?,
+    val smartPlugState: PrinterSmartPlugState? = null,
     val printingQueueJobId: Int?,
 )
 
@@ -38,6 +45,7 @@ object PrinterDetailCacheCodec {
             .putOptDouble("total_print_hours", snapshot.totalPrintHours)
             .put("queue_upcoming", encodeQueueJobs(snapshot.queueUpcoming))
             .putOptObject("machine_info", snapshot.machineInfo?.let { encodeMachineInfo(it) })
+            .putOptObject("smart_plug", snapshot.smartPlugState?.let { encodeSmartPlugState(it) })
             .putOptInt("printing_queue_job_id", snapshot.printingQueueJobId)
             .toString()
 
@@ -60,6 +68,7 @@ object PrinterDetailCacheCodec {
                 totalPrintHours = root.optNullableDouble("total_print_hours"),
                 queueUpcoming = decodeQueueJobs(root.optJSONArray("queue_upcoming")),
                 machineInfo = root.optJSONObject("machine_info")?.let { decodeMachineInfo(it) },
+                smartPlugState = root.optJSONObject("smart_plug")?.let { decodeSmartPlugState(it) },
                 printingQueueJobId = root.optNullableInt("printing_queue_job_id"),
             )
         } catch (_: Exception) {
@@ -170,6 +179,68 @@ object PrinterDetailCacheCodec {
             updatedAtIso = obj.optString("updated_at_iso").takeIf { it.isNotBlank() },
             nozzleCount = obj.optNullableInt("nozzle_count"),
             autoArchiveEnabled = obj.optNullableBoolean("auto_archive_enabled"),
+        )
+
+    private fun encodeSmartPlugState(state: PrinterSmartPlugState): JSONObject =
+        JSONObject()
+            .put("config", encodeSmartPlugConfig(state.config))
+            .putOptObject("live_status", state.liveStatus?.let { encodeSmartPlugLiveStatus(it) })
+            .putOptLong("last_updated_at_millis", state.lastUpdatedAtMillis)
+
+    private fun decodeSmartPlugState(obj: JSONObject): PrinterSmartPlugState? {
+        val configObj = obj.optJSONObject("config") ?: return null
+        return PrinterSmartPlugState(
+            config = decodeSmartPlugConfig(configObj),
+            liveStatus = obj.optJSONObject("live_status")?.let { decodeSmartPlugLiveStatus(it) },
+            lastUpdatedAtMillis = obj.optNullableLong("last_updated_at_millis"),
+        )
+    }
+
+    private fun encodeSmartPlugConfig(config: SmartPlugConfig): JSONObject =
+        JSONObject()
+            .put("id", config.id)
+            .put("name", config.name)
+            .putOptString("last_state", config.lastState)
+            .putOptString("last_checked_iso", config.lastCheckedIso)
+
+    private fun decodeSmartPlugConfig(obj: JSONObject): SmartPlugConfig =
+        SmartPlugConfig(
+            id = obj.optInt("id", 0),
+            name = obj.optString("name", "Smart plug"),
+            lastState = obj.optString("last_state").takeIf { it.isNotBlank() },
+            lastCheckedIso = obj.optString("last_checked_iso").takeIf { it.isNotBlank() },
+        )
+
+    private fun encodeSmartPlugLiveStatus(status: SmartPlugLiveStatus): JSONObject =
+        JSONObject()
+            .put("power_state", status.powerState.name)
+            .put("reachable", status.reachable)
+            .putOptString("device_name", status.deviceName)
+            .putOptObject("energy", status.energy?.let { encodeSmartPlugEnergy(it) })
+
+    private fun decodeSmartPlugLiveStatus(obj: JSONObject): SmartPlugLiveStatus {
+        val powerState = runCatching {
+            SmartOutletPowerState.valueOf(obj.optString("power_state", SmartOutletPowerState.Unknown.name))
+        }.getOrDefault(SmartOutletPowerState.Unknown)
+        return SmartPlugLiveStatus(
+            powerState = powerState,
+            reachable = obj.optBoolean("reachable", true),
+            deviceName = obj.optString("device_name").takeIf { it.isNotBlank() },
+            energy = obj.optJSONObject("energy")?.let { decodeSmartPlugEnergy(it) },
+        )
+    }
+
+    private fun encodeSmartPlugEnergy(energy: SmartPlugEnergyReading): JSONObject =
+        JSONObject()
+            .putOptDouble("power_watts", energy.powerWatts)
+            .putOptDouble("voltage_volts", energy.voltageVolts)
+            .putOptDouble("current_amps", energy.currentAmps)
+
+    private fun decodeSmartPlugEnergy(obj: JSONObject): SmartPlugEnergyReading =
+        SmartPlugEnergyReading(
+            powerWatts = obj.optNullableDouble("power_watts"),
+            voltageVolts = obj.optNullableDouble("voltage_volts"),
+            currentAmps = obj.optNullableDouble("current_amps"),
         )
 
     private fun encodeFilamentUsage(usage: FilamentUsage): JSONObject =

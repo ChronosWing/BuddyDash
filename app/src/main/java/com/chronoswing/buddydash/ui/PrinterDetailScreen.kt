@@ -46,8 +46,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -187,11 +189,15 @@ fun PrinterDetailScreen(
         onToggleLight = viewModel::toggleChamberLight,
         bedJogStepMm = uiState.bedJogStepMm,
         machineInfo = uiState.machineInfo,
+        smartPlugState = uiState.smartPlugState,
+        powerControlsEnabled = !viewModel.requiresConnection,
         printerModel = uiState.printerModel ?: printerModel,
         onBedJogStepChange = viewModel::setBedJogStepMm,
         onJogBedUp = viewModel::jogBedUp,
         onJogBedDown = viewModel::jogBedDown,
         onHomePrinter = viewModel::homePrinter,
+        onPowerOnSmartPlug = viewModel::powerOnSmartPlug,
+        onPowerOffSmartPlug = viewModel::powerOffSmartPlug,
         onPerformMaintenanceReset = viewModel::performMaintenanceReset,
         onMaintenanceResetSnackbarShown = viewModel::onMaintenanceResetSnackbarShown,
         onViewFullQueue = onViewFullQueue,
@@ -314,11 +320,15 @@ private fun PrinterDetailScreenContent(
     onToggleLight: () -> Unit,
     bedJogStepMm: Float,
     machineInfo: com.chronoswing.buddydash.data.model.PrinterMachineInfo?,
+    smartPlugState: com.chronoswing.buddydash.data.model.PrinterSmartPlugState?,
+    powerControlsEnabled: Boolean,
     printerModel: String?,
     onBedJogStepChange: (Float) -> Unit,
     onJogBedUp: () -> Unit,
     onJogBedDown: () -> Unit,
     onHomePrinter: () -> Unit,
+    onPowerOnSmartPlug: () -> Unit,
+    onPowerOffSmartPlug: () -> Unit,
     onPerformMaintenanceReset: (Int) -> Unit,
     onMaintenanceResetSnackbarShown: () -> Unit,
 ) {
@@ -356,6 +366,12 @@ private fun PrinterDetailScreenContent(
     val maintenanceResetFailedMessage = stringResource(R.string.maintenance_reset_failed)
     val printStartedMessage = stringResource(R.string.archive_reprint_started)
     val startNextPrintFailedMessage = stringResource(R.string.start_next_print_failed)
+    val requiresConnectionMessage = stringResource(R.string.requires_connection)
+    val powerOnSuccessMessage = stringResource(R.string.machine_power_on_success)
+    val powerOffSuccessMessage = stringResource(R.string.machine_power_off_success)
+    val powerOnFailedMessage = stringResource(R.string.machine_power_on_failed)
+    val powerOffFailedMessage = stringResource(R.string.machine_power_off_failed)
+    val snackbarScope = rememberCoroutineScope()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val statusTabIndex = 0
     val pollIntervalMs = if (selectedTab == statusTabIndex) 5_000L else 15_000L
@@ -405,6 +421,10 @@ private fun PrinterDetailScreenContent(
                 chamberLightFailedMessage = chamberLightFailedMessage,
                 printStoppedSuccessMessage = printStoppedSuccessMessage,
                 printStoppedFailedMessage = printStoppedFailedMessage,
+                powerOnSuccessMessage = powerOnSuccessMessage,
+                powerOffSuccessMessage = powerOffSuccessMessage,
+                powerOnFailedMessage = powerOnFailedMessage,
+                powerOffFailedMessage = powerOffFailedMessage,
             ),
         )
         onControlFeedbackShown()
@@ -659,6 +679,9 @@ private fun PrinterDetailScreenContent(
                                     labels = labels,
                                     printerModel = printerModel,
                                     machineInfo = machineInfo,
+                                    smartPlugState = smartPlugState,
+                                    printerStatus = printerStatus,
+                                    powerControlsEnabled = powerControlsEnabled,
                                     cameraToken = cameraToken,
                                     serverUrl = serverUrl,
                                     printerId = printerId,
@@ -669,6 +692,13 @@ private fun PrinterDetailScreenContent(
                                     onJogBedUp = onJogBedUp,
                                     onJogBedDown = onJogBedDown,
                                     onHomePrinter = onHomePrinter,
+                                    onPowerOn = onPowerOnSmartPlug,
+                                    onPowerOff = onPowerOffSmartPlug,
+                                    onRequiresConnectionTap = {
+                                        snackbarScope.launch {
+                                            snackbarHostState.showSnackbar(requiresConnectionMessage)
+                                        }
+                                    },
                                     onToggleLight = onToggleLight,
                                     onOpenPrinterArchives = onOpenPrinterArchives,
                                     onStopCameraStream = onStopCameraStream,
@@ -1045,11 +1075,17 @@ private fun controlFeedbackMessage(
     chamberLightFailedMessage: String,
     printStoppedSuccessMessage: String,
     printStoppedFailedMessage: String,
+    powerOnSuccessMessage: String,
+    powerOffSuccessMessage: String,
+    powerOnFailedMessage: String,
+    powerOffFailedMessage: String,
 ): String {
     if (feedback.success) {
         return when (feedback.action) {
             ControlAction.Stop -> printStoppedSuccessMessage
             ControlAction.HomeAxes -> homeSuccessMessage
+            ControlAction.SmartPlugOn -> powerOnSuccessMessage
+            ControlAction.SmartPlugOff -> powerOffSuccessMessage
             else -> genericSuccessMessage
         }
     }
@@ -1058,6 +1094,8 @@ private fun controlFeedbackMessage(
         ControlAction.BedJog -> bedJogFailedMessage
         ControlAction.ChamberLight -> chamberLightFailedMessage
         ControlAction.Stop -> printStoppedFailedMessage
+        ControlAction.SmartPlugOn -> powerOnFailedMessage
+        ControlAction.SmartPlugOff -> powerOffFailedMessage
         else -> genericFailedMessage
     }
 }

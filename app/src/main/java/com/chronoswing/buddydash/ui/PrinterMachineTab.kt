@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -24,10 +25,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.PrinterMachineInfo
+import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
+import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.data.model.SmartOutletPowerState
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
 import com.chronoswing.buddydash.ui.components.MachineStepFilterChip
@@ -38,7 +43,12 @@ import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.util.BED_JOG_STEP_OPTIONS_MM
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildMachineInfoRows
+import com.chronoswing.buddydash.util.formatSmartPlugCurrent
+import com.chronoswing.buddydash.util.formatSmartPlugPowerWatts
+import com.chronoswing.buddydash.util.formatSmartPlugVoltage
+import com.chronoswing.buddydash.util.formatStatusUpdatedAgo
 import com.chronoswing.buddydash.util.machineTabCapabilities
+import com.chronoswing.buddydash.util.requiresActivePowerOffConfirmation
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -46,6 +56,9 @@ fun MachineTab(
     labels: PrinterDetailLabels,
     printerModel: String?,
     machineInfo: PrinterMachineInfo?,
+    smartPlugState: PrinterSmartPlugState?,
+    printerStatus: PrinterStatus?,
+    powerControlsEnabled: Boolean,
     cameraToken: String,
     serverUrl: String,
     printerId: Int,
@@ -56,6 +69,9 @@ fun MachineTab(
     onJogBedUp: () -> Unit,
     onJogBedDown: () -> Unit,
     onHomePrinter: () -> Unit,
+    onPowerOn: () -> Unit,
+    onPowerOff: () -> Unit,
+    onRequiresConnectionTap: () -> Unit,
     onToggleLight: (() -> Unit)? = null,
     onOpenPrinterArchives: () -> Unit = {},
     onStopCameraStream: () -> Unit = {},
@@ -63,6 +79,7 @@ fun MachineTab(
     val caps = labels.machineTabCapabilities(cameraTokenConfigured = cameraToken.isNotBlank())
     var showCameraFullscreen by rememberSaveable { mutableStateOf(false) }
     var showHomeConfirm by remember { mutableStateOf(false) }
+    var showPowerOffConfirm by remember { mutableStateOf(false) }
 
     PrinterCameraFullscreenDialog(
         visible = showCameraFullscreen,
@@ -94,6 +111,50 @@ fun MachineTab(
             },
             dismissButton = {
                 TextButton(onClick = { showHomeConfirm = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
+    if (showPowerOffConfirm) {
+        val activeConfirm = printerStatus.requiresActivePowerOffConfirmation()
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showPowerOffConfirm = false },
+            title = {
+                Text(
+                    stringResource(
+                        if (activeConfirm) {
+                            R.string.machine_power_off_active_confirm_title
+                        } else {
+                            R.string.machine_power_off_confirm_title
+                        },
+                    ),
+                )
+            },
+            text = {
+                Text(
+                    stringResource(
+                        if (activeConfirm) {
+                            R.string.machine_power_off_active_confirm_message
+                        } else {
+                            R.string.machine_power_off_confirm_message
+                        },
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPowerOffConfirm = false
+                        onPowerOff()
+                    },
+                ) {
+                    Text(stringResource(R.string.machine_power_off))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPowerOffConfirm = false }) {
                     Text(stringResource(R.string.cancel))
                 }
             },
@@ -161,12 +222,90 @@ fun MachineTab(
             }
         }
 
+        smartPlugState?.let { plug ->
+            SmartPlugPowerSection(
+                plug = plug,
+                actionsEnabled = !isControlBusy,
+                powerControlsEnabled = powerControlsEnabled,
+                onPowerOn = onPowerOn,
+                onPowerOff = { showPowerOffConfirm = true },
+                onRequiresConnectionTap = onRequiresConnectionTap,
+            )
+        }
+
         MachinePrinterInfoCard(
             labels = labels,
             machineInfo = machineInfo,
             printerModel = printerModel,
             statusUpdatedAtMillis = statusUpdatedAtMillis,
         )
+    }
+}
+
+@Composable
+private fun SmartPlugPowerSection(
+    plug: PrinterSmartPlugState,
+    actionsEnabled: Boolean,
+    powerControlsEnabled: Boolean,
+    onPowerOn: () -> Unit,
+    onPowerOff: () -> Unit,
+    onRequiresConnectionTap: () -> Unit,
+) {
+    val energy = plug.energy
+    val powerStateLabel = when (plug.displayPowerState) {
+        SmartOutletPowerState.On -> stringResource(R.string.machine_power_state_on)
+        SmartOutletPowerState.Off -> stringResource(R.string.machine_power_state_off)
+        SmartOutletPowerState.Unknown -> stringResource(R.string.machine_power_state_unknown)
+    }
+    val lastUpdated = formatStatusUpdatedAgo(plug.lastUpdatedAtMillis)
+
+    DetailInfoCard {
+        SectionHeader(stringResource(R.string.machine_section_power))
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            CompactLabelValue(
+                label = stringResource(R.string.machine_power_state),
+                value = powerStateLabel,
+            )
+            formatSmartPlugPowerWatts(energy)?.let { watts ->
+                CompactLabelValue(label = stringResource(R.string.machine_power_draw), value = watts)
+            }
+            formatSmartPlugVoltage(energy)?.let { volts ->
+                CompactLabelValue(label = stringResource(R.string.machine_power_voltage), value = volts)
+            }
+            formatSmartPlugCurrent(energy)?.let { amps ->
+                CompactLabelValue(label = stringResource(R.string.machine_power_current), value = amps)
+            }
+            lastUpdated?.let { updated ->
+                CompactLabelValue(
+                    label = stringResource(R.string.machine_info_last_updated),
+                    value = updated,
+                )
+            }
+        }
+        Column(
+            modifier = Modifier.alpha(if (powerControlsEnabled) 1f else 0.55f),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            MachineUtilityButton(
+                label = stringResource(R.string.machine_power_on),
+                icon = Icons.Default.PowerSettingsNew,
+                enabled = actionsEnabled,
+                onClick = {
+                    if (powerControlsEnabled) onPowerOn() else onRequiresConnectionTap()
+                },
+            )
+            MachineUtilityButton(
+                label = stringResource(R.string.machine_power_off),
+                icon = Icons.Default.PowerSettingsNew,
+                enabled = actionsEnabled,
+                onClick = {
+                    if (powerControlsEnabled) onPowerOff() else onRequiresConnectionTap()
+                },
+            )
+        }
+        if (!powerControlsEnabled) {
+            MachineDisabledHint(reasonCode = "requires_connection")
+        }
     }
 }
 
@@ -196,6 +335,7 @@ private fun BedJogStepSelector(
 private fun MachineDisabledHint(reasonCode: String) {
     val text = when (reasonCode) {
         "offline" -> stringResource(R.string.machine_disabled_offline)
+        "requires_connection" -> stringResource(R.string.requires_connection)
         "busy" -> stringResource(R.string.machine_disabled_busy)
         "not_supported" -> stringResource(R.string.machine_disabled_unsupported)
         else -> return

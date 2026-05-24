@@ -49,6 +49,15 @@ object BambuddyApi {
     const val AMS_UNLOAD_PATH = "/api/v1/printers/{printer_id}/ams/unload"
     const val PRINTER_DETAIL_PATH = "/api/v1/printers/{printer_id}"
 
+    /** GET — smart plug assigned to printer (operationId: get_smart_plug_by_printer_…). */
+    const val SMART_PLUG_BY_PRINTER_PATH = "/api/v1/smart-plugs/by-printer/{printer_id}"
+
+    /** GET — live plug status (operationId: get_plug_status_…). */
+    const val SMART_PLUG_STATUS_PATH = "/api/v1/smart-plugs/{plug_id}/status"
+
+    /** POST — manual on/off/toggle (operationId: control_smart_plug_…). */
+    const val SMART_PLUG_CONTROL_PATH = "/api/v1/smart-plugs/{plug_id}/control"
+
     /** GET — list print queue (OpenAPI: list_queue_api_v1_queue__get). */
     const val QUEUE_PATH = "/api/v1/queue/"
 
@@ -94,6 +103,7 @@ object BambuddyApi {
     /** DELETE /api/v1/inventory/assignments/{printer_id}/{ams_id}/{tray_id} */
     val hasInventoryUnassignEndpoint: Boolean = true
     val hasPrinterDetailEndpoint: Boolean = true
+    val hasSmartPlugEndpoints: Boolean = true
     val hasCameraEndpoint: Boolean = true
     val hasFilesEndpoint: Boolean = true
     val hasSpoolInventoryEndpoint: Boolean = true
@@ -172,6 +182,15 @@ object BambuddyApi {
 
     fun printerDetailPath(printerId: Int): String =
         PRINTER_DETAIL_PATH.replace("{printer_id}", printerId.toString())
+
+    fun smartPlugByPrinterPath(printerId: Int): String =
+        SMART_PLUG_BY_PRINTER_PATH.replace("{printer_id}", printerId.toString())
+
+    fun smartPlugStatusPath(plugId: Int): String =
+        SMART_PLUG_STATUS_PATH.replace("{plug_id}", plugId.toString())
+
+    fun smartPlugControlPath(plugId: Int): String =
+        SMART_PLUG_CONTROL_PATH.replace("{plug_id}", plugId.toString())
 
     fun queuePath(printerId: Int): String = "$QUEUE_PATH?printer_id=$printerId"
 

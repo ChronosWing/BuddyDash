@@ -89,6 +89,18 @@ class BambuddyOpenApiTest {
         assertTrue(spec.contains("\"summary\":\"Clear Plate\"") || spec.contains("\"summary\": \"Clear Plate\""))
     }
 
+    @Test
+    fun smartPlugEndpoints_matchOpenApiSpec() {
+        val spec = findOpenApiSpec().readText()
+        assertTrue(spec.contains("\"${BambuddyApi.SMART_PLUG_BY_PRINTER_PATH}\""))
+        assertTrue(spec.contains("\"${BambuddyApi.SMART_PLUG_STATUS_PATH}\""))
+        assertTrue(spec.contains("\"${BambuddyApi.SMART_PLUG_CONTROL_PATH}\""))
+        assertTrue(spec.contains("get_smart_plug_by_printer_api_v1_smart_plugs_by_printer__printer_id__get"))
+        assertTrue(spec.contains("control_smart_plug_api_v1_smart_plugs__plug_id__control_post"))
+        assertTrue(spec.contains("SmartPlugControl"))
+        assertTrue(spec.contains("SmartPlugStatus"))
+    }
+
     private fun findOpenApiSpec(): File {
         var dir: File? = File(System.getProperty("user.dir"))
         while (dir != null) {
