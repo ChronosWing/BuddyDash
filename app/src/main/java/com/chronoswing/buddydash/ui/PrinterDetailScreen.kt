@@ -109,12 +109,14 @@ import com.chronoswing.buddydash.ui.components.StatusLastUpdatedIndicator
 import com.chronoswing.buddydash.util.showStaleDataBanner
 import com.chronoswing.buddydash.util.staleBannerShowsRefreshFailed
 import com.chronoswing.buddydash.util.ListLoadUi
+import com.chronoswing.buddydash.util.HmsSeverity
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildPrintHeadline
 import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
 import com.chronoswing.buddydash.util.toDetailLabels
 
 private val detailTabs = listOf("Status", "Filament", "Machine")
+private val HmsDetailAmber = androidx.compose.ui.graphics.Color(0xFFFBBF24)
 
 @Composable
 fun PrinterDetailScreen(
@@ -1024,10 +1026,10 @@ private fun IdleStatusTab(
         CompactLabelValue(
             label = stringResource(R.string.hms_health),
             value = labels.hmsHealth,
-            valueColor = if (labels.hmsHasErrors) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.primary
+            valueColor = when (labels.hmsAlertSeverity) {
+                HmsSeverity.Error -> MaterialTheme.colorScheme.error
+                HmsSeverity.Warning, HmsSeverity.Unknown -> HmsDetailAmber
+                HmsSeverity.Ok -> MaterialTheme.colorScheme.primary
             },
         )
     }

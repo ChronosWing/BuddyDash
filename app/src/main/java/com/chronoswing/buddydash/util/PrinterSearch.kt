@@ -62,7 +62,7 @@ fun printerMatchesNeedsAttentionFilter(printer: Printer): Boolean {
     if (printer.maintenanceIndicator == MaintenanceHomeIndicator.Due) return true
     val status = printer.liveStatus ?: return true
     if (!status.connected) return true
-    if (status.hmsErrorCount > 0) return true
+    if (status.resolveHmsAlertSeverity() != HmsSeverity.Ok) return true
     if (status.hasFilamentOrAmsIssue()) return true
     if (status.awaitingPlateClear == true) return true
     val raw = status.rawState?.uppercase()

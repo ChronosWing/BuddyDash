@@ -38,6 +38,21 @@ enum class HmsAlertLevel {
     Notification,
 }
 
+/**
+ * Aggregate HMS health level for a printer.
+ * Error wins over Warning wins over Unknown wins over Ok.
+ */
+enum class HmsSeverity {
+    /** No active HMS entries. */
+    Ok,
+    /** Entries exist but alert level cannot be determined from code or severity field. */
+    Unknown,
+    /** One or more active HMS warning entries. */
+    Warning,
+    /** One or more active HMS error/fault entries (takes priority over Warning and Unknown). */
+    Error,
+}
+
 fun parseHmsCodeAlertLevel(code: String): HmsAlertLevel? {
     val parts = code.split("-", "_").map { it.trim() }.filter { it.isNotEmpty() }
     if (parts.size < 3) return null
@@ -45,6 +60,22 @@ fun parseHmsCodeAlertLevel(code: String): HmsAlertLevel? {
         "0001" -> HmsAlertLevel.Error
         "0002" -> HmsAlertLevel.Warning
         "0003" -> HmsAlertLevel.Notification
+        else -> null
+    }
+}
+
+/**
+ * Alert level for a single HMS entry.
+ *
+ * Returns null when neither the code segment nor the severity field can determine the level.
+ * Callers must treat null as "unknown" — never silently treat as OK.
+ */
+fun PrinterHmsError.alertLevel(): HmsAlertLevel? {
+    parseHmsCodeAlertLevel(code)?.let { return it }
+    return when (severity) {
+        1 -> HmsAlertLevel.Error
+        2 -> HmsAlertLevel.Warning
+        3 -> HmsAlertLevel.Notification
         else -> null
     }
 }
@@ -59,6 +90,35 @@ fun PrinterHmsError.isFault(): Boolean {
         1 -> true
         2, 3 -> false
         else -> false
+    }
+}
+
+/**
+ * Aggregate HMS health severity across all HMS entries.
+ *
+ * Error wins over Warning wins over Unknown wins over Ok.
+ * Notification-only entries resolve to Ok (informational, not actionable).
+ * Entries with undetectable alert level resolve to Unknown — never silently Ok.
+ */
+fun PrinterStatus.resolveHmsAlertSeverity(): HmsSeverity {
+    if (hmsErrors.isEmpty()) return HmsSeverity.Ok
+
+    var hasUnknown = false
+    var hasWarning = false
+
+    for (entry in hmsErrors) {
+        when (entry.alertLevel()) {
+            HmsAlertLevel.Error -> return HmsSeverity.Error      // short-circuit
+            HmsAlertLevel.Warning -> hasWarning = true
+            HmsAlertLevel.Notification -> Unit                   // informational only
+            null -> hasUnknown = true                            // level undetectable
+        }
+    }
+
+    return when {
+        hasWarning -> HmsSeverity.Warning
+        hasUnknown -> HmsSeverity.Unknown
+        else -> HmsSeverity.Ok
     }
 }
 
@@ -77,14 +137,15 @@ fun logPrinterStatusMapping(
 ) {
     if (!DEBUG_LOG_STATUS_MAP) return
     val kind = status.resolveActivityKind()
+    val hmsSeverity = status.resolveHmsAlertSeverity()
     val raw = status.rawState
     val hmsTotal = status.hmsErrors.size
     val hmsFaults = status.hmsErrorCount
     val explicit = status.hasExplicitStatusFault()
     val reason = buildString {
         if (explicit) append("explicitFault ")
-        append("hmsTotal=$hmsTotal hmsFaults=$hmsFaults ")
-        if (hmsTotal > hmsFaults) append("(ignoredNonFaultHms=${hmsTotal - hmsFaults}) ")
+        append("hmsTotal=$hmsTotal hmsFaults=$hmsFaults hmsSeverity=$hmsSeverity ")
+        if (hmsTotal > hmsFaults) append("(nonFaultHms=${hmsTotal - hmsFaults}) ")
         if (kind == PrinterActivityKind.Error && !status.hasActiveFault() && raw != null) {
             append("unexpectedErrorMapping ")
         }
@@ -94,6 +155,15 @@ fun logPrinterStatusMapping(
         "${context.ifBlank { "status" }} rawState=$raw mapped=$kind errorReason=$reason " +
             "fields=${statusMappingFieldSample(json)}",
     )
+    // Log each HMS entry with resolved level
+    status.hmsErrors.forEachIndexed { i, entry ->
+        Log.d(
+            TAG_STATUS_MAP,
+            "  hms[$i] code=${entry.code} alertLevel=${entry.alertLevel()} " +
+                "severity=${entry.severity} module=${entry.module} " +
+                "detail=${entry.detail?.take(64)}",
+        )
+    }
 }
 
 private fun statusMappingFieldSample(json: JSONObject): String = buildString {

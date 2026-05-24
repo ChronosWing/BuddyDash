@@ -2,6 +2,7 @@ package com.chronoswing.buddydash.util
 
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.data.model.Printer
+import com.chronoswing.buddydash.data.model.PrinterHmsError
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
 
@@ -31,6 +32,10 @@ data class PrinterCardLabels(
     val cardMicroMotion: CardMicroMotion = CardMicroMotion.None,
     val maintenanceIndicator: MaintenanceHomeIndicator = MaintenanceHomeIndicator.None,
     val pendingQueueCount: Int = 0,
+    /** Aggregate HMS health severity; Ok means no active HMS alerts. */
+    val hmsAlertSeverity: HmsSeverity = HmsSeverity.Ok,
+    /** Raw HMS entries for the detail sheet; empty when no alerts exist. */
+    val hmsErrors: List<PrinterHmsError> = emptyList(),
 )
 
 fun Printer.toCardLabels(): PrinterCardLabels {
@@ -65,6 +70,8 @@ fun Printer.toCardLabels(): PrinterCardLabels {
             cardMicroMotion = CardMicroMotion.None,
             maintenanceIndicator = MaintenanceHomeIndicator.None,
             pendingQueueCount = pendingQueueCount,
+            hmsAlertSeverity = HmsSeverity.Ok,
+            hmsErrors = emptyList(),
         )
     }
     val detail = status.toDetailLabels(printerModel = model)
@@ -128,5 +135,7 @@ fun Printer.toCardLabels(): PrinterCardLabels {
         cardMicroMotion = resolveCardMicroMotion(activityKind, status.rawState),
         maintenanceIndicator = maintenanceIndicator,
         pendingQueueCount = pendingQueueCount,
+        hmsAlertSeverity = status.resolveHmsAlertSeverity(),
+        hmsErrors = status.hmsErrors,
     )
 }
