@@ -19,6 +19,7 @@ data class SmartPlugEnergyReading(
     val powerWatts: Double? = null,
     val voltageVolts: Double? = null,
     val currentAmps: Double? = null,
+    val powerFactor: Double? = null,
 )
 
 /** Live status from GET /api/v1/smart-plugs/{plug_id}/status. */

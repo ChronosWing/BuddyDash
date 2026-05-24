@@ -910,6 +910,7 @@ class BambuddyApiClient {
                 powerWatts = it.optNullableDouble("power"),
                 voltageVolts = it.optNullableDouble("voltage"),
                 currentAmps = it.optNullableDouble("current"),
+                powerFactor = it.optNullableDouble("factor"),
             )
         }
         return SmartPlugLiveStatus(

@@ -26,6 +26,7 @@ data class PrinterDetailCacheSnapshot(
     val queueUpcoming: List<PrintQueueJob>,
     val machineInfo: PrinterMachineInfo?,
     val smartPlugState: PrinterSmartPlugState? = null,
+    val smartPlugPowerHistory: List<Float> = emptyList(),
     val printingQueueJobId: Int?,
 )
 
@@ -46,6 +47,7 @@ object PrinterDetailCacheCodec {
             .put("queue_upcoming", encodeQueueJobs(snapshot.queueUpcoming))
             .putOptObject("machine_info", snapshot.machineInfo?.let { encodeMachineInfo(it) })
             .putOptObject("smart_plug", snapshot.smartPlugState?.let { encodeSmartPlugState(it) })
+            .put("smart_plug_power_history", encodeFloatList(snapshot.smartPlugPowerHistory))
             .putOptInt("printing_queue_job_id", snapshot.printingQueueJobId)
             .toString()
 
@@ -69,6 +71,7 @@ object PrinterDetailCacheCodec {
                 queueUpcoming = decodeQueueJobs(root.optJSONArray("queue_upcoming")),
                 machineInfo = root.optJSONObject("machine_info")?.let { decodeMachineInfo(it) },
                 smartPlugState = root.optJSONObject("smart_plug")?.let { decodeSmartPlugState(it) },
+                smartPlugPowerHistory = decodeFloatList(root.optJSONArray("smart_plug_power_history")),
                 printingQueueJobId = root.optNullableInt("printing_queue_job_id"),
             )
         } catch (_: Exception) {
@@ -235,13 +238,28 @@ object PrinterDetailCacheCodec {
             .putOptDouble("power_watts", energy.powerWatts)
             .putOptDouble("voltage_volts", energy.voltageVolts)
             .putOptDouble("current_amps", energy.currentAmps)
+            .putOptDouble("power_factor", energy.powerFactor)
 
     private fun decodeSmartPlugEnergy(obj: JSONObject): SmartPlugEnergyReading =
         SmartPlugEnergyReading(
             powerWatts = obj.optNullableDouble("power_watts"),
             voltageVolts = obj.optNullableDouble("voltage_volts"),
             currentAmps = obj.optNullableDouble("current_amps"),
+            powerFactor = obj.optNullableDouble("power_factor"),
         )
+
+    private fun encodeFloatList(values: List<Float>): JSONArray =
+        JSONArray().apply { values.forEach { put(it.toDouble()) } }
+
+    private fun decodeFloatList(array: JSONArray?): List<Float> {
+        if (array == null) return emptyList()
+        return buildList {
+            for (i in 0 until array.length()) {
+                val value = array.optDouble(i, Double.NaN)
+                if (!value.isNaN()) add(value.toFloat())
+            }
+        }
+    }
 
     private fun encodeFilamentUsage(usage: FilamentUsage): JSONObject =
         JSONObject()

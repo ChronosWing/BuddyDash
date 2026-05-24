@@ -100,6 +100,7 @@ data class PrinterDetailUiState(
     val activePrintFilamentUsage: FilamentUsage? = null,
     val machineInfo: PrinterMachineInfo? = null,
     val smartPlugState: PrinterSmartPlugState? = null,
+    val smartPlugPowerHistory: List<Float> = emptyList(),
     val bedJogStepMm: Float = BED_JOG_STEP_OPTIONS_MM[1],
     val filamentSlotDisplays: List<FilamentSlotDisplay> = emptyList(),
     val inventorySpools: List<SpoolInventoryItem> = emptyList(),
@@ -296,6 +297,7 @@ class PrinterDetailViewModel(
                 totalPrintHours = snapshot.totalPrintHours,
                 machineInfo = snapshot.machineInfo,
                 smartPlugState = snapshot.smartPlugState,
+                smartPlugPowerHistory = snapshot.smartPlugPowerHistory,
                 queueUpcoming = snapshot.queueUpcoming,
                 printingQueueJobId = snapshot.printingQueueJobId,
                 lastStatusUpdatedAtMillis = snapshot.lastUpdatedAtMillis,
@@ -504,10 +506,18 @@ class PrinterDetailViewModel(
                 machineInfo = bundle.machineInfo,
                 printingQueueJobId = queueSnapshot.printing?.id,
                 smartPlugState = bundle.smartPlugState,
+                smartPlugPowerHistory = nextSmartPlugPowerHistory(
+                    current = _uiState.value.smartPlugPowerHistory,
+                    plugState = bundle.smartPlugState,
+                ),
             ),
         )
         logPrinterDetailCacheWrite(printerId, writeOk)
         _uiState.update {
+            val history = nextSmartPlugPowerHistory(
+                current = it.smartPlugPowerHistory,
+                plugState = bundle.smartPlugState,
+            )
             it.copy(
                 isLoading = false,
                 isRefreshing = false,
@@ -516,6 +526,7 @@ class PrinterDetailViewModel(
                 totalPrintHours = bundle.maintenance?.totalPrintHours,
                 machineInfo = bundle.machineInfo,
                 smartPlugState = bundle.smartPlugState,
+                smartPlugPowerHistory = history,
                 queueUpcoming = upcoming,
                 startNextQueuedPrintReadiness = evaluateStartNextQueuedPrintReadiness(
                     status = status,
@@ -1101,3 +1112,14 @@ private data class StatusFetchBundle(
     val machineInfo: PrinterMachineInfo?,
     val smartPlugState: PrinterSmartPlugState?,
 )
+
+private const val SMART_PLUG_POWER_HISTORY_MAX = 60
+
+private fun nextSmartPlugPowerHistory(
+    current: List<Float>,
+    plugState: PrinterSmartPlugState?,
+): List<Float> {
+    val watts = plugState?.energy?.powerWatts ?: return if (plugState == null) emptyList() else current
+    if (watts.isNaN() || watts < 0) return current
+    return (current + watts.toFloat()).takeLast(SMART_PLUG_POWER_HISTORY_MAX)
+}
