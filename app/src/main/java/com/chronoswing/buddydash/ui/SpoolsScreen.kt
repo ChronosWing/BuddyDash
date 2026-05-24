@@ -68,7 +68,7 @@ import com.chronoswing.buddydash.util.staleBannerShowsRefreshFailed
 import com.chronoswing.buddydash.ui.components.SpoolInventoryRow
 import com.chronoswing.buddydash.ui.components.SpoolListSkeleton
 import com.chronoswing.buddydash.ui.components.asImageVector
-import com.chronoswing.buddydash.ui.layout.BuddyDashExpandedFormContainer
+import com.chronoswing.buddydash.ui.layout.BUDDYDASH_GRID_GUTTER_DP
 import com.chronoswing.buddydash.ui.layout.rememberBuddyDashExpandedGridColumnCount
 import com.chronoswing.buddydash.util.ArchiveSpoolLookupFilter
 import com.chronoswing.buddydash.util.ListLoadUi
@@ -296,12 +296,11 @@ private fun SpoolsScreenContent(
                             archiveLookupFilter = archiveLookupFilter,
                             onSearchQueryChange = onSearchQueryChange,
                             onFilterChange = onFilterChange,
-                            onClearArchiveLookup = onClearArchiveLookup,
-                            gridColumns = spoolGridColumns,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                        )
+            onClearArchiveLookup = onClearArchiveLookup,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        )
                         if (spools.isEmpty() && hasCompletedLoad) {
                             EmptyContent(
                                 message = when {
@@ -403,8 +402,8 @@ private fun SpoolInventoryList(
             columns = GridCells.Fixed(gridColumns),
             modifier = Modifier.fillMaxSize(),
             contentPadding = contentPadding,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(BUDDYDASH_GRID_GUTTER_DP.dp),
+            verticalArrangement = Arrangement.spacedBy(BUDDYDASH_GRID_GUTTER_DP.dp),
         ) {
             items(
                 items = spools,
@@ -444,10 +443,9 @@ private fun SpoolSearchAndFilters(
     onSearchQueryChange: (String) -> Unit,
     onFilterChange: (SpoolInventoryFilter) -> Unit,
     onClearArchiveLookup: () -> Unit,
-    gridColumns: Int,
     modifier: Modifier = Modifier,
 ) {
-    BuddyDashExpandedFormContainer(gridColumns = gridColumns, modifier = modifier) {
+    Column(modifier = modifier) {
         SpoolSearchAndFiltersContent(
             searchQuery = searchQuery,
             filter = filter,

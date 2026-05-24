@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.chronoswing.buddydash.ui.layout.BUDDYDASH_GRID_GUTTER_DP
 import com.chronoswing.buddydash.data.model.FilamentSlot
 import com.chronoswing.buddydash.ui.motion.rememberPrefersReducedMotion
 import com.chronoswing.buddydash.util.CardMicroMotion
@@ -190,14 +191,14 @@ fun FilamentDetailGroups(
                 } else {
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(BUDDYDASH_GRID_GUTTER_DP.dp),
+                        verticalArrangement = Arrangement.spacedBy(BUDDYDASH_GRID_GUTTER_DP.dp),
                         maxItemsInEachRow = columns,
                     ) {
                         group.slots.forEach { slot ->
                             val display = displayBySlot[slot] ?: return@forEach
                             FilamentDetailSlotCard(
-                                modifier = Modifier.fillMaxWidth(0.48f),
+                                modifier = Modifier.fillMaxWidth(1f / columns),
                                 display = display,
                                 isExternal = group.isExternal,
                                 glowMotion = glowMotion,

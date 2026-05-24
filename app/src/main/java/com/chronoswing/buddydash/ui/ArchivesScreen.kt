@@ -68,7 +68,7 @@ import com.chronoswing.buddydash.ui.components.OfflineStaleBanner
 import com.chronoswing.buddydash.util.showStaleDataBanner
 import com.chronoswing.buddydash.util.staleBannerShowsRefreshFailed
 import com.chronoswing.buddydash.ui.components.asImageVector
-import com.chronoswing.buddydash.ui.layout.BuddyDashExpandedFormContainer
+import com.chronoswing.buddydash.ui.layout.BUDDYDASH_GRID_GUTTER_DP
 import com.chronoswing.buddydash.ui.layout.rememberBuddyDashExpandedGridColumnCount
 import com.chronoswing.buddydash.util.ArchivePrinterFilter
 import com.chronoswing.buddydash.util.ArchiveResultFilter
@@ -339,7 +339,6 @@ private fun ArchivesHistoryContent(
         ArchiveSearchAndFilters(
             searchQuery = searchQuery,
             filter = filter,
-            gridColumns = archiveGridColumns,
             onSearchQueryChange = onSearchQueryChange,
             onFilterChange = onFilterChange,
             modifier = Modifier
@@ -421,8 +420,8 @@ private fun ArchiveHistoryList(
             columns = GridCells.Fixed(gridColumns),
             modifier = Modifier.fillMaxSize(),
             contentPadding = contentPadding,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(BUDDYDASH_GRID_GUTTER_DP.dp),
+            verticalArrangement = Arrangement.spacedBy(BUDDYDASH_GRID_GUTTER_DP.dp),
         ) {
             items(
                 items = archives,
@@ -458,12 +457,11 @@ private fun ArchiveHistoryListItem(
 private fun ArchiveSearchAndFilters(
     searchQuery: String,
     filter: ArchiveResultFilter,
-    gridColumns: Int,
     onSearchQueryChange: (String) -> Unit,
     onFilterChange: (ArchiveResultFilter) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BuddyDashExpandedFormContainer(gridColumns = gridColumns, modifier = modifier) {
+    Column(modifier = modifier) {
         ArchiveSearchAndFiltersContent(
             searchQuery = searchQuery,
             filter = filter,

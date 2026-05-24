@@ -15,6 +15,12 @@ const val BUDDYDASH_EXPANDED_WIDTH_MIN_DP = 600
 /** Max width for search/forms on expanded layouts so controls do not stretch edge-to-edge. */
 const val BUDDYDASH_EXPANDED_FORM_MAX_WIDTH_DP = 720
 
+/** Max width for detail scroll content on expanded layouts (two-column splits). */
+const val BUDDYDASH_EXPANDED_DETAIL_MAX_WIDTH_DP = 960
+
+/** Horizontal and vertical gutter between adaptive grid cells. */
+const val BUDDYDASH_GRID_GUTTER_DP = 10
+
 /** @see BUDDYDASH_EXPANDED_WIDTH_MIN_DP */
 const val HOME_PRINTER_GRID_MIN_WIDTH_DP = BUDDYDASH_EXPANDED_WIDTH_MIN_DP
 
@@ -58,6 +64,37 @@ fun BuddyDashExpandedFormContainer(
             contentAlignment = Alignment.TopCenter,
         ) {
             Box(Modifier.buddyDashExpandedFormWidth(gridColumns)) {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+fun Modifier.buddyDashExpandedDetailWidth(isExpandedWidth: Boolean): Modifier =
+    if (isExpandedWidth) {
+        widthIn(max = BUDDYDASH_EXPANDED_DETAIL_MAX_WIDTH_DP.dp).fillMaxWidth()
+    } else {
+        fillMaxWidth()
+    }
+
+/** Centers expanded-width detail scroll content while leaving compact layout unchanged. */
+@Composable
+fun BuddyDashExpandedDetailContainer(
+    isExpandedWidth: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    if (!isExpandedWidth) {
+        Box(modifier = modifier.fillMaxWidth()) {
+            content()
+        }
+    } else {
+        Box(
+            modifier = modifier.fillMaxWidth(),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            Box(Modifier.buddyDashExpandedDetailWidth(isExpandedWidth = true)) {
                 content()
             }
         }

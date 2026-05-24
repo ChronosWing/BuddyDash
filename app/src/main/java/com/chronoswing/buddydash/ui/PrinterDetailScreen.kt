@@ -104,6 +104,7 @@ import com.chronoswing.buddydash.ui.components.LoadingContent
 import com.chronoswing.buddydash.ui.motion.BuddyDashTabFadeContainer
 import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
 import com.chronoswing.buddydash.ui.motion.SecondaryScreenHeader
+import com.chronoswing.buddydash.ui.layout.BuddyDashExpandedDetailContainer
 import com.chronoswing.buddydash.ui.layout.rememberBuddyDashExpandedGridColumnCount
 import com.chronoswing.buddydash.ui.layout.rememberIsBuddyDashExpandedWidth
 import com.chronoswing.buddydash.ui.components.SecondaryNote
@@ -601,6 +602,7 @@ private fun PrinterDetailScreenContent(
             )
             else -> {
                 val labels = labels ?: return@AnimatedContent
+                val isExpandedWidth = rememberIsBuddyDashExpandedWidth()
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -626,15 +628,19 @@ private fun PrinterDetailScreenContent(
                         onRefresh = onPullRefresh,
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(scrollState)
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        BuddyDashExpandedDetailContainer(
+                            isExpandedWidth = isExpandedWidth,
+                            modifier = Modifier.fillMaxSize(),
                         ) {
-                            BuddyDashTabFadeContainer(selectedTab = selectedTab) {
-                            when (selectedTab) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(scrollState)
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                BuddyDashTabFadeContainer(selectedTab = selectedTab) {
+                                when (selectedTab) {
                                 0 -> StatusTab(
                                     labels = labels,
                                     printerModel = printerModel,
@@ -710,6 +716,7 @@ private fun PrinterDetailScreenContent(
                                 )
                             }
                             }
+                        }
                         }
                     }
                 }
@@ -827,6 +834,7 @@ private fun StatusTab(
             labels = labels,
             isMaintenanceResetBusy = isMaintenanceResetBusy,
             onPerformMaintenanceReset = onPerformMaintenanceReset,
+            isExpandedWidth = isExpandedWidth,
         )
     }
 }
@@ -836,15 +844,49 @@ private fun DetailOperationalStats(
     labels: PrinterDetailLabels,
     isMaintenanceResetBusy: Boolean,
     onPerformMaintenanceReset: (Int) -> Unit,
+    isExpandedWidth: Boolean,
 ) {
-    DetailConnectivityCard(labels)
-    DetailFansCard(labels)
-    DetailPrintSpeedCard(labels)
-    DetailMaintenanceCard(
-        labels = labels,
-        resetBusy = isMaintenanceResetBusy,
-        onPerformReset = onPerformMaintenanceReset,
-    )
+    if (!isExpandedWidth) {
+        DetailConnectivityCard(labels)
+        DetailFansCard(labels)
+        DetailPrintSpeedCard(labels)
+        DetailMaintenanceCard(
+            labels = labels,
+            resetBusy = isMaintenanceResetBusy,
+            onPerformReset = onPerformMaintenanceReset,
+        )
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                DetailConnectivityCard(labels)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                DetailFansCard(labels)
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                DetailPrintSpeedCard(labels)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                DetailMaintenanceCard(
+                    labels = labels,
+                    resetBusy = isMaintenanceResetBusy,
+                    onPerformReset = onPerformMaintenanceReset,
+                )
+            }
+        }
+    }
 }
 
 @Composable

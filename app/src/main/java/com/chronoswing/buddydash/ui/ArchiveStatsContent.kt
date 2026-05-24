@@ -29,6 +29,8 @@ import com.chronoswing.buddydash.util.ARCHIVE_DISPLAY_NAME_FALLBACK
 import com.chronoswing.buddydash.util.ArchiveRecentFailure
 import com.chronoswing.buddydash.util.ArchiveStatsSnapshot
 import com.chronoswing.buddydash.util.ArchiveStatsTimeRange
+import com.chronoswing.buddydash.ui.layout.BUDDYDASH_GRID_GUTTER_DP
+import com.chronoswing.buddydash.ui.layout.rememberBuddyDashExpandedGridColumnCount
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -38,6 +40,7 @@ fun ArchiveStatsContent(
     onTimeRangeChange: (ArchiveStatsTimeRange) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val statGridColumns = if (rememberBuddyDashExpandedGridColumnCount() > 1) 3 else 2
     Column(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -73,15 +76,15 @@ fun ArchiveStatsContent(
                     item(key = "stat_cards") {
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            maxItemsInEachRow = 2,
+                            horizontalArrangement = Arrangement.spacedBy(BUDDYDASH_GRID_GUTTER_DP.dp),
+                            verticalArrangement = Arrangement.spacedBy(BUDDYDASH_GRID_GUTTER_DP.dp),
+                            maxItemsInEachRow = statGridColumns,
                         ) {
                             cards.forEach { (label, value) ->
                                 ArchiveStatCard(
                                     label = label,
                                     value = value,
-                                    modifier = Modifier.fillMaxWidth(0.48f),
+                                    modifier = Modifier.fillMaxWidth(1f / statGridColumns),
                                 )
                             }
                         }
