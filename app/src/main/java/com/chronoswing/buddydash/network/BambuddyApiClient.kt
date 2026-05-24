@@ -7,6 +7,11 @@ import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.PrintArchive
 import com.chronoswing.buddydash.data.model.PrinterMachineInfo
 import com.chronoswing.buddydash.data.model.PrintQueueJob
+import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
+import com.chronoswing.buddydash.data.model.SmartPlugConfig
+import com.chronoswing.buddydash.data.model.SmartPlugEnergyReading
+import com.chronoswing.buddydash.data.model.SmartPlugLiveStatus
+import com.chronoswing.buddydash.data.model.parseSmartOutletPowerState
 import com.chronoswing.buddydash.data.model.PrinterQueueSnapshot
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import com.chronoswing.buddydash.data.model.PrinterMaintenanceOverview
@@ -784,6 +789,141 @@ class BambuddyApiClient {
                 parsePrinterMachineInfo(JSONObject(body))
             }
         }
+
+  suspend fun fetchSmartPlugByPrinter(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+    ): Result<SmartPlugConfig?> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasSmartPlugEndpoints) {
+            return@withContext Result.success(null)
+        }
+        fetchNullableJson(serverUrl, apiKey, BambuddyApi.smartPlugByPrinterPath(printerId)) { body ->
+            parseSmartPlugConfig(JSONObject(body))
+        }
+    }
+
+    suspend fun fetchSmartPlugStatus(
+        serverUrl: String,
+        apiKey: String,
+        plugId: Int,
+    ): Result<SmartPlugLiveStatus> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasSmartPlugEndpoints) {
+            return@withContext Result.failure(
+                UnsupportedOperationException("Smart plug endpoints not found"),
+            )
+        }
+        runApiCall(serverUrl, apiKey, BambuddyApi.smartPlugStatusPath(plugId)) { body ->
+            parseSmartPlugLiveStatus(JSONObject(body))
+        }
+    }
+
+    suspend fun controlSmartPlug(
+        serverUrl: String,
+        apiKey: String,
+        plugId: Int,
+        action: String,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasSmartPlugEndpoints) {
+            return@withContext Result.failure(
+                UnsupportedOperationException("Smart plug endpoints not found"),
+            )
+        }
+        val payload = JSONObject().put("action", action).toString()
+        runApiCall(
+            serverUrl = serverUrl,
+            apiKey = apiKey,
+            path = BambuddyApi.smartPlugControlPath(plugId),
+            method = "POST",
+            postBody = payload,
+        ) { Unit }
+    }
+
+    suspend fun fetchPrinterSmartPlugState(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+    ): Result<PrinterSmartPlugState?> = withContext(Dispatchers.IO) {
+        val config = fetchSmartPlugByPrinter(serverUrl, apiKey, printerId).getOrElse { return@withContext Result.failure(it) }
+            ?: return@withContext Result.success(null)
+        val liveStatus = fetchSmartPlugStatus(serverUrl, apiKey, config.id).getOrNull()
+        Result.success(
+            PrinterSmartPlugState(
+                config = config,
+                liveStatus = liveStatus,
+                lastUpdatedAtMillis = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    private inline fun <T> fetchNullableJson(
+        serverUrl: String,
+        apiKey: String,
+        path: String,
+        parse: (String) -> T,
+    ): Result<T?> {
+        val baseUrl = normalizeBambuddyBaseUrl(serverUrl)
+            ?: return Result.failure(IllegalArgumentException("Server URL is required"))
+        val trimmedKey = apiKey.trim()
+        if (trimmedKey.isEmpty()) {
+            return Result.failure(IllegalArgumentException("API key is required"))
+        }
+        return runCatching {
+            client.newCall(
+                Request.Builder()
+                    .url("$baseUrl$path")
+                    .header("X-API-Key", trimmedKey)
+                    .get()
+                    .build(),
+            ).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                when {
+                    response.code == 404 -> null
+                    !response.isSuccessful -> {
+                        val detail = runCatching { JSONObject(body).optString("detail") }
+                            .getOrNull()
+                            ?.takeIf { it.isNotBlank() }
+                        throw Exception(detail ?: "Server returned ${response.code}")
+                    }
+                    body.isBlank() || body == "null" -> null
+                    else -> parse(body)
+                }
+            }
+        }.fold(
+            onSuccess = { Result.success(it) },
+            onFailure = { Result.failure(Exception(it.toUserNetworkMessage("Request failed"))) },
+        )
+    }
+
+    private fun parseSmartPlugConfig(json: JSONObject): SmartPlugConfig =
+        SmartPlugConfig(
+            id = json.getInt("id"),
+            name = json.optString("name", "Smart plug"),
+            lastState = json.optString("last_state").takeIf { it.isNotBlank() },
+            lastCheckedIso = json.optString("last_checked").takeIf { it.isNotBlank() },
+        )
+
+    private fun parseSmartPlugLiveStatus(json: JSONObject): SmartPlugLiveStatus {
+        val energyJson = json.optJSONObject("energy")
+        val energy = energyJson?.let {
+            SmartPlugEnergyReading(
+                powerWatts = it.optNullableDouble("power"),
+                voltageVolts = it.optNullableDouble("voltage"),
+                currentAmps = it.optNullableDouble("current"),
+            )
+        }
+        return SmartPlugLiveStatus(
+            powerState = parseSmartOutletPowerState(json.optString("state").takeIf { it.isNotBlank() }),
+            reachable = json.optBoolean("reachable", true),
+            deviceName = json.optString("device_name").takeIf { it.isNotBlank() },
+            energy = energy,
+        )
+    }
+
+    private fun JSONObject.optNullableDouble(key: String): Double? {
+        if (!has(key) || isNull(key)) return null
+        return optDouble(key).takeIf { !it.isNaN() }
+    }
 
     suspend fun homeAxes(
         serverUrl: String,

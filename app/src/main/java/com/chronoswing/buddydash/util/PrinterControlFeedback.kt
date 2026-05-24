@@ -12,6 +12,8 @@ enum class ControlAction {
     Pause,
     Resume,
     Stop,
+    SmartPlugOn,
+    SmartPlugOff,
 }
 
 data class ControlFeedback(

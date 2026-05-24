@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.BuddyDashDebug
+import com.chronoswing.buddydash.util.validateConnectionSettings
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +37,17 @@ class SettingsViewModel(
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            settingsRepository.settingsRecoveryMessage.collect { message ->
+                _uiState.update {
+                    it.copy(
+                        statusMessage = message,
+                        isSuccess = false,
+                        saved = false,
+                    )
+                }
+            }
+        }
         viewModelScope.launch {
             settingsRepository.serverUrl.collect { url ->
                 _uiState.update { it.copy(serverUrl = url) }
@@ -129,22 +141,49 @@ class SettingsViewModel(
     fun saveSettings() {
         val state = _uiState.value
         viewModelScope.launch {
-            settingsRepository.saveServerUrl(state.serverUrl)
-            settingsRepository.saveApiKey(state.apiKey)
-            settingsRepository.saveCameraToken(state.cameraToken)
+            val result = settingsRepository.saveConnectionSettings(
+                serverUrl = state.serverUrl,
+                apiKey = state.apiKey,
+                cameraToken = state.cameraToken,
+            )
             _uiState.update {
-                it.copy(saved = true, statusMessage = null, isSuccess = null)
+                if (result.isSuccess) {
+                    it.copy(saved = true, statusMessage = null, isSuccess = null)
+                } else {
+                    it.copy(
+                        saved = false,
+                        isSuccess = false,
+                        statusMessage = result.exceptionOrNull()?.message ?: "Could not save settings",
+                    )
+                }
             }
         }
     }
 
     fun testConnection() {
         val state = _uiState.value
+        val validation = validateConnectionSettings(
+            serverUrl = state.serverUrl,
+            apiKey = state.apiKey,
+            cameraToken = state.cameraToken,
+        )
+        if (validation.isFailure) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    isSuccess = false,
+                    statusMessage = validation.exceptionOrNull()?.message ?: "Connection failed",
+                )
+            }
+            return
+        }
+
         viewModelScope.launch {
             _uiState.update {
                 it.copy(isLoading = true, statusMessage = null, isSuccess = null)
             }
-            val result = apiClient.testApiConnection(state.serverUrl, state.apiKey)
+            val validated = validation.getOrThrow()
+            val result = apiClient.testApiConnection(validated.serverUrl, validated.apiKey)
             _uiState.update {
                 it.copy(
                     isLoading = false,
