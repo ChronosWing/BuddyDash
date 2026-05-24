@@ -41,14 +41,10 @@ fun PrinterStatus.buildPrinterErrorLines(): List<String> =
         .distinct()
 
 fun PrinterHmsError.toDisplayLine(): String {
+    // Prefer lookup message → API detail → formatted code as one-liner fallback
+    BambuHmsLookup.lookup(this)?.message?.let { return it }
     detail?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
-    val codeText = code.trim().takeIf { it.isNotBlank() }
-    return buildList {
-        codeText?.let { add("Code: $it") }
-        module?.let { add("Module $it") }
-        severity?.let { add("Severity $it") }
-        if (attr != 0) add("Attr $attr")
-    }.joinToString(" · ").ifBlank { codeText ?: "HMS alert" }
+    return BambuHmsLookup.formatDisplayCode(this) ?: code.trim().takeIf { it.isNotBlank() } ?: "HMS alert"
 }
 
 fun parsePrinterHmsErrors(array: JSONArray?): List<PrinterHmsError> {

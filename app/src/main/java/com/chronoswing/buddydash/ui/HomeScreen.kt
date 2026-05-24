@@ -53,7 +53,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.chronoswing.buddydash.ui.components.HmsDetailSheet
-import com.chronoswing.buddydash.util.BuddyDashDebug
 import com.chronoswing.buddydash.util.HmsSeverity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -490,21 +489,6 @@ private fun GlancePrinterCard(
                     { showHmsSheet = true }
                 } else null,
             )
-
-            if (BuddyDashDebug.enabled) {
-                val hmsCount = liveStatus?.hmsErrors?.size ?: -1
-                val severity = labels.hmsAlertSeverity
-                val hasStatus = liveStatus != null
-                Text(
-                    text = "HMS count=$hmsCount severity=$severity status=${if (hasStatus) "present" else "nil"}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = when (severity) {
-                        HmsSeverity.Error -> MaterialTheme.colorScheme.error
-                        HmsSeverity.Warning, HmsSeverity.Unknown -> Color(0xFFFBBF24)
-                        HmsSeverity.Ok -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    },
-                )
-            }
 
             if (labels.isActivePrint) {
                 Row(
