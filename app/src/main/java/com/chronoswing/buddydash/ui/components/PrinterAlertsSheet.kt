@@ -28,12 +28,15 @@ import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
 @Composable
 fun PrinterAlertsSheet(
     printerName: String,
-    printerModel: String?,
     hmsErrors: List<PrinterHmsError>,
     hmsAlertSeverity: HmsSeverity,
     maintenanceItems: List<MaintenanceItem>,
     maintenanceIndicator: MaintenanceHomeIndicator,
     maintenanceTotalPrintHours: Double?,
+    showClearHmsAction: Boolean,
+    isClearingHms: Boolean,
+    clearHmsError: String?,
+    onClearHms: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -43,12 +46,15 @@ fun PrinterAlertsSheet(
     ) {
         PrinterAlertsContent(
             printerName = printerName,
-            printerModel = printerModel,
             hmsErrors = hmsErrors,
             hmsAlertSeverity = hmsAlertSeverity,
             maintenanceItems = maintenanceItems,
             maintenanceIndicator = maintenanceIndicator,
             maintenanceTotalPrintHours = maintenanceTotalPrintHours,
+            showClearHmsAction = showClearHmsAction,
+            isClearingHms = isClearingHms,
+            clearHmsError = clearHmsError,
+            onClearHms = onClearHms,
         )
     }
 }
@@ -56,12 +62,15 @@ fun PrinterAlertsSheet(
 @Composable
 fun PrinterAlertsContent(
     printerName: String,
-    printerModel: String?,
     hmsErrors: List<PrinterHmsError>,
     hmsAlertSeverity: HmsSeverity,
     maintenanceItems: List<MaintenanceItem>,
     maintenanceIndicator: MaintenanceHomeIndicator,
     maintenanceTotalPrintHours: Double?,
+    showClearHmsAction: Boolean,
+    isClearingHms: Boolean,
+    clearHmsError: String?,
+    onClearHms: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -95,7 +104,12 @@ fun PrinterAlertsContent(
             HmsAlertsListContent(
                 hmsErrors = hmsErrors,
                 hmsAlertSeverity = hmsAlertSeverity,
-                printerModel = printerModel,
+            )
+            HmsClearActionSection(
+                visible = showClearHmsAction,
+                isClearing = isClearingHms,
+                clearError = clearHmsError,
+                onClear = onClearHms,
             )
         }
 

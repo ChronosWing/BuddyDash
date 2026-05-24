@@ -203,7 +203,9 @@
     <string name="hms_sheet_severity_notification">Notification</string>
     <string name="hms_sheet_severity_unknown">Unknown severity</string>
     <string name="hms_sheet_no_entries">No HMS alert details available.</string>
-    <string name="hms_sheet_wiki_link">View on Bambu Lab Wiki</string>
+    <string name="hms_sheet_wiki_link">View Bambu HMS help</string>
+    <string name="hms_clear_button">Clear HMS alerts</string>
+    <string name="hms_clear_failed">Could not clear HMS alerts. Try again.</string>
     <string name="maintenance_sheet_title">Maintenance</string>
     <string name="maintenance_sheet_status_due">Due</string>
     <string name="maintenance_sheet_status_due_soon">Due soon</string>

@@ -149,6 +149,7 @@ fun HomeScreen(
         debugForcePrintGlow = uiState.debugForcePrintGlow,
         debugShowLogoGlowBounds = uiState.debugShowLogoGlowBounds,
         onPrinterClick = onPrinterClick,
+        onClearPrinterHms = viewModel::clearPrinterHmsErrors,
     )
 }
 
@@ -178,6 +179,7 @@ private fun HomeScreenContent(
     debugForcePrintGlow: Boolean,
     debugShowLogoGlowBounds: Boolean,
     onPrinterClick: (Printer) -> Unit,
+    onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
 ) {
     val cachedCount = printers.size
     val printerCounts = printers.homePrinterDashboardCounts()
@@ -407,6 +409,7 @@ private fun HomeScreenContent(
                                     serverUrl = serverUrl,
                                     cameraToken = cameraToken,
                                     onClick = { onPrinterClick(printer) },
+                                    onClearPrinterHms = onClearPrinterHms,
                                 )
                             }
                         }
@@ -427,6 +430,7 @@ private fun GlancePrinterCard(
     serverUrl: String,
     cameraToken: String,
     onClick: () -> Unit,
+    onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
 ) {
     val printThumbnailIdentity = rememberCurrentPrintThumbnailIdentity(
         printerId = printerId,
@@ -434,16 +438,48 @@ private fun GlancePrinterCard(
         fileName = labels.fileLine,
     )
     var alertSheet by remember { mutableStateOf<HomePrinterAlertSheet?>(null) }
+    var hmsClearInProgress by remember(printerId) { mutableStateOf(false) }
+    var hmsClearError by remember(printerId) { mutableStateOf<String?>(null) }
+    val hmsClearFailedMessage = stringResource(R.string.hms_clear_failed)
     val hasHms = labels.hmsAlertSeverity != HmsSeverity.Ok
     val hasMaintenance = labels.maintenanceIndicator != MaintenanceHomeIndicator.None
+    val showClearHmsAction = hasHms
+
+    LaunchedEffect(hasHms, hasMaintenance) {
+        when (alertSheet) {
+            HomePrinterAlertSheet.Hms -> if (!hasHms) alertSheet = null
+            HomePrinterAlertSheet.Unified -> when {
+                !hasHms && !hasMaintenance -> alertSheet = null
+                !hasHms && hasMaintenance -> alertSheet = HomePrinterAlertSheet.Maintenance
+            }
+            else -> Unit
+        }
+    }
+
+    val onClearHms: () -> Unit = {
+        if (!hmsClearInProgress) {
+            hmsClearInProgress = true
+            hmsClearError = null
+            onClearPrinterHms(printerId) { result ->
+                hmsClearInProgress = false
+                result.fold(
+                    onSuccess = { hmsClearError = null },
+                    onFailure = { hmsClearError = hmsClearFailedMessage },
+                )
+            }
+        }
+    }
 
     when (val sheet = alertSheet) {
         HomePrinterAlertSheet.Hms -> if (hasHms) {
             HmsDetailSheet(
                 printerName = labels.title,
-                printerModel = labels.printerModel,
                 hmsErrors = labels.hmsErrors,
                 hmsAlertSeverity = labels.hmsAlertSeverity,
+                showClearAction = showClearHmsAction,
+                isClearingHms = hmsClearInProgress,
+                clearHmsError = hmsClearError,
+                onClearHms = onClearHms,
                 onDismiss = { alertSheet = null },
             )
         }
@@ -459,12 +495,15 @@ private fun GlancePrinterCard(
         HomePrinterAlertSheet.Unified -> if (hasHms && hasMaintenance) {
             PrinterAlertsSheet(
                 printerName = labels.title,
-                printerModel = labels.printerModel,
                 hmsErrors = labels.hmsErrors,
                 hmsAlertSeverity = labels.hmsAlertSeverity,
                 maintenanceItems = labels.maintenanceItems,
                 maintenanceIndicator = labels.maintenanceIndicator,
                 maintenanceTotalPrintHours = labels.maintenanceTotalPrintHours,
+                showClearHmsAction = showClearHmsAction,
+                isClearingHms = hmsClearInProgress,
+                clearHmsError = hmsClearError,
+                onClearHms = onClearHms,
                 onDismiss = { alertSheet = null },
             )
         }

@@ -283,6 +283,45 @@ class HomeViewModel(
         requestRefresh(RefreshSource.MANUAL, force = true)
     }
 
+    fun clearPrinterHmsErrors(printerId: Int, onComplete: (Result<Unit>) -> Unit) {
+        viewModelScope.launch {
+            val state = _uiState.value
+            if (!state.hasCredentials) {
+                onComplete(Result.failure(IllegalStateException("Not configured")))
+                return@launch
+            }
+            apiClient.clearHmsErrors(state.serverUrl, state.apiKey, printerId).fold(
+                onSuccess = {
+                    refreshSinglePrinter(printerId)
+                    onComplete(Result.success(Unit))
+                },
+                onFailure = { error -> onComplete(Result.failure(error)) },
+            )
+        }
+    }
+
+    private suspend fun refreshSinglePrinter(printerId: Int) {
+        val state = _uiState.value
+        val base = state.printers.find { it.id == printerId } ?: return
+        apiClient.enrichPrintersForHome(state.serverUrl, state.apiKey, listOf(base)).fold(
+            onSuccess = { enriched ->
+                val updatedPrinter = enriched.firstOrNull() ?: return
+                val updatedAt = System.currentTimeMillis()
+                val newPrinters = state.printers.map { printer ->
+                    if (printer.id == printerId) updatedPrinter else printer
+                }
+                homePrintersCacheRepository.save(state.serverUrl, newPrinters, updatedAt)
+                _uiState.update { current ->
+                    current.copy(
+                        printers = newPrinters,
+                        lastUpdatedAtMillis = updatedAt,
+                    )
+                }
+            },
+            onFailure = { /* server clear succeeded; next poll will reconcile */ },
+        )
+    }
+
     fun requestRefresh(
         source: RefreshSource,
         force: Boolean = false,

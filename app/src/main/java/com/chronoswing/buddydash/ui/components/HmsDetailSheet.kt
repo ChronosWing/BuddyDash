@@ -19,11 +19,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -49,9 +51,12 @@ private val HmsAmberSheet = Color(0xFFFBBF24)
 @Composable
 fun HmsDetailSheet(
     printerName: String,
-    printerModel: String?,
     hmsErrors: List<PrinterHmsError>,
     hmsAlertSeverity: HmsSeverity,
+    showClearAction: Boolean,
+    isClearingHms: Boolean,
+    clearHmsError: String?,
+    onClearHms: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -79,7 +84,12 @@ fun HmsDetailSheet(
             HmsAlertsListContent(
                 hmsErrors = hmsErrors,
                 hmsAlertSeverity = hmsAlertSeverity,
-                printerModel = printerModel,
+            )
+            HmsClearActionSection(
+                visible = showClearAction,
+                isClearing = isClearingHms,
+                clearError = clearHmsError,
+                onClear = onClearHms,
             )
         }
     }
@@ -125,7 +135,6 @@ fun HmsSheetHeader(
 fun HmsAlertsListContent(
     hmsErrors: List<PrinterHmsError>,
     hmsAlertSeverity: HmsSeverity,
-    printerModel: String?,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -142,10 +151,49 @@ fun HmsAlertsListContent(
                         entry = entry,
                         index = index,
                         total = hmsErrors.size,
-                        printerModel = printerModel,
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun HmsClearActionSection(
+    visible: Boolean,
+    isClearing: Boolean,
+    clearError: String?,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (!visible) return
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedButton(
+            onClick = onClear,
+            enabled = !isClearing,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (isClearing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(stringResource(R.string.hms_clear_button))
+            }
+        }
+        clearError?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }
@@ -155,7 +203,6 @@ private fun HmsEntryRow(
     entry: PrinterHmsError,
     index: Int,
     total: Int,
-    printerModel: String?,
 ) {
     val context = LocalContext.current
     val lookupInfo = BambuHmsLookup.lookup(entry)
@@ -178,7 +225,6 @@ private fun HmsEntryRow(
     val formattedCode = BambuHmsLookup.formatDisplayCode(entry)
     val message: String? = entry.detail?.trim()?.takeIf { it.isNotBlank() }
         ?: lookupInfo?.message
-    val wikiUrl = BambuHmsLookup.resolveWikiUrl(entry, printerModel)
 
     Surface(
         shape = RoundedCornerShape(8.dp),
@@ -237,29 +283,27 @@ private fun HmsEntryRow(
                 )
             }
 
-            wikiUrl?.let { url ->
-                Spacer(modifier = Modifier.height(2.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse(url)),
-                        )
-                    },
-                ) {
-                    Text(
-                        text = stringResource(R.string.hms_sheet_wiki_link),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(BambuHmsLookup.GENERIC_HMS_WIKI_URL)),
                     )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(12.dp),
-                    )
-                }
+                },
+            ) {
+                Text(
+                    text = stringResource(R.string.hms_sheet_wiki_link),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(12.dp),
+                )
             }
         }
     }
