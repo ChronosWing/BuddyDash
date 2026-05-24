@@ -895,6 +895,18 @@ class BambuddyApiClient {
     ): PrinterStatus {
         val temperatures = json.optJSONObject("temperatures")
         val hmsErrorsArray = json.optJSONArray("hms_errors")
+        if (BuddyDashDebug.enabled) {
+            val hmsRaw = json.opt("hms_errors")
+            Log.d(
+                TAG_DETAIL,
+                "HMS printer=${json.optInt("id", -1)} " +
+                    "hms_errors_present=${json.has("hms_errors")} " +
+                    "hms_errors_null=${json.isNull("hms_errors")} " +
+                    "hms_raw_type=${hmsRaw?.javaClass?.simpleName} " +
+                    "hms_array_len=${hmsErrorsArray?.length() ?: -1} " +
+                    "hms_raw=${hmsRaw?.toString()?.take(300)}",
+            )
+        }
         val hmsErrors = parsePrinterHmsErrors(hmsErrorsArray)
         val statusFaultMessages = parsePrinterStatusFaultMessages(json)
 
