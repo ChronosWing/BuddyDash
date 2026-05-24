@@ -12,8 +12,20 @@ class BuddyDashHomeLayoutTest {
     }
 
     @Test
-    fun homePrinterGridColumnCount_twoColumnsAtBreakpointAndAbove() {
+    fun homePrinterGridColumnCount_delegatesToExpandedGridHelper() {
         assertEquals(2, homePrinterGridColumnCount(600))
-        assertEquals(2, homePrinterGridColumnCount(840))
+        assertEquals(1, homePrinterGridColumnCount(599))
+    }
+
+    @Test
+    fun buddyDashExpandedGridColumnCount_twoColumnsAtBreakpointAndAbove() {
+        assertEquals(2, buddyDashExpandedGridColumnCount(600))
+        assertEquals(2, buddyDashExpandedGridColumnCount(840))
+    }
+
+    @Test
+    fun buddyDashExpandedGridColumnCount_singleColumnBelowBreakpoint() {
+        assertEquals(1, buddyDashExpandedGridColumnCount(599))
+        assertEquals(1, buddyDashExpandedGridColumnCount(360))
     }
 }

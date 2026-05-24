@@ -17,6 +17,12 @@ import com.chronoswing.buddydash.ui.motion.SecondaryScreenHeader
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.derivedStateOf
@@ -62,6 +68,8 @@ import com.chronoswing.buddydash.util.staleBannerShowsRefreshFailed
 import com.chronoswing.buddydash.ui.components.SpoolInventoryRow
 import com.chronoswing.buddydash.ui.components.SpoolListSkeleton
 import com.chronoswing.buddydash.ui.components.asImageVector
+import com.chronoswing.buddydash.ui.layout.BuddyDashExpandedFormContainer
+import com.chronoswing.buddydash.ui.layout.rememberBuddyDashExpandedGridColumnCount
 import com.chronoswing.buddydash.util.ArchiveSpoolLookupFilter
 import com.chronoswing.buddydash.util.ListLoadUi
 import com.chronoswing.buddydash.data.model.SpoolInventoryItem
@@ -182,6 +190,7 @@ private fun SpoolsScreenContent(
         isRefreshing = isRefreshing,
         cachedItemCount = cachedCount,
     )
+    val spoolGridColumns = rememberBuddyDashExpandedGridColumnCount()
 
     LaunchedEffect(archiveLookupFilter, spools.isEmpty(), isLoading, hasCompletedLoad) {
         if (
@@ -288,6 +297,7 @@ private fun SpoolsScreenContent(
                             onSearchQueryChange = onSearchQueryChange,
                             onFilterChange = onFilterChange,
                             onClearArchiveLookup = onClearArchiveLookup,
+                            gridColumns = spoolGridColumns,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -317,37 +327,15 @@ private fun SpoolsScreenContent(
                             )
                         } else {
                             val listState = rememberLazyListState()
-                            val visibleSpoolIds by remember {
-                                derivedStateOf {
-                                    listState.layoutInfo.visibleItemsInfo
-                                        .mapNotNull { item ->
-                                            (item.key as? Int) ?: (item.key as? String)?.toIntOrNull()
-                                        }
-                                        .toSet()
-                                }
-                            }
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(
-                                    start = 12.dp,
-                                    end = 12.dp,
-                                    bottom = 12.dp,
-                                ),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                items(
-                                    items = spools,
-                                    key = { it.id },
-                                ) { spool ->
-                                    SpoolInventoryRow(
-                                        spool = spool,
-                                        cardUsage = cardUsageFor(spool),
-                                        glowAnimationEnabled = spool.id in visibleSpoolIds,
-                                        onClick = { onSpoolClick(spool.id) },
-                                    )
-                                }
-                            }
+                            val gridState = rememberLazyGridState()
+                            SpoolInventoryList(
+                                spools = spools,
+                                gridColumns = spoolGridColumns,
+                                listState = listState,
+                                gridState = gridState,
+                                cardUsageFor = cardUsageFor,
+                                onSpoolClick = onSpoolClick,
+                            )
                         }
                     }
                 }
@@ -359,7 +347,120 @@ private fun SpoolsScreenContent(
 }
 
 @Composable
+private fun SpoolInventoryList(
+    spools: List<SpoolInventoryItem>,
+    gridColumns: Int,
+    listState: LazyListState,
+    gridState: LazyGridState,
+    cardUsageFor: (SpoolInventoryItem) -> SpoolInventoryCardUsage,
+    onSpoolClick: (Int) -> Unit,
+) {
+    val visibleSpoolIds by remember(listState, gridState, gridColumns) {
+        derivedStateOf {
+            if (gridColumns <= 1) {
+                listState.layoutInfo.visibleItemsInfo
+                    .mapNotNull { item ->
+                        (item.key as? Int) ?: (item.key as? String)?.toIntOrNull()
+                    }
+                    .toSet()
+            } else {
+                gridState.layoutInfo.visibleItemsInfo
+                    .mapNotNull { item ->
+                        (item.key as? Int) ?: (item.key as? String)?.toIntOrNull()
+                    }
+                    .toSet()
+            }
+        }
+    }
+    val contentPadding = PaddingValues(
+        start = 12.dp,
+        end = 12.dp,
+        bottom = 12.dp,
+    )
+
+    if (gridColumns <= 1) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(
+                items = spools,
+                key = { it.id },
+            ) { spool ->
+                SpoolInventoryListItem(
+                    spool = spool,
+                    cardUsage = cardUsageFor(spool),
+                    glowAnimationEnabled = spool.id in visibleSpoolIds,
+                    onClick = { onSpoolClick(spool.id) },
+                )
+            }
+        }
+    } else {
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Fixed(gridColumns),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = contentPadding,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(
+                items = spools,
+                key = { it.id },
+            ) { spool ->
+                SpoolInventoryListItem(
+                    spool = spool,
+                    cardUsage = cardUsageFor(spool),
+                    glowAnimationEnabled = spool.id in visibleSpoolIds,
+                    onClick = { onSpoolClick(spool.id) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpoolInventoryListItem(
+    spool: SpoolInventoryItem,
+    cardUsage: SpoolInventoryCardUsage,
+    glowAnimationEnabled: Boolean,
+    onClick: () -> Unit,
+) {
+    SpoolInventoryRow(
+        spool = spool,
+        cardUsage = cardUsage,
+        glowAnimationEnabled = glowAnimationEnabled,
+        onClick = onClick,
+    )
+}
+
+@Composable
 private fun SpoolSearchAndFilters(
+    searchQuery: String,
+    filter: SpoolInventoryFilter,
+    archiveLookupFilter: ArchiveSpoolLookupFilter?,
+    onSearchQueryChange: (String) -> Unit,
+    onFilterChange: (SpoolInventoryFilter) -> Unit,
+    onClearArchiveLookup: () -> Unit,
+    gridColumns: Int,
+    modifier: Modifier = Modifier,
+) {
+    BuddyDashExpandedFormContainer(gridColumns = gridColumns, modifier = modifier) {
+        SpoolSearchAndFiltersContent(
+            searchQuery = searchQuery,
+            filter = filter,
+            archiveLookupFilter = archiveLookupFilter,
+            onSearchQueryChange = onSearchQueryChange,
+            onFilterChange = onFilterChange,
+            onClearArchiveLookup = onClearArchiveLookup,
+        )
+    }
+}
+
+@Composable
+private fun SpoolSearchAndFiltersContent(
     searchQuery: String,
     filter: SpoolInventoryFilter,
     archiveLookupFilter: ArchiveSpoolLookupFilter?,
