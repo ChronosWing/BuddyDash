@@ -7,6 +7,9 @@ object BambuddyApi {
     /** POST Clear Plate — operationId: clear_plate_api_v1_printers__printer_id__clear_plate_post */
     const val CLEAR_PLATE_PATH = "/api/v1/printers/{printer_id}/clear-plate"
 
+    /** POST — clear HMS/print errors (operationId: clear_hms_errors_…). */
+    const val HMS_CLEAR_PATH = "/api/v1/printers/{printer_id}/hms/clear"
+
     /** GET — PrinterStatus includes awaiting_plate_clear */
     const val PRINTER_STATUS_PATH = "/api/v1/printers/{printer_id}/status"
 
@@ -75,6 +78,7 @@ object BambuddyApi {
         "/api/v1/library/files/{file_id}/plate-thumbnail/{plate_index}"
 
     val hasClearPlateEndpoint: Boolean = true
+    val hasHmsClearEndpoint: Boolean = true
     val hasQueueEndpoint: Boolean = true
     val hasChamberLightEndpoint: Boolean = true
     val hasPrintControlEndpoints: Boolean = true
@@ -107,6 +111,9 @@ object BambuddyApi {
 
     fun clearPlatePath(printerId: Int): String =
         CLEAR_PLATE_PATH.replace("{printer_id}", printerId.toString())
+
+    fun hmsClearPath(printerId: Int): String =
+        HMS_CLEAR_PATH.replace("{printer_id}", printerId.toString())
 
     fun printerStatusPath(printerId: Int): String =
         PRINTER_STATUS_PATH.replace("{printer_id}", printerId.toString())

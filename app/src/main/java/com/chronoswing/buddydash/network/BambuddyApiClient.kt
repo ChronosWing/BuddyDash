@@ -387,6 +387,24 @@ class BambuddyApiClient {
             }
         }
 
+    suspend fun clearHmsErrors(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!BambuddyApi.hasHmsClearEndpoint) {
+            return@withContext Result.failure(
+                UnsupportedOperationException("HMS clear endpoint not found"),
+            )
+        }
+        runApiCall(
+            serverUrl = serverUrl,
+            apiKey = apiKey,
+            path = BambuddyApi.hmsClearPath(printerId),
+            method = "POST",
+        ) { Unit }
+    }
+
     suspend fun performMaintenance(
         serverUrl: String,
         apiKey: String,
