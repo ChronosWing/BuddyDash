@@ -16,6 +16,8 @@ import com.chronoswing.buddydash.util.ValidatedConnectionSettings
 import com.chronoswing.buddydash.util.validateConnectionSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -36,6 +38,13 @@ class SettingsRepository(private val context: Context) {
 
     val encryptedStore = EncryptedCredentialStore(context)
 
+    /**
+     * Bumped after every encrypted credential write so that downstream
+     * credential flows re-read from [EncryptedCredentialStore].
+     * Without this, saves that bypass DataStore would be invisible to collectors.
+     */
+    private val credentialVersion = MutableStateFlow(0)
+
     private val safePreferences: Flow<Preferences> = context.settingsDataStore.data
         .catch { error ->
             Log.w(TAG, "Settings DataStore read failed; resetting to defaults", error)
@@ -44,16 +53,16 @@ class SettingsRepository(private val context: Context) {
             emit(emptyPreferences())
         }
 
-    val serverUrl: Flow<String> = safePreferences.map {
-        encryptedStore.readServerUrl().ifEmpty { it.safeString(SERVER_URL_KEY) }
+    val serverUrl: Flow<String> = combine(safePreferences, credentialVersion) { prefs, _ ->
+        encryptedStore.readServerUrl().ifEmpty { prefs.safeString(SERVER_URL_KEY) }
     }
 
-    val apiKey: Flow<String> = safePreferences.map {
-        encryptedStore.readApiKey().ifEmpty { it.safeString(API_KEY_KEY) }
+    val apiKey: Flow<String> = combine(safePreferences, credentialVersion) { prefs, _ ->
+        encryptedStore.readApiKey().ifEmpty { prefs.safeString(API_KEY_KEY) }
     }
 
-    val cameraToken: Flow<String> = safePreferences.map {
-        encryptedStore.readCameraToken().ifEmpty { it.safeString(CAMERA_TOKEN_KEY) }
+    val cameraToken: Flow<String> = combine(safePreferences, credentialVersion) { prefs, _ ->
+        encryptedStore.readCameraToken().ifEmpty { prefs.safeString(CAMERA_TOKEN_KEY) }
     }
 
     /**
@@ -80,6 +89,7 @@ class SettingsRepository(private val context: Context) {
         }
 
         encryptedStore.markMigrated()
+        credentialVersion.value++
 
         runCatching {
             context.settingsDataStore.edit { preferences ->
@@ -235,6 +245,7 @@ class SettingsRepository(private val context: Context) {
                 settings.cameraToken,
             )
             if (!saved) throw IllegalStateException("Failed to save encrypted credentials")
+            credentialVersion.value++
             runCatching {
                 context.settingsDataStore.edit { preferences ->
                     preferences.remove(SERVER_URL_KEY)
