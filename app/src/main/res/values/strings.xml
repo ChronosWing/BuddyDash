@@ -243,6 +243,18 @@
     <string name="filter_offline">Offline</string>
     <string name="no_printers_printing">No printers are printing</string>
     <string name="no_printers_offline">No offline printers</string>
+    <!-- Maintenance snooze -->
+    <string name="maintenance_snooze_title">Snooze</string>
+    <string name="maintenance_snooze_later_today">Later today</string>
+    <string name="maintenance_snooze_tomorrow">Tomorrow</string>
+    <string name="maintenance_snooze_dismiss">Dismiss for now</string>
+    <!-- Printer card visibility -->
+    <string name="card_visibility_title">Card visibility</string>
+    <string name="card_visibility_camera">Camera preview</string>
+    <string name="card_visibility_power">Power chip</string>
+    <string name="card_visibility_hms">HMS chip</string>
+    <string name="card_visibility_maintenance">Maintenance chip</string>
+    <string name="card_visibility_temps">Temperatures</string>
     <string name="eta">ETA</string>
     <string name="nozzle_temp">Nozzle temp</string>
     <string name="bed_temp">Bed temp</string>

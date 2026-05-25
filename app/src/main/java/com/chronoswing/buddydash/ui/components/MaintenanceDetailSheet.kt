@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -42,6 +44,18 @@ import com.chronoswing.buddydash.util.maintenanceDisplayLines
 
 private val MaintenanceAmber = Color(0xFFFBBF24)
 
+enum class MaintenanceSnoozeDuration {
+    LaterToday,
+    Tomorrow,
+    Dismiss,
+}
+
+fun MaintenanceSnoozeDuration.toMillis(): Long = when (this) {
+    MaintenanceSnoozeDuration.LaterToday -> 6L * 60 * 60 * 1000
+    MaintenanceSnoozeDuration.Tomorrow -> 24L * 60 * 60 * 1000
+    MaintenanceSnoozeDuration.Dismiss -> 72L * 60 * 60 * 1000
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MaintenanceDetailSheet(
@@ -49,6 +63,7 @@ fun MaintenanceDetailSheet(
     maintenanceItems: List<MaintenanceItem>,
     maintenanceIndicator: MaintenanceHomeIndicator,
     totalPrintHours: Double?,
+    onSnooze: ((Int, MaintenanceSnoozeDuration) -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -62,6 +77,7 @@ fun MaintenanceDetailSheet(
             maintenanceIndicator = maintenanceIndicator,
             totalPrintHours = totalPrintHours,
             showHeader = true,
+            onSnooze = onSnooze,
         )
     }
 }
@@ -75,6 +91,7 @@ fun MaintenanceAlertsContent(
     showHeader: Boolean,
     modifier: Modifier = Modifier,
     standaloneSheet: Boolean = true,
+    onSnooze: ((Int, MaintenanceSnoozeDuration) -> Unit)? = null,
 ) {
     val attentionLines = maintenanceAttentionLines(maintenanceItems)
     val fallbackNeeded = attentionLines.isEmpty() &&
@@ -120,6 +137,11 @@ fun MaintenanceAlertsContent(
                         MaintenanceAlertEntryRow(
                             line = line,
                             item = item,
+                            onSnooze = if (onSnooze != null) {
+                                { duration -> onSnooze(line.itemId, duration) }
+                            } else {
+                                null
+                            },
                         )
                     }
                 }
@@ -185,6 +207,7 @@ private fun MaintenanceSheetHeader(
 private fun MaintenanceAlertEntryRow(
     line: MaintenanceLine,
     item: MaintenanceItem?,
+    onSnooze: ((MaintenanceSnoozeDuration) -> Unit)? = null,
 ) {
     val (levelLabel, levelColor) = when (line.kind) {
         MaintenanceLineKind.Due ->
@@ -266,6 +289,43 @@ private fun MaintenanceAlertEntryRow(
                     color = progressColor,
                     trackColor = progressTrack,
                 )
+            }
+            if (onSnooze != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.maintenance_snooze_title),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.CenterVertically),
+                    )
+                    TextButton(
+                        onClick = { onSnooze(MaintenanceSnoozeDuration.LaterToday) },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.maintenance_snooze_later_today),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                    TextButton(
+                        onClick = { onSnooze(MaintenanceSnoozeDuration.Tomorrow) },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.maintenance_snooze_tomorrow),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                    TextButton(
+                        onClick = { onSnooze(MaintenanceSnoozeDuration.Dismiss) },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.maintenance_snooze_dismiss),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
             }
         }
     }
