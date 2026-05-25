@@ -219,6 +219,7 @@
     <string name="nfc_link_copied">NFC link copied</string>
     <string name="machine_info_printer_id">Printer ID</string>
     <!-- Quick Actions -->
+    <string name="quick_action_hint">Long press for quick actions</string>
     <string name="quick_action_clear_plate">Clear plate</string>
     <string name="quick_action_toggle_power">Toggle power</string>
     <string name="quick_action_finish">Finish</string>

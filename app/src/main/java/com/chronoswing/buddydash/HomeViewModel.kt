@@ -75,6 +75,8 @@ data class HomeUiState(
     val homeCardDensity: Int = 1,
     /** Per-printer card visibility overrides (printer ID → visibility). */
     val cardVisibility: Map<Int, PrinterCardVisibility> = emptyMap(),
+    /** False until user has long-pressed a printer card at least once. */
+    val hasUsedQuickActions: Boolean = false,
 )
 
 class HomeViewModel(
@@ -185,6 +187,11 @@ class HomeViewModel(
         viewModelScope.launch {
             settingsRepository.homeCardDensity.collect { density ->
                 _uiState.update { it.copy(homeCardDensity = density) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.hasUsedQuickActions.collect { used ->
+                _uiState.update { it.copy(hasUsedQuickActions = used) }
             }
         }
     }
@@ -694,6 +701,11 @@ class HomeViewModel(
         } catch (e: CancellationException) {
             throw e
         }
+    }
+
+    fun markQuickActionsUsed() {
+        if (_uiState.value.hasUsedQuickActions) return
+        viewModelScope.launch { settingsRepository.saveHasUsedQuickActions() }
     }
 
     private fun refreshCardVisibility() {
