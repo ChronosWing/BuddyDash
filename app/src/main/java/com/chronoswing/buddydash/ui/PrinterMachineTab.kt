@@ -76,7 +76,8 @@ fun MachineTab(
     onToggleLight: (() -> Unit)? = null,
     onOpenPrinterArchives: () -> Unit = {},
     onStopCameraStream: () -> Unit = {},
-    onCopyNfcClearPlateLink: () -> Unit = {},
+    hasSmartOutlet: Boolean = false,
+    onCopyNfcLink: (String) -> Unit = {},
 ) {
     val caps = labels.machineTabCapabilities(cameraTokenConfigured = cameraToken.isNotBlank())
     val isExpandedWidth = rememberIsBuddyDashExpandedWidth()
@@ -251,7 +252,6 @@ fun MachineTab(
                             printerId = printerId,
                             statusUpdatedAtMillis = statusUpdatedAtMillis,
                             useInfoGrid = true,
-                            onCopyNfcClearPlateLink = onCopyNfcClearPlateLink,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                         )
                     }
@@ -276,10 +276,15 @@ fun MachineTab(
                         printerId = printerId,
                         statusUpdatedAtMillis = statusUpdatedAtMillis,
                         useInfoGrid = true,
-                        onCopyNfcClearPlateLink = onCopyNfcClearPlateLink,
                     )
                 }
             }
+
+            MachineNfcActionsCard(
+                printerId = printerId,
+                hasSmartOutlet = hasSmartOutlet,
+                onCopyLink = onCopyNfcLink,
+            )
         } else {
             smartPlugState?.let { plug ->
                 SmartPlugPowerCard(
@@ -300,7 +305,12 @@ fun MachineTab(
                 printerId = printerId,
                 statusUpdatedAtMillis = statusUpdatedAtMillis,
                 useInfoGrid = false,
-                onCopyNfcClearPlateLink = onCopyNfcClearPlateLink,
+            )
+
+            MachineNfcActionsCard(
+                printerId = printerId,
+                hasSmartOutlet = hasSmartOutlet,
+                onCopyLink = onCopyNfcLink,
             )
         }
     }
@@ -431,7 +441,6 @@ private fun MachinePrinterInfoCard(
     printerId: Int,
     statusUpdatedAtMillis: Long?,
     useInfoGrid: Boolean,
-    onCopyNfcClearPlateLink: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val rows = buildMachineInfoRows(
@@ -472,22 +481,45 @@ private fun MachinePrinterInfoCard(
                 }
             }
         }
-        Column(
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-            modifier = Modifier.padding(top = 4.dp),
-        ) {
+    }
+}
+
+@Composable
+private fun MachineNfcActionsCard(
+    printerId: Int,
+    hasSmartOutlet: Boolean,
+    onCopyLink: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DetailInfoCard(modifier = modifier) {
+        SectionHeader(stringResource(R.string.nfc_machine_actions_title))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             MachineUtilityButton(
-                label = stringResource(R.string.machine_copy_nfc_link),
+                label = stringResource(R.string.nfc_action_clear_plate),
                 icon = Icons.Default.ContentCopy,
                 enabled = true,
-                onClick = onCopyNfcClearPlateLink,
+                onClick = { onCopyLink("buddydash://printer/$printerId/clear-plate") },
             )
-            Text(
-                text = stringResource(R.string.machine_nfc_sticker_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                modifier = Modifier.padding(start = 4.dp),
+            MachineUtilityButton(
+                label = stringResource(R.string.nfc_action_finish),
+                icon = Icons.Default.ContentCopy,
+                enabled = true,
+                onClick = { onCopyLink("buddydash://printer/$printerId/finish") },
             )
+            if (hasSmartOutlet) {
+                MachineUtilityButton(
+                    label = stringResource(R.string.nfc_action_toggle_power),
+                    icon = Icons.Default.ContentCopy,
+                    enabled = true,
+                    onClick = { onCopyLink("buddydash://printer/$printerId/toggle-power") },
+                )
+            }
         }
+        Text(
+            text = stringResource(R.string.nfc_actions_writer_hint),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+            modifier = Modifier.padding(top = 2.dp, start = 4.dp),
+        )
     }
 }

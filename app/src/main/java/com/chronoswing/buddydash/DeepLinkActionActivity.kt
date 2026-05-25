@@ -4,7 +4,11 @@ import android.content.Intent
 import android.net.Uri
 import android.nfc.NdefMessage
 import android.nfc.NfcAdapter
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -12,8 +16,8 @@ import androidx.lifecycle.lifecycleScope
 import com.chronoswing.buddydash.data.HomePrintersCacheRepository
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.network.BambuddyApiClient
-import com.chronoswing.buddydash.nfc.NfcClearPlateExecutor
-import com.chronoswing.buddydash.util.ClearPlateActionOutcome
+import com.chronoswing.buddydash.nfc.NfcActionExecutor
+import com.chronoswing.buddydash.util.NfcActionOutcome
 import kotlinx.coroutines.launch
 
 /**
@@ -21,16 +25,21 @@ import kotlinx.coroutines.launch
  * Transparent theme — shows only a result toast and finishes without opening Home.
  *
  * Handles both:
- * - `ACTION_VIEW` from deep links / adb testing
  * - `NDEF_DISCOVERED` from physical NFC tag scans
+ * - `ACTION_VIEW` from deep links / adb testing
+ *
+ * Supported actions:
+ * - `buddydash://printer/{id}/clear-plate`
+ * - `buddydash://printer/{id}/toggle-power`
+ * - `buddydash://printer/{id}/finish`
  */
 class DeepLinkActionActivity : ComponentActivity() {
 
     private val settingsRepository by lazy { SettingsRepository(applicationContext) }
     private val homePrintersCacheRepository by lazy { HomePrintersCacheRepository(applicationContext) }
     private val apiClient by lazy { BambuddyApiClient() }
-    private val clearPlateExecutor by lazy {
-        NfcClearPlateExecutor(
+    private val executor by lazy {
+        NfcActionExecutor(
             settingsRepository = settingsRepository,
             apiClient = apiClient,
             homePrintersCacheRepository = homePrintersCacheRepository,
@@ -62,43 +71,109 @@ class DeepLinkActionActivity : ComponentActivity() {
         }
 
         lifecycleScope.launch {
-            val outcome = clearPlateExecutor.execute(uri)
+            val outcome = executor.execute(uri)
             if (BuildConfig.DEBUG) {
-                Log.d(TAG, "Clear plate result — uri=$uri outcome=$outcome")
+                Log.d(TAG, "NFC result — uri=$uri outcome=$outcome")
             }
-            when (outcome) {
-                ClearPlateActionOutcome.Debounced -> Unit
-                ClearPlateActionOutcome.InvalidLink ->
-                    showToast(getString(R.string.nfc_clear_plate_invalid_link))
-                ClearPlateActionOutcome.MissingCredentials ->
-                    openSettingsWithMessage(getString(R.string.nfc_clear_plate_configure_first))
-                ClearPlateActionOutcome.ConnectionRequired ->
-                    showToast(getString(R.string.nfc_clear_plate_connection_required))
-                ClearPlateActionOutcome.PrinterActive ->
-                    showToast(getString(R.string.nfc_clear_plate_printer_active))
-                ClearPlateActionOutcome.PrinterNotFound ->
-                    showToast(getString(R.string.nfc_clear_plate_printer_not_found))
-                ClearPlateActionOutcome.ApiFailed ->
-                    showToast(getString(R.string.nfc_clear_plate_api_failed))
-                ClearPlateActionOutcome.AlreadyCleared ->
-                    showToast(getString(R.string.nfc_clear_plate_already_cleared))
-                is ClearPlateActionOutcome.Success ->
-                    showToast(getString(R.string.nfc_clear_plate_success, outcome.printerName))
-            }
+            performHaptic(outcome.tier)
+            presentOutcome(outcome)
             finish()
         }
     }
 
-    /**
-     * Resolves the BuddyDash URI from the intent.
-     *
-     * For `ACTION_VIEW`, `intent.data` is set directly by the system.
-     * For `NDEF_DISCOVERED`, `intent.data` is usually set when the NDEF record
-     * contains a URI, but as a fallback we also parse the raw NDEF messages.
-     */
+    // ── Outcome → Toast / Navigation ──────────────────────────────
+
+    private fun presentOutcome(outcome: NfcActionOutcome) {
+        when (outcome) {
+            NfcActionOutcome.Debounced -> Unit
+
+            // clear-plate
+            is NfcActionOutcome.PlateCleared ->
+                showToast(getString(R.string.nfc_plate_cleared, outcome.printerName))
+            NfcActionOutcome.PlateAlreadyClear ->
+                showToast(getString(R.string.nfc_plate_already_clear))
+            NfcActionOutcome.PrinterBusyPlateUnchanged ->
+                showToast(getString(R.string.nfc_printer_busy_plate))
+
+            // toggle-power
+            is NfcActionOutcome.PowerOn ->
+                showToast(getString(R.string.nfc_power_on, outcome.printerName))
+            is NfcActionOutcome.PowerOff ->
+                showToast(getString(R.string.nfc_power_off, outcome.printerName))
+            NfcActionOutcome.PrinterBusyPowerUnchanged ->
+                showToast(getString(R.string.nfc_printer_busy_power))
+            NfcActionOutcome.SmartOutletUnavailable ->
+                showToast(getString(R.string.nfc_outlet_unavailable))
+            NfcActionOutcome.SmartOutletStateUnknown ->
+                showToast(getString(R.string.nfc_outlet_state_unknown))
+
+            // finish
+            NfcActionOutcome.FinishedWithPowerOff ->
+                showToast(getString(R.string.nfc_finished_power_off))
+            NfcActionOutcome.FinishedPlateClear ->
+                showToast(getString(R.string.nfc_finished_plate_clear))
+            NfcActionOutcome.PrinterBusyFinishSkipped ->
+                showToast(getString(R.string.nfc_printer_busy_finish))
+
+            // general
+            NfcActionOutcome.InvalidLink ->
+                showToast(getString(R.string.nfc_invalid_link))
+            NfcActionOutcome.MissingCredentials ->
+                openSettingsWithMessage(getString(R.string.nfc_configure_first))
+            NfcActionOutcome.ConnectionRequired ->
+                showToast(getString(R.string.nfc_connection_required))
+            NfcActionOutcome.PrinterNotFound ->
+                showToast(getString(R.string.nfc_printer_not_found))
+            NfcActionOutcome.ApiFailed ->
+                showToast(getString(R.string.nfc_action_failed))
+        }
+    }
+
+    // ── Haptics ───────────────────────────────────────────────────
+
+    private fun performHaptic(tier: NfcActionOutcome.Tier) {
+        if (tier == NfcActionOutcome.Tier.Noop && tier == NfcActionOutcome.Tier.Noop) {
+            // Debounced gets the lightest possible tick
+        }
+        val vibrator = getVibrator() ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val effect = when (tier) {
+                NfcActionOutcome.Tier.Success ->
+                    VibrationEffect.createOneShot(35, 80)
+                NfcActionOutcome.Tier.Noop ->
+                    VibrationEffect.createOneShot(20, 40)
+                NfcActionOutcome.Tier.Warning ->
+                    VibrationEffect.createOneShot(50, 140)
+                NfcActionOutcome.Tier.Failure ->
+                    VibrationEffect.createOneShot(60, 180)
+            }
+            vibrator.vibrate(effect)
+        } else {
+            @Suppress("DEPRECATION")
+            val ms = when (tier) {
+                NfcActionOutcome.Tier.Success -> 35L
+                NfcActionOutcome.Tier.Noop -> 20L
+                NfcActionOutcome.Tier.Warning -> 50L
+                NfcActionOutcome.Tier.Failure -> 60L
+            }
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(ms)
+        }
+    }
+
+    private fun getVibrator(): Vibrator? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (getSystemService(VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(VIBRATOR_SERVICE) as? Vibrator
+        }
+    }
+
+    // ── URI resolution ────────────────────────────────────────────
+
     private fun resolveUri(intent: Intent?): Uri? {
         intent ?: return null
-
         intent.data?.let { return it }
 
         @Suppress("DEPRECATION")
@@ -119,9 +194,10 @@ class DeepLinkActionActivity : ComponentActivity() {
                 }
             }
         }
-
         return null
     }
+
+    // ── Helpers ───────────────────────────────────────────────────
 
     private fun showToast(message: String) {
         Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
@@ -139,6 +215,5 @@ class DeepLinkActionActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "BuddyDash/NfcDispatch"
-        const val ACTION_CLEAR_PLATE = "com.chronoswing.buddydash.action.CLEAR_PLATE"
     }
 }
