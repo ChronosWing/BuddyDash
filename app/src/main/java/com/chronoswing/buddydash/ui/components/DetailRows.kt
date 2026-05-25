@@ -11,10 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import com.chronoswing.buddydash.ui.motion.AnimatedLinearProgressIndicator
 import com.chronoswing.buddydash.ui.motion.FadeValueText
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
@@ -134,59 +132,11 @@ fun DetailInfoCard(
     }
 }
 
-@Composable
-fun CopyableCompactLabelValue(
-    label: String,
-    value: String,
-    onCopy: () -> Unit,
-    modifier: Modifier = Modifier,
-    copyContentDescription: String,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FadeValueText(
-                text = value,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = valueColor,
-            )
-            IconButton(
-                onClick = onCopy,
-                modifier = Modifier.size(32.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ContentCopy,
-                    contentDescription = copyContentDescription,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                )
-            }
-        }
-    }
-}
-
 /** Pairs of label/value rows in a responsive two-column grid (expanded machine info, etc.). */
 @Composable
 fun CompactInfoGrid(
     rows: List<Pair<String, String>>,
     modifier: Modifier = Modifier,
-    copyableValues: Set<String> = emptySet(),
-    onCopyValue: ((String) -> Unit)? = null,
-    copyContentDescription: String = "",
 ) {
     if (rows.isEmpty()) return
     Column(
@@ -199,22 +149,11 @@ fun CompactInfoGrid(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 pair.forEach { (label, value) ->
-                    val cellModifier = Modifier.weight(1f)
-                    if (copyableValues.contains(value) && onCopyValue != null) {
-                        CopyableCompactLabelValue(
-                            label = label,
-                            value = value,
-                            onCopy = { onCopyValue(value) },
-                            modifier = cellModifier,
-                            copyContentDescription = copyContentDescription,
-                        )
-                    } else {
-                        CompactLabelValue(
-                            label = label,
-                            value = value,
-                            modifier = cellModifier,
-                        )
-                    }
+                    CompactLabelValue(
+                        label = label,
+                        value = value,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
                 if (pair.size == 1) {
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
