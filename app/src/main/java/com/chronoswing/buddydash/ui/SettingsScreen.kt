@@ -264,56 +264,60 @@ private const val GITHUB_REPO_URL = "https://github.com/ChronosWing/BuddyDash"
 @Composable
 private fun SettingsAboutSection() {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val snackbarMessage = stringResource(R.string.about_open_failed)
+    val failMessage = stringResource(R.string.about_open_failed)
+    fun openUrl(url: String) {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (_: Exception) {
+            android.widget.Toast.makeText(context, failMessage, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
             text = stringResource(R.string.about_title),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 2.dp))
+
         Text(
             text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
         )
         Text(
-            text = stringResource(
-                R.string.about_version,
-                BuildConfig.VERSION_NAME,
-                BuildConfig.VERSION_CODE,
-            ),
-            style = MaterialTheme.typography.bodySmall,
+            text = stringResource(R.string.about_version, BuildConfig.VERSION_NAME),
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Text(
+            text = stringResource(R.string.about_subtitle),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+        )
+
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = 8.dp),
         ) {
-            OutlinedButton(onClick = {
-                try {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_REPO_URL)),
-                    )
-                } catch (_: Exception) {
-                    android.widget.Toast.makeText(context, snackbarMessage, android.widget.Toast.LENGTH_SHORT).show()
-                }
-            }) {
+            OutlinedButton(onClick = { openUrl(GITHUB_REPO_URL) }) {
                 Text(stringResource(R.string.about_github))
             }
-            OutlinedButton(onClick = {
-                try {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse("$GITHUB_REPO_URL/issues")),
-                    )
-                } catch (_: Exception) {
-                    android.widget.Toast.makeText(context, snackbarMessage, android.widget.Toast.LENGTH_SHORT).show()
-                }
-            }) {
+            OutlinedButton(onClick = { openUrl("$GITHUB_REPO_URL/issues") }) {
                 Text(stringResource(R.string.about_report_issue))
             }
         }
+
+        Text(
+            text = stringResource(R.string.about_beta_hint),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }
 
