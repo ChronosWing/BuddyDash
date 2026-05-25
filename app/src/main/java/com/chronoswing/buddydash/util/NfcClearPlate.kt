@@ -100,6 +100,14 @@ fun isClearPlateAlreadyAcknowledged(message: String): Boolean {
  */
 const val NFC_CLEAR_PLATE_EXAMPLE_URI = "buddydash://printer/{printerId}/clear-plate"
 
+/** Deep link written to NFC tags (printer ID preferred). */
+fun buildNfcClearPlateUri(printerId: Int): String = "buddydash://printer/$printerId/clear-plate"
+
+fun buildNfcClearPlateUriByName(printerName: String): String {
+    val encoded = Uri.encode(printerName.trim())
+    return "buddydash://printer/$encoded/clear-plate"
+}
+
 object NfcClearPlateDebounce {
     private const val DEBOUNCE_MS = 2_000L
 

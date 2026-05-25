@@ -88,12 +88,18 @@ class PrinterMachineInfoTest {
             nozzleCount = 1,
             autoArchiveEnabled = true,
         )
-        val keys = buildMachineInfoRows(labels, machineInfo, printerModel = null, statusUpdatedAtMillis = null)
-            .map { it.first }
+        val keys = buildMachineInfoRows(
+            labels,
+            machineInfo,
+            printerModel = null,
+            printerId = 42,
+            statusUpdatedAtMillis = null,
+        ).map { it.first }
         assertEquals(
             listOf(
                 "connection",
                 "state",
+                "printer_id",
                 "model",
                 "firmware",
                 "ip",

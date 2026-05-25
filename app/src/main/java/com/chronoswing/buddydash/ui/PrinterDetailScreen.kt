@@ -49,8 +49,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -116,6 +118,7 @@ import com.chronoswing.buddydash.util.staleBannerShowsRefreshFailed
 import com.chronoswing.buddydash.util.ListLoadUi
 import com.chronoswing.buddydash.util.HmsSeverity
 import com.chronoswing.buddydash.util.PrinterDetailLabels
+import com.chronoswing.buddydash.util.buildNfcClearPlateUri
 import com.chronoswing.buddydash.util.buildPrintHeadline
 import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
 import com.chronoswing.buddydash.util.toDetailLabels
@@ -376,6 +379,9 @@ private fun PrinterDetailScreenContent(
     val powerOffSuccessMessage = stringResource(R.string.machine_power_off_success)
     val powerOnFailedMessage = stringResource(R.string.machine_power_on_failed)
     val powerOffFailedMessage = stringResource(R.string.machine_power_off_failed)
+    val printerIdCopiedMessage = stringResource(R.string.printer_id_copied)
+    val nfcLinkCopiedMessage = stringResource(R.string.nfc_link_copied)
+    val clipboard = LocalClipboardManager.current
     val snackbarScope = rememberCoroutineScope()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val statusTabIndex = 0
@@ -713,6 +719,18 @@ private fun PrinterDetailScreenContent(
                                     onToggleLight = onToggleLight,
                                     onOpenPrinterArchives = onOpenPrinterArchives,
                                     onStopCameraStream = onStopCameraStream,
+                                    onCopyPrinterId = {
+                                        clipboard.setText(AnnotatedString(printerId.toString()))
+                                        snackbarScope.launch {
+                                            snackbarHostState.showSnackbar(printerIdCopiedMessage)
+                                        }
+                                    },
+                                    onCopyNfcClearPlateLink = {
+                                        clipboard.setText(AnnotatedString(buildNfcClearPlateUri(printerId)))
+                                        snackbarScope.launch {
+                                            snackbarHostState.showSnackbar(nfcLinkCopiedMessage)
+                                        }
+                                    },
                                 )
                             }
                             }

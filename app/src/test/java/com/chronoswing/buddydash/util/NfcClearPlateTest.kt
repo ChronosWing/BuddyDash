@@ -110,6 +110,11 @@ class NfcClearPlateTest {
     }
 
     @Test
+    fun buildNfcClearPlateUri_usesPrinterId() {
+        assertEquals("buddydash://printer/7/clear-plate", buildNfcClearPlateUri(7))
+    }
+
+    @Test
     fun isClearPlateAlreadyAcknowledged_detectsNoOpMessages() {
         assertTrue(isClearPlateAlreadyAcknowledged("Plate already cleared"))
         assertTrue(isClearPlateAlreadyAcknowledged("Already clear — no action needed"))

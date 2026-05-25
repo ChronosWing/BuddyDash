@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Videocam
@@ -30,6 +31,7 @@ import com.chronoswing.buddydash.R
 import com.chronoswing.buddydash.data.model.PrinterMachineInfo
 import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
 import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.ui.components.CopyableCompactLabelValue
 import com.chronoswing.buddydash.ui.components.CompactInfoGrid
 import com.chronoswing.buddydash.ui.components.CompactLabelValue
 import com.chronoswing.buddydash.ui.components.DetailInfoCard
@@ -74,6 +76,8 @@ fun MachineTab(
     onToggleLight: (() -> Unit)? = null,
     onOpenPrinterArchives: () -> Unit = {},
     onStopCameraStream: () -> Unit = {},
+    onCopyPrinterId: () -> Unit = {},
+    onCopyNfcClearPlateLink: () -> Unit = {},
 ) {
     val caps = labels.machineTabCapabilities(cameraTokenConfigured = cameraToken.isNotBlank())
     val isExpandedWidth = rememberIsBuddyDashExpandedWidth()
@@ -216,7 +220,13 @@ fun MachineTab(
             }
         }
 
-        val infoRows = buildMachineInfoRows(labels, machineInfo, printerModel, statusUpdatedAtMillis)
+        val infoRows = buildMachineInfoRows(
+            labels,
+            machineInfo,
+            printerModel,
+            printerId,
+            statusUpdatedAtMillis,
+        )
         if (isExpandedWidth) {
             when {
                 smartPlugState != null && infoRows.isNotEmpty() -> {
@@ -239,8 +249,11 @@ fun MachineTab(
                             labels = labels,
                             machineInfo = machineInfo,
                             printerModel = printerModel,
+                            printerId = printerId,
                             statusUpdatedAtMillis = statusUpdatedAtMillis,
                             useInfoGrid = true,
+                            onCopyPrinterId = onCopyPrinterId,
+                            onCopyNfcClearPlateLink = onCopyNfcClearPlateLink,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                         )
                     }
@@ -262,8 +275,11 @@ fun MachineTab(
                         labels = labels,
                         machineInfo = machineInfo,
                         printerModel = printerModel,
+                        printerId = printerId,
                         statusUpdatedAtMillis = statusUpdatedAtMillis,
                         useInfoGrid = true,
+                        onCopyPrinterId = onCopyPrinterId,
+                        onCopyNfcClearPlateLink = onCopyNfcClearPlateLink,
                     )
                 }
             }
@@ -284,8 +300,11 @@ fun MachineTab(
                 labels = labels,
                 machineInfo = machineInfo,
                 printerModel = printerModel,
+                printerId = printerId,
                 statusUpdatedAtMillis = statusUpdatedAtMillis,
                 useInfoGrid = false,
+                onCopyPrinterId = onCopyPrinterId,
+                onCopyNfcClearPlateLink = onCopyNfcClearPlateLink,
             )
         }
     }
@@ -413,16 +432,28 @@ private fun MachinePrinterInfoCard(
     labels: PrinterDetailLabels,
     machineInfo: PrinterMachineInfo?,
     printerModel: String?,
+    printerId: Int,
     statusUpdatedAtMillis: Long?,
     useInfoGrid: Boolean,
+    onCopyPrinterId: () -> Unit,
+    onCopyNfcClearPlateLink: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val rows = buildMachineInfoRows(labels, machineInfo, printerModel, statusUpdatedAtMillis)
+    val rows = buildMachineInfoRows(
+        labels,
+        machineInfo,
+        printerModel,
+        printerId,
+        statusUpdatedAtMillis,
+    )
     if (rows.isEmpty()) return
+    val printerIdValue = printerId.toString()
+    val copyPrinterIdLabel = stringResource(R.string.machine_copy_printer_id)
     val labeledRows = rows.map { (key, value) ->
         val label = when (key) {
             "connection" -> stringResource(R.string.connection)
             "state" -> stringResource(R.string.machine_info_state)
+            "printer_id" -> stringResource(R.string.machine_info_printer_id)
             "model" -> stringResource(R.string.machine_info_model)
             "firmware" -> stringResource(R.string.firmware)
             "ip" -> stringResource(R.string.machine_info_ip)
@@ -440,13 +471,34 @@ private fun MachinePrinterInfoCard(
     DetailInfoCard(modifier = modifier) {
         SectionHeader(stringResource(R.string.machine_section_printer_info))
         if (useInfoGrid) {
-            CompactInfoGrid(rows = labeledRows)
+            CompactInfoGrid(
+                rows = labeledRows,
+                copyableValues = setOf(printerIdValue),
+                onCopyValue = { onCopyPrinterId() },
+                copyContentDescription = copyPrinterIdLabel,
+            )
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 labeledRows.forEach { (label, value) ->
-                    CompactLabelValue(label = label, value = value)
+                    if (value == printerIdValue) {
+                        CopyableCompactLabelValue(
+                            label = label,
+                            value = value,
+                            onCopy = onCopyPrinterId,
+                            copyContentDescription = copyPrinterIdLabel,
+                        )
+                    } else {
+                        CompactLabelValue(label = label, value = value)
+                    }
                 }
             }
         }
+        MachineUtilityButton(
+            label = stringResource(R.string.machine_copy_nfc_link),
+            icon = Icons.Default.ContentCopy,
+            enabled = true,
+            onClick = onCopyNfcClearPlateLink,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
