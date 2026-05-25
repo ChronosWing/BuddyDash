@@ -47,10 +47,12 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SingleBed
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Icon
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -835,19 +837,23 @@ private fun GlancePrinterCard(
                     }
                 }
 
-                // -- Temperatures (Standard if data exists + toggle, Detailed always if data) --
-                if (labels.tempsLine != null && effectiveShowTemps) {
+                // -- Temperatures (Standard only — Detailed folds them into metadata strip) --
+                if (labels.tempsLine != null && effectiveShowTemps &&
+                    viewMode != HomeCardViewMode.Detailed
+                ) {
                     PrintTempsRow(
                         nozzleTemp = labels.nozzleTemp,
                         bedTemp = labels.bedTemp,
                     )
                 }
 
-                // -- Detailed mode: extra metadata --
+                // -- Detailed mode: icon-driven metadata strip (includes temps) --
                 if (viewMode == HomeCardViewMode.Detailed) {
                     GlanceCardDetailedExtras(
                         liveStatus = liveStatus,
                         maintenanceTotalPrintHours = labels.maintenanceTotalPrintHours,
+                        nozzleTemp = if (effectiveShowTemps) labels.nozzleTemp else null,
+                        bedTemp = if (effectiveShowTemps) labels.bedTemp else null,
                     )
                 }
 
@@ -870,10 +876,18 @@ private fun GlancePrinterCard(
 private fun GlanceCardDetailedExtras(
     liveStatus: PrinterStatus?,
     maintenanceTotalPrintHours: Double?,
+    nozzleTemp: String? = null,
+    bedTemp: String? = null,
 ) {
     data class MetaChip(val icon: ImageVector, val value: String)
 
     val chips = buildList {
+        nozzleTemp?.let {
+            add(MetaChip(Icons.Filled.LocalFireDepartment, it.replace("°C", "°")))
+        }
+        bedTemp?.let {
+            add(MetaChip(Icons.Filled.SingleBed, it.replace("°C", "°")))
+        }
         liveStatus?.nozzleDiameterDisplay?.let { raw ->
             val short = raw.replace(Regex("\\s*mm$", RegexOption.IGNORE_CASE), "")
             add(MetaChip(Icons.Filled.Build, short))
