@@ -208,6 +208,7 @@
     <string name="machine_copy_printer_id">Copy printer ID</string>
     <string name="printer_id_copied">Printer ID copied</string>
     <string name="nfc_link_copied">NFC link copied</string>
+    <string name="machine_nfc_sticker_hint">For NFC stickers</string>
     <string name="eta">ETA</string>
     <string name="nozzle_temp">Nozzle temp</string>
     <string name="bed_temp">Bed temp</string>

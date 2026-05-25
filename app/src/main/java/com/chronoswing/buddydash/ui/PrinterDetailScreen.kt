@@ -379,7 +379,6 @@ private fun PrinterDetailScreenContent(
     val powerOffSuccessMessage = stringResource(R.string.machine_power_off_success)
     val powerOnFailedMessage = stringResource(R.string.machine_power_on_failed)
     val powerOffFailedMessage = stringResource(R.string.machine_power_off_failed)
-    val printerIdCopiedMessage = stringResource(R.string.printer_id_copied)
     val nfcLinkCopiedMessage = stringResource(R.string.nfc_link_copied)
     val clipboard = LocalClipboardManager.current
     val snackbarScope = rememberCoroutineScope()
@@ -719,12 +718,6 @@ private fun PrinterDetailScreenContent(
                                     onToggleLight = onToggleLight,
                                     onOpenPrinterArchives = onOpenPrinterArchives,
                                     onStopCameraStream = onStopCameraStream,
-                                    onCopyPrinterId = {
-                                        clipboard.setText(AnnotatedString(printerId.toString()))
-                                        snackbarScope.launch {
-                                            snackbarHostState.showSnackbar(printerIdCopiedMessage)
-                                        }
-                                    },
                                     onCopyNfcClearPlateLink = {
                                         clipboard.setText(AnnotatedString(buildNfcClearPlateUri(printerId)))
                                         snackbarScope.launch {
