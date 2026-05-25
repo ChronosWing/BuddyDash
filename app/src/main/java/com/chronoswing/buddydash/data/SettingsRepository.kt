@@ -100,6 +100,16 @@ class SettingsRepository(private val context: Context) {
         preferences.safeBoolean(KEEP_SCREEN_AWAKE_KEY, false)
     }
 
+    val hasUsedQuickActions: Flow<Boolean> = safePreferences.map { preferences ->
+        preferences.safeBoolean(HAS_USED_QUICK_ACTIONS_KEY, false)
+    }
+
+    suspend fun saveHasUsedQuickActions() {
+        context.settingsDataStore.edit { preferences ->
+            preferences[HAS_USED_QUICK_ACTIONS_KEY] = true
+        }
+    }
+
     suspend fun saveConnectionSettings(
         serverUrl: String,
         apiKey: String,
@@ -214,6 +224,7 @@ class SettingsRepository(private val context: Context) {
         private val FINISH_SHOW_CONFIRMATION_KEY = booleanPreferencesKey("finish_show_confirmation")
         private val REMEMBER_LAST_DETAIL_TAB_KEY = booleanPreferencesKey("remember_last_detail_tab")
         private val KEEP_SCREEN_AWAKE_KEY = booleanPreferencesKey("keep_screen_awake")
+        private val HAS_USED_QUICK_ACTIONS_KEY = booleanPreferencesKey("has_used_quick_actions")
     }
 }
 

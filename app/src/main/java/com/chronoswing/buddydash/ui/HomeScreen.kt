@@ -40,8 +40,10 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -179,6 +181,8 @@ fun HomeScreen(
         debugShowLogoGlowBounds = uiState.debugShowLogoGlowBounds,
         homeCardDensity = uiState.homeCardDensity,
         cardVisibility = uiState.cardVisibility,
+        showQuickActionHint = !uiState.hasUsedQuickActions,
+        onQuickActionHintDismissed = { viewModel.markQuickActionsUsed() },
         onPrinterClick = onPrinterClick,
         onClearPrinterHms = viewModel::clearPrinterHmsErrors,
         onQuickAction = onQuickAction,
@@ -212,6 +216,8 @@ private fun HomeScreenContent(
     debugShowLogoGlowBounds: Boolean,
     homeCardDensity: Int = 1,
     cardVisibility: Map<Int, PrinterCardVisibility> = emptyMap(),
+    showQuickActionHint: Boolean = false,
+    onQuickActionHintDismissed: () -> Unit = {},
     onPrinterClick: (Printer) -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
     onQuickAction: (Printer, QuickAction) -> Unit = { _, _ -> },
@@ -432,6 +438,8 @@ private fun HomeScreenContent(
                             viewMode = viewMode,
                             layoutValues = layoutValues,
                             cardVisibility = cardVisibility,
+                            showQuickActionHint = showQuickActionHint,
+                            onQuickActionHintDismissed = onQuickActionHintDismissed,
                             onPrinterClick = onPrinterClick,
                             onClearPrinterHms = onClearPrinterHms,
                             onQuickAction = onQuickAction,
@@ -459,6 +467,8 @@ private fun HomePrinterCardsList(
     viewMode: HomeCardViewMode,
     layoutValues: HomeCardLayoutValues,
     cardVisibility: Map<Int, PrinterCardVisibility>,
+    showQuickActionHint: Boolean,
+    onQuickActionHintDismissed: () -> Unit,
     onPrinterClick: (Printer) -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
     onQuickAction: (Printer, QuickAction) -> Unit,
@@ -486,7 +496,7 @@ private fun HomePrinterCardsList(
                     )
                 }
             }
-            items(filteredPrinters, key = { it.id }) { printer ->
+            itemsIndexed(filteredPrinters, key = { _, p -> p.id }) { index, printer ->
                 HomePrinterCardItem(
                     printer = printer,
                     serverUrl = serverUrl,
@@ -494,6 +504,8 @@ private fun HomePrinterCardsList(
                     viewMode = viewMode,
                     layoutValues = layoutValues,
                     visibility = cardVisibility[printer.id] ?: PrinterCardVisibility(),
+                    showQuickActionHint = showQuickActionHint && index == 0,
+                    onQuickActionHintDismissed = onQuickActionHintDismissed,
                     onPrinterClick = onPrinterClick,
                     onClearPrinterHms = onClearPrinterHms,
                     onQuickAction = onQuickAction,
@@ -520,7 +532,7 @@ private fun HomePrinterCardsList(
                     )
                 }
             }
-            items(filteredPrinters, key = { it.id }) { printer ->
+            itemsIndexed(filteredPrinters, key = { _, p -> p.id }) { index, printer ->
                 HomePrinterCardItem(
                     printer = printer,
                     serverUrl = serverUrl,
@@ -528,6 +540,8 @@ private fun HomePrinterCardsList(
                     viewMode = viewMode,
                     layoutValues = layoutValues,
                     visibility = cardVisibility[printer.id] ?: PrinterCardVisibility(),
+                    showQuickActionHint = showQuickActionHint && index == 0,
+                    onQuickActionHintDismissed = onQuickActionHintDismissed,
                     onPrinterClick = onPrinterClick,
                     onClearPrinterHms = onClearPrinterHms,
                     onQuickAction = onQuickAction,
@@ -558,6 +572,8 @@ private fun HomePrinterCardItem(
     viewMode: HomeCardViewMode,
     layoutValues: HomeCardLayoutValues,
     visibility: PrinterCardVisibility,
+    showQuickActionHint: Boolean = false,
+    onQuickActionHintDismissed: () -> Unit = {},
     onPrinterClick: (Printer) -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
     onQuickAction: (Printer, QuickAction) -> Unit,
@@ -572,6 +588,8 @@ private fun HomePrinterCardItem(
         viewMode = viewMode,
         layoutValues = layoutValues,
         visibility = visibility,
+        showQuickActionHint = showQuickActionHint,
+        onQuickActionHintDismissed = onQuickActionHintDismissed,
         onClick = { onPrinterClick(printer) },
         onClearPrinterHms = onClearPrinterHms,
         onQuickAction = { action -> onQuickAction(printer, action) },
@@ -590,6 +608,8 @@ private fun GlancePrinterCard(
     viewMode: HomeCardViewMode,
     layoutValues: HomeCardLayoutValues,
     visibility: PrinterCardVisibility = PrinterCardVisibility(),
+    showQuickActionHint: Boolean = false,
+    onQuickActionHintDismissed: () -> Unit = {},
     onClick: () -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
     onQuickAction: (QuickAction) -> Unit,
@@ -707,6 +727,7 @@ private fun GlancePrinterCard(
                     onLongClick = {
                         view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                         showQuickActions = true
+                        onQuickActionHintDismissed()
                     },
                 ),
             colors = CardDefaults.cardColors(
@@ -864,6 +885,14 @@ private fun GlancePrinterCard(
                         activeKey = labels.activeFilamentSlot,
                         cardMicroMotion = labels.cardMicroMotion,
                         modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+
+                if (showQuickActionHint) {
+                    Text(
+                        text = stringResource(R.string.quick_action_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                     )
                 }
             }
