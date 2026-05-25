@@ -159,7 +159,7 @@ enum class BottomNavTab {
     SETTINGS,
 }
 
-/** Temporary: verify bottom-tab destinations. Set false before release. */
+/** Debug-only: verify bottom-tab destinations. */
 private val debugLogNavDestinations: Boolean get() = com.chronoswing.buddydash.util.BuddyDashDebug.enabled
 private const val TAG_NAV = "BuddyDash/Nav"
 

@@ -4,7 +4,7 @@ import com.chronoswing.buddydash.data.model.FilamentUsage
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
-/** Temporary: log filament usage field discovery. Set false before release. */
+/** Debug-only: log filament usage field discovery. */
 val DEBUG_LOG_FILAMENT_USAGE: Boolean get() = BuddyDashDebug.enabled
 
 const val TAG_FILAMENT_USAGE = "BuddyDash/FilamentUsage"
