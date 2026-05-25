@@ -40,7 +40,7 @@ Whether you run a single printer or a small farm, BuddyDash focuses on fast stat
       <img src="assets/screenshots/FoldLayoutPrintDetails.png" height="420" />
     </a>
     <a href="assets/screenshots/FoldLayoutSpool.png">
-      <img src="assets/screenshots/FoldLayoutSpool.png" height="420" />
+      <img src="assets/screenshots/FoldMachine.png" height="420" />
     </a>
   </div>
 </div>
