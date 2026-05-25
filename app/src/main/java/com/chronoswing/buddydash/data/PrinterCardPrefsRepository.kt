@@ -16,7 +16,7 @@ private val Context.printerCardPrefsDataStore by preferencesDataStore(
 private const val TAG = "BuddyDash/CardPrefs"
 
 data class PrinterCardVisibility(
-    val showCameraPreview: Boolean = true,
+    val showPrintThumbnail: Boolean = true,
     val showPowerChip: Boolean = true,
     val showHmsChip: Boolean = true,
     val showMaintenanceChip: Boolean = true,
@@ -80,7 +80,7 @@ class PrinterCardPrefsRepository(private val context: Context) {
 
 private fun encodeVisibility(v: PrinterCardVisibility): String = try {
     JSONObject().apply {
-        put("camera", v.showCameraPreview)
+        put("thumbnail", v.showPrintThumbnail)
         put("power", v.showPowerChip)
         put("hms", v.showHmsChip)
         put("maint", v.showMaintenanceChip)
@@ -94,7 +94,7 @@ private fun encodeVisibility(v: PrinterCardVisibility): String = try {
 private fun decodeVisibility(json: String): PrinterCardVisibility = try {
     val obj = JSONObject(json)
     PrinterCardVisibility(
-        showCameraPreview = obj.optBoolean("camera", true),
+        showPrintThumbnail = obj.optBoolean("thumbnail", obj.optBoolean("camera", true)),
         showPowerChip = obj.optBoolean("power", true),
         showHmsChip = obj.optBoolean("hms", true),
         showMaintenanceChip = obj.optBoolean("maint", true),

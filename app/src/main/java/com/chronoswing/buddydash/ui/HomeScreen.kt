@@ -121,8 +121,8 @@ import com.chronoswing.buddydash.util.applyHomePrinterSearch
 import com.chronoswing.buddydash.util.homeSearchEmptyMessageRes
 import com.chronoswing.buddydash.util.homePrinterDashboardCounts
 import com.chronoswing.buddydash.data.PrinterCardVisibility
-import com.chronoswing.buddydash.util.HomeCardDensity
-import com.chronoswing.buddydash.util.HomeCardDensityValues
+import com.chronoswing.buddydash.util.HomeCardLayoutValues
+import com.chronoswing.buddydash.util.HomeCardViewMode
 import com.chronoswing.buddydash.util.layoutValues
 import com.chronoswing.buddydash.util.PrinterActivityKind
 import com.chronoswing.buddydash.util.resolveActivityKind
@@ -201,14 +201,14 @@ private fun HomeScreenContent(
     printGlowMultiplier: Float,
     debugForcePrintGlow: Boolean,
     debugShowLogoGlowBounds: Boolean,
-    homeCardDensity: Int = 0,
+    homeCardDensity: Int = 1,
     cardVisibility: Map<Int, PrinterCardVisibility> = emptyMap(),
     onPrinterClick: (Printer) -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
     onQuickAction: (Printer, QuickAction) -> Unit = { _, _ -> },
 ) {
-    val density = HomeCardDensity.fromIndex(homeCardDensity)
-    val densityValues = density.layoutValues()
+    val viewMode = HomeCardViewMode.fromIndex(homeCardDensity)
+    val layoutValues = viewMode.layoutValues()
     val cachedCount = printers.size
     val printerCounts = printers.homePrinterDashboardCounts()
     val showHeaderMetadata = settingsReady && hasCredentials
@@ -420,7 +420,8 @@ private fun HomeScreenContent(
                             searchFilter = searchFilter,
                             serverUrl = serverUrl,
                             cameraToken = cameraToken,
-                            densityValues = densityValues,
+                            viewMode = viewMode,
+                            layoutValues = layoutValues,
                             cardVisibility = cardVisibility,
                             onPrinterClick = onPrinterClick,
                             onClearPrinterHms = onClearPrinterHms,
@@ -446,7 +447,8 @@ private fun HomePrinterCardsList(
     searchFilter: HomePrinterSearchFilter,
     serverUrl: String,
     cameraToken: String,
-    densityValues: HomeCardDensityValues,
+    viewMode: HomeCardViewMode,
+    layoutValues: HomeCardLayoutValues,
     cardVisibility: Map<Int, PrinterCardVisibility>,
     onPrinterClick: (Printer) -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
@@ -465,7 +467,7 @@ private fun HomePrinterCardsList(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(densityValues.listItemSpacing),
+            verticalArrangement = Arrangement.spacedBy(layoutValues.listItemSpacing),
         ) {
             if (showSearchEmpty) {
                 item(key = "search_empty") {
@@ -480,7 +482,8 @@ private fun HomePrinterCardsList(
                     printer = printer,
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
-                    densityValues = densityValues,
+                    viewMode = viewMode,
+                    layoutValues = layoutValues,
                     visibility = cardVisibility[printer.id] ?: PrinterCardVisibility(),
                     onPrinterClick = onPrinterClick,
                     onClearPrinterHms = onClearPrinterHms,
@@ -494,8 +497,8 @@ private fun HomePrinterCardsList(
             columns = GridCells.Fixed(gridColumns),
             modifier = Modifier.fillMaxSize(),
             contentPadding = contentPadding,
-            horizontalArrangement = Arrangement.spacedBy(densityValues.listItemSpacing),
-            verticalArrangement = Arrangement.spacedBy(densityValues.listItemSpacing),
+            horizontalArrangement = Arrangement.spacedBy(layoutValues.listItemSpacing),
+            verticalArrangement = Arrangement.spacedBy(layoutValues.listItemSpacing),
         ) {
             if (showSearchEmpty) {
                 item(
@@ -513,7 +516,8 @@ private fun HomePrinterCardsList(
                     printer = printer,
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
-                    densityValues = densityValues,
+                    viewMode = viewMode,
+                    layoutValues = layoutValues,
                     visibility = cardVisibility[printer.id] ?: PrinterCardVisibility(),
                     onPrinterClick = onPrinterClick,
                     onClearPrinterHms = onClearPrinterHms,
@@ -542,7 +546,8 @@ private fun HomePrinterCardItem(
     printer: Printer,
     serverUrl: String,
     cameraToken: String,
-    densityValues: HomeCardDensityValues,
+    viewMode: HomeCardViewMode,
+    layoutValues: HomeCardLayoutValues,
     visibility: PrinterCardVisibility,
     onPrinterClick: (Printer) -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
@@ -555,7 +560,8 @@ private fun HomePrinterCardItem(
         liveStatus = printer.liveStatus,
         serverUrl = serverUrl,
         cameraToken = cameraToken,
-        densityValues = densityValues,
+        viewMode = viewMode,
+        layoutValues = layoutValues,
         visibility = visibility,
         onClick = { onPrinterClick(printer) },
         onClearPrinterHms = onClearPrinterHms,
@@ -572,7 +578,8 @@ private fun GlancePrinterCard(
     liveStatus: PrinterStatus?,
     serverUrl: String,
     cameraToken: String,
-    densityValues: HomeCardDensityValues,
+    viewMode: HomeCardViewMode,
+    layoutValues: HomeCardLayoutValues,
     visibility: PrinterCardVisibility = PrinterCardVisibility(),
     onClick: () -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
@@ -672,6 +679,12 @@ private fun GlancePrinterCard(
         )
     }
 
+    val effectiveShowMaintenanceChip = visibility.showMaintenanceChip
+    val effectiveShowHmsChip = visibility.showHmsChip
+    val effectiveShowTemps = visibility.showTemperatures &&
+        (viewMode != HomeCardViewMode.Minimal)
+    val effectiveShowThumbnail = visibility.showPrintThumbnail
+
     HomeCardMicroMotionFrame(
         animateIdleBreath = false,
         motion = labels.cardMicroMotion,
@@ -693,136 +706,187 @@ private fun GlancePrinterCard(
             border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
         ) {
             Column(
-                modifier = Modifier.padding(densityValues.cardPadding),
-                verticalArrangement = Arrangement.spacedBy(densityValues.contentSpacing),
+                modifier = Modifier.padding(layoutValues.cardPadding),
+                verticalArrangement = Arrangement.spacedBy(layoutValues.contentSpacing),
             ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = labels.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                labels.subtitle?.let { subtitle ->
+                // -- Header: printer name + model --
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = labels.title,
+                        style = if (viewMode == HomeCardViewMode.Minimal)
+                            MaterialTheme.typography.titleSmall
+                        else MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                }
-            }
-
-            PrinterQuickStatusRow(
-                activityKind = labels.activityKind,
-                progressCompact = labels.progressCompact,
-                plateKind = labels.plateKind,
-                maintenanceIndicator = if (visibility.showMaintenanceChip) labels.maintenanceIndicator else MaintenanceHomeIndicator.None,
-                pendingQueueCount = labels.pendingQueueCount,
-                hmsAlertSeverity = if (visibility.showHmsChip) labels.hmsAlertSeverity else HmsSeverity.Ok,
-                onHmsChipClick = if (hasHms && !hasMaintenance) {
-                    { alertSheet = HomePrinterAlertSheet.Hms }
-                } else {
-                    null
-                },
-                onMaintenanceChipClick = if (hasMaintenance && !hasHms) {
-                    { alertSheet = HomePrinterAlertSheet.Maintenance }
-                } else {
-                    null
-                },
-                onUnifiedAlertsClick = if (hasHms && hasMaintenance) {
-                    { alertSheet = HomePrinterAlertSheet.Unified }
-                } else {
-                    null
-                },
-            )
-
-            if (labels.isActivePrint) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = densityValues.contentSpacing / 2),
-                    horizontalArrangement = Arrangement.spacedBy(densityValues.cameraSpacing),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(densityValues.contentSpacing),
-                    ) {
-                        labels.progressFraction?.let { fraction ->
-                            MicroMotionProgressBar(
-                                progress = { fraction.coerceIn(0f, 1f) },
-                                motion = labels.cardMicroMotion,
-                                modifier = Modifier.height(3.dp),
-                            )
-                        }
-                        labels.fileLine?.let { file ->
-                            PrintFileNameText(
-                                fileName = file,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                        labels.etaLine?.let { eta ->
-                            Text(
-                                text = eta,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    if (visibility.showCameraPreview) {
-                        MicroMotionThumbnailFrame(
-                            motion = labels.cardMicroMotion,
-                            modifier = Modifier.padding(start = 4.dp, end = 2.dp),
-                        ) {
-                            PrinterCoverImage(
-                                serverUrl = serverUrl,
-                                cameraToken = cameraToken,
-                                thumbnailIdentity = printThumbnailIdentity,
-                                size = densityValues.thumbnailSize,
-                            )
-                        }
+                    labels.subtitle?.let { subtitle ->
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
-            } else {
-                if (labels.showLastPrint && labels.lastPrintResult != null) {
-                    Text(
-                        text = stringResource(
-                            R.string.last_print_line,
-                            labels.lastPrintResult,
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
 
-                labels.fileLine?.let { file ->
-                    PrintFileNameText(
-                        fileName = file,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            if (labels.tempsLine != null && visibility.showTemperatures) {
-                PrintTempsRow(
-                    nozzleTemp = labels.nozzleTemp,
-                    bedTemp = labels.bedTemp,
+                // -- Status chips --
+                PrinterQuickStatusRow(
+                    activityKind = labels.activityKind,
+                    progressCompact = labels.progressCompact,
+                    plateKind = labels.plateKind,
+                    maintenanceIndicator = if (effectiveShowMaintenanceChip) labels.maintenanceIndicator else MaintenanceHomeIndicator.None,
+                    pendingQueueCount = labels.pendingQueueCount,
+                    hmsAlertSeverity = if (effectiveShowHmsChip) labels.hmsAlertSeverity else HmsSeverity.Ok,
+                    onHmsChipClick = if (hasHms && !hasMaintenance) {
+                        { alertSheet = HomePrinterAlertSheet.Hms }
+                    } else {
+                        null
+                    },
+                    onMaintenanceChipClick = if (hasMaintenance && !hasHms) {
+                        { alertSheet = HomePrinterAlertSheet.Maintenance }
+                    } else {
+                        null
+                    },
+                    onUnifiedAlertsClick = if (hasHms && hasMaintenance) {
+                        { alertSheet = HomePrinterAlertSheet.Unified }
+                    } else {
+                        null
+                    },
                 )
-            }
 
-            FilamentHomeGroupsRow(
-                slots = labels.filamentSlots,
-                activeKey = labels.activeFilamentSlot,
-                cardMicroMotion = labels.cardMicroMotion,
-                modifier = Modifier.padding(top = 2.dp),
-            )
+                // -- Active print section --
+                if (labels.isActivePrint) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = layoutValues.contentSpacing / 2),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(layoutValues.contentSpacing),
+                        ) {
+                            labels.progressFraction?.let { fraction ->
+                                MicroMotionProgressBar(
+                                    progress = { fraction.coerceIn(0f, 1f) },
+                                    motion = labels.cardMicroMotion,
+                                    modifier = Modifier.height(3.dp),
+                                )
+                            }
+                            if (viewMode != HomeCardViewMode.Minimal) {
+                                labels.fileLine?.let { file ->
+                                    PrintFileNameText(
+                                        fileName = file,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                }
+                            }
+                            labels.etaLine?.let { eta ->
+                                Text(
+                                    text = eta,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        if (effectiveShowThumbnail) {
+                            MicroMotionThumbnailFrame(
+                                motion = labels.cardMicroMotion,
+                                modifier = Modifier.padding(start = 4.dp, end = 2.dp),
+                            ) {
+                                PrinterCoverImage(
+                                    serverUrl = serverUrl,
+                                    cameraToken = cameraToken,
+                                    thumbnailIdentity = printThumbnailIdentity,
+                                    size = layoutValues.thumbnailSize,
+                                )
+                            }
+                        }
+                    }
+                } else if (viewMode != HomeCardViewMode.Minimal) {
+                    // -- Idle section (Standard + Detailed) --
+                    if (labels.showLastPrint && labels.lastPrintResult != null) {
+                        Text(
+                            text = stringResource(
+                                R.string.last_print_line,
+                                labels.lastPrintResult,
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    labels.fileLine?.let { file ->
+                        PrintFileNameText(
+                            fileName = file,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                // -- Temperatures (Standard if data exists + toggle, Detailed always if data) --
+                if (labels.tempsLine != null && effectiveShowTemps) {
+                    PrintTempsRow(
+                        nozzleTemp = labels.nozzleTemp,
+                        bedTemp = labels.bedTemp,
+                    )
+                }
+
+                // -- Detailed mode: extra metadata --
+                if (viewMode == HomeCardViewMode.Detailed) {
+                    GlanceCardDetailedExtras(
+                        liveStatus = liveStatus,
+                        maintenanceTotalPrintHours = labels.maintenanceTotalPrintHours,
+                    )
+                }
+
+                // -- Filament slots (Standard + Detailed) --
+                if (viewMode != HomeCardViewMode.Minimal) {
+                    FilamentHomeGroupsRow(
+                        slots = labels.filamentSlots,
+                        activeKey = labels.activeFilamentSlot,
+                        cardMicroMotion = labels.cardMicroMotion,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun GlanceCardDetailedExtras(
+    liveStatus: PrinterStatus?,
+    maintenanceTotalPrintHours: Double?,
+) {
+    val extras = buildList {
+        liveStatus?.nozzleDiameterDisplay?.let { add("Nozzle $it") }
+        liveStatus?.wifiSignalDbm?.let { add("Wi-Fi ${it}dBm") }
+        liveStatus?.firmwareVersion?.let { add("FW $it") }
+        maintenanceTotalPrintHours?.let { add("${it.toInt()}h printed") }
+        liveStatus?.speedLevel?.let { level ->
+            val label = when (level) {
+                1 -> "Silent"
+                2 -> "Standard"
+                3 -> "Sport"
+                4 -> "Ludicrous"
+                else -> null
+            }
+            label?.let { add(it) }
+        }
+    }
+    if (extras.isEmpty()) return
+    Text(
+        text = extras.joinToString(" · "),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 private val HomeTitleLogoImageSize = 104.dp

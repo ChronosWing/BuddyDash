@@ -546,9 +546,9 @@ private fun MachineCardVisibilityCard(
     DetailInfoCard {
         SectionHeader(stringResource(R.string.card_visibility_title))
         CardVisibilityToggle(
-            label = stringResource(R.string.card_visibility_camera),
-            checked = visibility.showCameraPreview,
-            onCheckedChange = { onVisibilityChange(visibility.copy(showCameraPreview = it)) },
+            label = stringResource(R.string.card_visibility_thumbnail),
+            checked = visibility.showPrintThumbnail,
+            onCheckedChange = { onVisibilityChange(visibility.copy(showPrintThumbnail = it)) },
         )
         CardVisibilityToggle(
             label = stringResource(R.string.card_visibility_hms),

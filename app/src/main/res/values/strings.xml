@@ -229,11 +229,14 @@
     <string name="settings_finish_clear_plate">Clear plate</string>
     <string name="settings_finish_power_off">Power off smart outlet</string>
     <string name="settings_finish_confirmation">Show confirmation</string>
-    <!-- Settings: Home card density -->
-    <string name="settings_density_title">Home card density</string>
-    <string name="settings_density_comfortable">Comfortable</string>
-    <string name="settings_density_compact">Compact</string>
-    <string name="settings_density_dense">Dense</string>
+    <!-- Settings: Home card view mode -->
+    <string name="settings_view_mode_title">Home card view</string>
+    <string name="settings_view_mode_minimal">Minimal</string>
+    <string name="settings_view_mode_standard">Standard</string>
+    <string name="settings_view_mode_detailed">Detailed</string>
+    <string name="settings_view_mode_hint_minimal">Compact cards for many printers</string>
+    <string name="settings_view_mode_hint_standard">Balanced BuddyDash view</string>
+    <string name="settings_view_mode_hint_detailed">More printer info at a glance</string>
     <!-- Settings: QoL -->
     <string name="settings_qol_title">Preferences</string>
     <string name="settings_remember_tab">Remember last detail tab</string>
@@ -250,7 +253,7 @@
     <string name="maintenance_snooze_dismiss">Dismiss for now</string>
     <!-- Printer card visibility -->
     <string name="card_visibility_title">Home card display</string>
-    <string name="card_visibility_camera">Camera preview</string>
+    <string name="card_visibility_thumbnail">Print thumbnail</string>
     <string name="card_visibility_power">Power chip</string>
     <string name="card_visibility_hms">HMS chip</string>
     <string name="card_visibility_maintenance">Maintenance chip</string>

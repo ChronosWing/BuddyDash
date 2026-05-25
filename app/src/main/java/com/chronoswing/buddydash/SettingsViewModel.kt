@@ -30,7 +30,7 @@ data class SettingsUiState(
     val debugShowLogoGlowBounds: Boolean = false,
     val nfcExamplePrinter: NfcSettingsExamplePrinter? = null,
     // QoL settings
-    val homeCardDensity: Int = 0,
+    val homeCardDensity: Int = 1,
     val finishClearPlate: Boolean = true,
     val finishPowerOff: Boolean = true,
     val finishShowConfirmation: Boolean = false,
