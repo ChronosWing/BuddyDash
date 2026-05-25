@@ -71,8 +71,8 @@ data class HomeUiState(
     val printGlowMultiplier: Float = 1f,
     val debugForcePrintGlow: Boolean = false,
     val debugShowLogoGlowBounds: Boolean = false,
-    /** Home card density: 0=Comfortable, 1=Compact, 2=Dense */
-    val homeCardDensity: Int = 0,
+    /** Home card view mode: 0=Minimal, 1=Standard, 2=Detailed */
+    val homeCardDensity: Int = 1,
     /** Per-printer card visibility overrides (printer ID → visibility). */
     val cardVisibility: Map<Int, PrinterCardVisibility> = emptyMap(),
 )

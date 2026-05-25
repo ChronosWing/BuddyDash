@@ -495,12 +495,17 @@ private fun SettingsCardDensitySection(
     density: Int,
     onDensityChange: (Int) -> Unit,
 ) {
+    val modes = listOf(
+        Triple(R.string.settings_view_mode_minimal, R.string.settings_view_mode_hint_minimal, 0),
+        Triple(R.string.settings_view_mode_standard, R.string.settings_view_mode_hint_standard, 1),
+        Triple(R.string.settings_view_mode_detailed, R.string.settings_view_mode_hint_detailed, 2),
+    )
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = stringResource(R.string.settings_density_title),
+            text = stringResource(R.string.settings_view_mode_title),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -508,18 +513,21 @@ private fun SettingsCardDensitySection(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            val labels = listOf(
-                R.string.settings_density_comfortable,
-                R.string.settings_density_compact,
-                R.string.settings_density_dense,
-            )
-            labels.forEachIndexed { index, labelRes ->
+            modes.forEach { (labelRes, _, index) ->
                 FilterChip(
                     selected = density == index,
                     onClick = { onDensityChange(index) },
                     label = { Text(stringResource(labelRes)) },
                 )
             }
+        }
+        val hintRes = modes.firstOrNull { it.third == density }?.second
+        if (hintRes != null) {
+            Text(
+                text = stringResource(hintRes),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            )
         }
     }
 }

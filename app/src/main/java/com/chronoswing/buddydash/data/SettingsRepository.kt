@@ -75,9 +75,9 @@ class SettingsRepository(private val context: Context) {
 
     // ── QoL settings ──────────────────────────────────────────────
 
-    /** 0 = Comfortable (default), 1 = Compact, 2 = Dense */
+    /** 0 = Minimal, 1 = Standard (default), 2 = Detailed */
     val homeCardDensity: Flow<Int> = safePreferences.map { preferences ->
-        preferences.safeInt(HOME_CARD_DENSITY_KEY, 0)
+        preferences.safeInt(HOME_CARD_DENSITY_KEY, 1)
     }
 
     val finishClearPlate: Flow<Boolean> = safePreferences.map { preferences ->
