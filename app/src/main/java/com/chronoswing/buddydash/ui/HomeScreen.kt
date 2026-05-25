@@ -43,15 +43,22 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -858,35 +865,56 @@ private fun GlancePrinterCard(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun GlanceCardDetailedExtras(
     liveStatus: PrinterStatus?,
     maintenanceTotalPrintHours: Double?,
 ) {
-    val extras = buildList {
-        liveStatus?.nozzleDiameterDisplay?.let { add("Nozzle $it") }
-        liveStatus?.wifiSignalDbm?.let { add("Wi-Fi ${it}dBm") }
-        liveStatus?.firmwareVersion?.let { add("FW $it") }
-        maintenanceTotalPrintHours?.let { add("${it.toInt()}h printed") }
-        liveStatus?.speedLevel?.let { level ->
-            val label = when (level) {
-                1 -> "Silent"
-                2 -> "Standard"
-                3 -> "Sport"
-                4 -> "Ludicrous"
-                else -> null
-            }
-            label?.let { add(it) }
+    data class MetaChip(val icon: ImageVector, val value: String)
+
+    val chips = buildList {
+        liveStatus?.nozzleDiameterDisplay?.let { raw ->
+            val short = raw.replace(Regex("\\s*mm$", RegexOption.IGNORE_CASE), "")
+            add(MetaChip(Icons.Filled.Build, short))
+        }
+        liveStatus?.wifiSignalDbm?.let {
+            add(MetaChip(Icons.Filled.Wifi, "$it"))
+        }
+        maintenanceTotalPrintHours?.let {
+            add(MetaChip(Icons.Filled.Schedule, "${it.toInt()}h"))
+        }
+        liveStatus?.firmwareVersion?.let { fw ->
+            val short = fw.trimStart('0').split(".").take(2)
+                .joinToString(".") { it.trimStart('0').ifEmpty { "0" } }
+            add(MetaChip(Icons.Filled.Memory, short))
         }
     }
-    if (extras.isEmpty()) return
-    Text(
-        text = extras.joinToString(" · "),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-    )
+    if (chips.isEmpty()) return
+    val metaColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        chips.forEach { chip ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = chip.icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(13.dp),
+                    tint = metaColor,
+                )
+                Text(
+                    text = chip.value,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = metaColor,
+                )
+            }
+        }
+    }
 }
 
 private val HomeTitleLogoImageSize = 104.dp
