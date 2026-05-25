@@ -3,7 +3,9 @@ package com.chronoswing.buddydash
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.SettingsRepository
+import com.chronoswing.buddydash.data.HomePrintersCacheRepository
 import com.chronoswing.buddydash.network.BambuddyApiClient
+import com.chronoswing.buddydash.ui.components.NfcSettingsExamplePrinter
 import com.chronoswing.buddydash.util.BuddyDashDebug
 import com.chronoswing.buddydash.util.validateConnectionSettings
 import kotlinx.coroutines.flow.combine
@@ -26,11 +28,13 @@ data class SettingsUiState(
     val printGlowMultiplier: Float = 1f,
     val debugForcePrintGlow: Boolean = false,
     val debugShowLogoGlowBounds: Boolean = false,
+    val nfcExamplePrinter: NfcSettingsExamplePrinter? = null,
 )
 
 class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
     private val apiClient: BambuddyApiClient,
+    private val homePrintersCacheRepository: HomePrintersCacheRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -51,6 +55,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.serverUrl.collect { url ->
                 _uiState.update { it.copy(serverUrl = url) }
+                refreshNfcExamplePrinter()
             }
         }
         viewModelScope.launch {
@@ -184,6 +189,9 @@ class SettingsViewModel(
             }
             val validated = validation.getOrThrow()
             val result = apiClient.testApiConnection(validated.serverUrl, validated.apiKey)
+            if (result.isSuccess) {
+                cachePrintersForNfcExample(validated.serverUrl, validated.apiKey)
+            }
             _uiState.update {
                 it.copy(
                     isLoading = false,
@@ -195,5 +203,32 @@ class SettingsViewModel(
                 )
             }
         }
+    }
+
+    private suspend fun refreshNfcExamplePrinter() {
+        val url = _uiState.value.serverUrl.trim()
+        if (url.isBlank()) {
+            _uiState.update { it.copy(nfcExamplePrinter = null) }
+            return
+        }
+        val first = homePrintersCacheRepository.load(url)?.printers?.firstOrNull()
+        _uiState.update {
+            it.copy(
+                nfcExamplePrinter = first?.let { printer ->
+                    NfcSettingsExamplePrinter(name = printer.name, id = printer.id)
+                },
+            )
+        }
+    }
+
+    private suspend fun cachePrintersForNfcExample(serverUrl: String, apiKey: String) {
+        val printers = apiClient.fetchPrinters(serverUrl, apiKey).getOrNull() ?: return
+        if (printers.isEmpty()) return
+        homePrintersCacheRepository.save(
+            serverUrl = serverUrl,
+            printers = printers,
+            lastUpdatedAtMillis = System.currentTimeMillis(),
+        )
+        refreshNfcExamplePrinter()
     }
 }

@@ -575,7 +575,7 @@ fun BuddyDashNav(
             composable(Routes.SETTINGS) {
                 val viewModel: SettingsViewModel = viewModel(
                     factory = viewModelFactory {
-                        SettingsViewModel(settingsRepository, apiClient)
+                        SettingsViewModel(settingsRepository, apiClient, homePrintersCacheRepository)
                     },
                 )
                 SettingsScreen(viewModel = viewModel)

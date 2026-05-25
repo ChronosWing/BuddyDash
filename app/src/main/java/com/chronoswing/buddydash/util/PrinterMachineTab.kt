@@ -75,10 +75,12 @@ fun buildMachineInfoRows(
     labels: PrinterDetailLabels,
     machineInfo: PrinterMachineInfo?,
     printerModel: String?,
+    printerId: Int,
     statusUpdatedAtMillis: Long?,
 ): List<Pair<String, String>> = buildList {
     add("connection" to labels.connection)
     add("state" to labels.currentActivity)
+    add("printer_id" to printerId.toString())
     val model = machineInfo?.model ?: printerModel
     model?.takeIf { it.isNotBlank() }?.let { add("model" to it) }
     labels.firmwareLine?.let { add("firmware" to it) }
