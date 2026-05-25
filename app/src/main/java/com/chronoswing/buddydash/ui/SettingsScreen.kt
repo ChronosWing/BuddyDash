@@ -496,8 +496,8 @@ private fun SettingsCardDensitySection(
     onDensityChange: (Int) -> Unit,
 ) {
     val modes = listOf(
-        Triple(R.string.settings_view_mode_minimal, R.string.settings_view_mode_hint_minimal, 0),
-        Triple(R.string.settings_view_mode_standard, R.string.settings_view_mode_hint_standard, 1),
+        Triple(R.string.settings_view_mode_minimal, R.string.settings_view_mode_hint_minimal, 1),
+        Triple(R.string.settings_view_mode_standard, R.string.settings_view_mode_hint_standard, 0),
         Triple(R.string.settings_view_mode_detailed, R.string.settings_view_mode_hint_detailed, 2),
     )
     Column(

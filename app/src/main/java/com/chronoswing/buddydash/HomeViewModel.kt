@@ -71,8 +71,8 @@ data class HomeUiState(
     val printGlowMultiplier: Float = 1f,
     val debugForcePrintGlow: Boolean = false,
     val debugShowLogoGlowBounds: Boolean = false,
-    /** Home card view mode: 0=Minimal, 1=Standard, 2=Detailed */
-    val homeCardDensity: Int = 1,
+    /** Home card view mode: 0=Standard, 1=Minimal, 2=Detailed */
+    val homeCardDensity: Int = 0,
     /** Per-printer card visibility overrides (printer ID → visibility). */
     val cardVisibility: Map<Int, PrinterCardVisibility> = emptyMap(),
     /** False until user has long-pressed a printer card at least once. */

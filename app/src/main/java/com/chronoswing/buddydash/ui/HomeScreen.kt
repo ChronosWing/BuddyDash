@@ -214,7 +214,7 @@ private fun HomeScreenContent(
     printGlowMultiplier: Float,
     debugForcePrintGlow: Boolean,
     debugShowLogoGlowBounds: Boolean,
-    homeCardDensity: Int = 1,
+    homeCardDensity: Int = 0,
     cardVisibility: Map<Int, PrinterCardVisibility> = emptyMap(),
     showQuickActionHint: Boolean = false,
     onQuickActionHintDismissed: () -> Unit = {},
