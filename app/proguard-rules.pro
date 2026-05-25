@@ -23,6 +23,12 @@
     <fields>;
 }
 
+# ── AndroidX Security Crypto ──────────────────────────────────────────────────
+# EncryptedSharedPreferences uses Android Keystore via reflection
+-keep class androidx.security.crypto.** { *; }
+-keep class com.google.crypto.tink.** { *; }
+-dontwarn com.google.crypto.tink.**
+
 # ── Kotlin ───────────────────────────────────────────────────────────────────
 # Keep Kotlin metadata for internal inline/reified functions
 -keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod

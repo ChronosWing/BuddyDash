@@ -487,5 +487,8 @@
     <string name="about_beta_hint">Beta software · expect rapid iteration</string>
     <string name="about_github">GitHub</string>
     <string name="about_report_issue">Report issue</string>
+    <string name="about_export_diagnostics">Export diagnostics</string>
+    <string name="about_diagnostics_exported">Diagnostics exported</string>
+    <string name="about_diagnostics_failed">Could not export diagnostics</string>
     <string name="about_open_failed">Could not open link</string>
 </resources>

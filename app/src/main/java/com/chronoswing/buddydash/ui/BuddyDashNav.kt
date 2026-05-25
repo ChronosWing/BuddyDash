@@ -259,6 +259,7 @@ fun BuddyDashNav(
     }
 
     LaunchedEffect(Unit) {
+        settingsRepository.migrateCredentialsIfNeeded()
         if (debugLogNavDestinations) {
             Log.d(
                 TAG_NAV,
@@ -592,7 +593,10 @@ fun BuddyDashNav(
                         SettingsViewModel(settingsRepository, apiClient, homePrintersCacheRepository)
                     },
                 )
-                SettingsScreen(viewModel = viewModel)
+                SettingsScreen(
+                    viewModel = viewModel,
+                    settingsRepository = settingsRepository,
+                )
             }
 
             composable(
