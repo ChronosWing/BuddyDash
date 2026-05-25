@@ -9,6 +9,8 @@ import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.ClearPlateActionOutcome
 import com.chronoswing.buddydash.util.NfcClearPlateDebounce
 import com.chronoswing.buddydash.util.blocksNfcPlateClear
+import com.chronoswing.buddydash.util.isClearPlateAlreadyAcknowledged
+import com.chronoswing.buddydash.util.isPlateKnownCleared
 import com.chronoswing.buddydash.util.parseClearPlateDeepLink
 import com.chronoswing.buddydash.util.resolvePrinterByKey
 import kotlinx.coroutines.flow.first
@@ -38,6 +40,10 @@ class NfcClearPlateExecutor(
         val printer = resolvePrinter(serverUrl, apiKey, link.printerKey)
             ?: return ClearPlateActionOutcome.PrinterNotFound
 
+        printer.liveStatus?.takeIf { isPlateKnownCleared(it) }?.let {
+            return ClearPlateActionOutcome.AlreadyCleared
+        }
+
         val statusResult = apiClient.fetchPrinterStatus(serverUrl, apiKey, printer.id)
         val status = statusResult.getOrNull()
         if (statusResult.isFailure && status == null) {
@@ -53,18 +59,30 @@ class NfcClearPlateExecutor(
         if (status != null && blocksNfcPlateClear(status)) {
             return ClearPlateActionOutcome.PrinterActive
         }
+        if (status != null && isPlateKnownCleared(status)) {
+            return ClearPlateActionOutcome.AlreadyCleared
+        }
 
         return apiClient.clearPlate(serverUrl, apiKey, printer.id).fold(
-            onSuccess = {
-                refreshHomePrinterCache(serverUrl, apiKey, printer)
-                ClearPlateActionOutcome.Success(printerName = printer.name)
+            onSuccess = { message ->
+                if (isClearPlateAlreadyAcknowledged(message)) {
+                    ClearPlateActionOutcome.AlreadyCleared
+                } else {
+                    refreshHomePrinterCache(serverUrl, apiKey, printer)
+                    ClearPlateActionOutcome.Success(printerName = printer.name)
+                }
             },
             onFailure = { error ->
-                Log.w(TAG, "NFC clear plate API failed for printerId=${printer.id}", error)
-                if (error.isConnectivityFailure()) {
-                    ClearPlateActionOutcome.ConnectionRequired
+                val detail = error.message.orEmpty()
+                if (isClearPlateAlreadyAcknowledged(detail)) {
+                    ClearPlateActionOutcome.AlreadyCleared
                 } else {
-                    ClearPlateActionOutcome.ApiFailed
+                    Log.w(TAG, "NFC clear plate API failed for printerId=${printer.id}", error)
+                    if (error.isConnectivityFailure()) {
+                        ClearPlateActionOutcome.ConnectionRequired
+                    } else {
+                        ClearPlateActionOutcome.ApiFailed
+                    }
                 }
             },
         )

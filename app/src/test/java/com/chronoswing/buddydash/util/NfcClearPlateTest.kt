@@ -76,4 +76,43 @@ class NfcClearPlateTest {
         assertTrue(NfcClearPlateDebounce.shouldProcess("clear-plate:42"))
         assertFalse(NfcClearPlateDebounce.shouldProcess("clear-plate:42"))
     }
+
+    @Test
+    fun isPlateKnownCleared_trueWhenAwaitingPlateClearFalse() {
+        val status = PrinterStatus(
+            connected = true,
+            rawState = "IDLE",
+            progress = null,
+            fileName = null,
+            remainingTimeSeconds = null,
+            nozzleTemp = null,
+            bedTemp = null,
+            awaitingPlateClear = false,
+        )
+        assertTrue(isPlateKnownCleared(status))
+    }
+
+    @Test
+    fun isPlateKnownCleared_falseWhenUnknownOrNeedsClear() {
+        val unknown = PrinterStatus(
+            connected = true,
+            rawState = "IDLE",
+            progress = null,
+            fileName = null,
+            remainingTimeSeconds = null,
+            nozzleTemp = null,
+            bedTemp = null,
+            awaitingPlateClear = null,
+        )
+        val needsClear = unknown.copy(awaitingPlateClear = true)
+        assertFalse(isPlateKnownCleared(unknown))
+        assertFalse(isPlateKnownCleared(needsClear))
+    }
+
+    @Test
+    fun isClearPlateAlreadyAcknowledged_detectsNoOpMessages() {
+        assertTrue(isClearPlateAlreadyAcknowledged("Plate already cleared"))
+        assertTrue(isClearPlateAlreadyAcknowledged("Already clear — no action needed"))
+        assertFalse(isClearPlateAlreadyAcknowledged("Plate marked clear"))
+    }
 }
