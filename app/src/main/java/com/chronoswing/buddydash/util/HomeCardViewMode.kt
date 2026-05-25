@@ -4,8 +4,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 enum class HomeCardViewMode(val index: Int) {
-    Minimal(0),
-    Standard(1),
+    Standard(0),
+    Minimal(1),
     Detailed(2);
 
     companion object {
