@@ -37,6 +37,7 @@ fun PrintFileNameText(
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
     fontWeight: FontWeight? = null,
+    maxLines: Int = 2,
 ) {
     val displayName = formatFilenameForDisplay(fileName)
     Text(
@@ -47,7 +48,7 @@ fun PrintFileNameText(
         style = style,
         color = color,
         fontWeight = fontWeight,
-        maxLines = 2,
+        maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
     )
 }

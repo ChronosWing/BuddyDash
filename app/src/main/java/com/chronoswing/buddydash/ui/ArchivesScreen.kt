@@ -375,6 +375,7 @@ private fun ArchivesHistoryContent(
                 serverUrl = serverUrl,
                 cameraToken = cameraToken,
                 onArchiveClick = onArchiveClick,
+                compactCards = archiveGridColumns > 1,
             )
         }
     }
@@ -389,6 +390,7 @@ private fun ArchiveHistoryList(
     serverUrl: String,
     cameraToken: String,
     onArchiveClick: (PrintArchive) -> Unit,
+    compactCards: Boolean = false,
 ) {
     val contentPadding = PaddingValues(
         start = 12.dp,
@@ -411,6 +413,7 @@ private fun ArchiveHistoryList(
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
                     onArchiveClick = onArchiveClick,
+                    compact = compactCards,
                 )
             }
         }
@@ -432,6 +435,7 @@ private fun ArchiveHistoryList(
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
                     onArchiveClick = onArchiveClick,
+                    compact = compactCards,
                 )
             }
         }
@@ -444,12 +448,14 @@ private fun ArchiveHistoryListItem(
     serverUrl: String,
     cameraToken: String,
     onArchiveClick: (PrintArchive) -> Unit,
+    compact: Boolean = false,
 ) {
     ArchiveListRow(
         archive = archive,
         serverUrl = serverUrl,
         cameraToken = cameraToken,
         modifier = Modifier.buddyDashClickable { onArchiveClick(archive) },
+        compact = compact,
     )
 }
 

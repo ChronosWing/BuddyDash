@@ -3,6 +3,7 @@ package com.chronoswing.buddydash.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.BorderStroke
@@ -29,6 +30,7 @@ fun ArchiveListRow(
     serverUrl: String,
     cameraToken: String,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val displayName = if (archive.displayName == ARCHIVE_DISPLAY_NAME_FALLBACK) {
         stringResource(R.string.archive_unnamed_print)
@@ -38,6 +40,8 @@ fun ArchiveListRow(
     val statusLine = formatArchiveStatusPrinterLine(archive)
     val metaLine = formatArchiveListMetaLine(archive)
     val showMaterial = archiveHasMaterialDisplay(archive)
+    val verticalPadding = if (compact) 8.dp else 10.dp
+    val lineSpacing = if (compact) 2.dp else 3.dp
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -48,9 +52,9 @@ fun ArchiveListRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = verticalPadding),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             ArchiveThumbnail(
                 archiveId = archive.id,
@@ -60,12 +64,13 @@ fun ArchiveListRow(
             )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
+                verticalArrangement = Arrangement.spacedBy(lineSpacing),
             ) {
                 PrintFileNameText(
                     fileName = displayName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
+                    maxLines = 1,
                 )
                 Text(
                     text = statusLine,
@@ -74,13 +79,18 @@ fun ArchiveListRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                metaLine?.let { meta ->
+                if (metaLine != null || compact) {
                     Text(
-                        text = meta,
+                        text = metaLine.orEmpty(),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = if (compact) {
+                            Modifier.defaultMinSize(minHeight = 14.dp)
+                        } else {
+                            Modifier
+                        },
                     )
                 }
                 if (showMaterial) {
