@@ -194,6 +194,13 @@ private fun SettingsScreenContent(
                 )
             }
 
+            Text(
+                text = stringResource(R.string.nfc_clear_plate_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                modifier = Modifier.padding(top = 4.dp),
+            )
+
             if (BuddyDashDebug.enabled) {
                 HomeHeaderVisualDebugSection(
                     gridColumns = gridColumns,

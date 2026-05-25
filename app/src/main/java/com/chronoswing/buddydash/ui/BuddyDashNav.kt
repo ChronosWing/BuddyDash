@@ -227,6 +227,7 @@ fun BuddyDashNav(
     printerDetailCacheRepository: PrinterDetailCacheRepository,
     spoolDetailCacheRepository: SpoolDetailCacheRepository,
     apiClient: BambuddyApiClient,
+    settingsNavigationNonce: Int = 0,
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -255,6 +256,18 @@ fun BuddyDashNav(
                 "bottomNavTabs=Printers(${Routes.HOME}), Spools(${Routes.SPOOLS}), " +
                     "Archives(${Routes.ARCHIVES}), Settings(${Routes.SETTINGS})",
             )
+        }
+    }
+
+    LaunchedEffect(settingsNavigationNonce) {
+        if (settingsNavigationNonce > 0) {
+            navController.navigate(Routes.SETTINGS) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = false
+                }
+                launchSingleTop = true
+                restoreState = false
+            }
         }
     }
 
