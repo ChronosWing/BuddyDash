@@ -120,6 +120,10 @@ import com.chronoswing.buddydash.util.HomePrinterSearchFilter
 import com.chronoswing.buddydash.util.applyHomePrinterSearch
 import com.chronoswing.buddydash.util.homeSearchEmptyMessageRes
 import com.chronoswing.buddydash.util.homePrinterDashboardCounts
+import com.chronoswing.buddydash.data.PrinterCardVisibility
+import com.chronoswing.buddydash.util.HomeCardDensity
+import com.chronoswing.buddydash.util.HomeCardDensityValues
+import com.chronoswing.buddydash.util.layoutValues
 import com.chronoswing.buddydash.util.PrinterActivityKind
 import com.chronoswing.buddydash.util.resolveActivityKind
 import com.chronoswing.buddydash.util.toCardLabels
@@ -164,6 +168,8 @@ fun HomeScreen(
         printGlowMultiplier = uiState.printGlowMultiplier,
         debugForcePrintGlow = uiState.debugForcePrintGlow,
         debugShowLogoGlowBounds = uiState.debugShowLogoGlowBounds,
+        homeCardDensity = uiState.homeCardDensity,
+        cardVisibility = uiState.cardVisibility,
         onPrinterClick = onPrinterClick,
         onClearPrinterHms = viewModel::clearPrinterHmsErrors,
         onQuickAction = onQuickAction,
@@ -195,10 +201,14 @@ private fun HomeScreenContent(
     printGlowMultiplier: Float,
     debugForcePrintGlow: Boolean,
     debugShowLogoGlowBounds: Boolean,
+    homeCardDensity: Int = 0,
+    cardVisibility: Map<Int, PrinterCardVisibility> = emptyMap(),
     onPrinterClick: (Printer) -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
     onQuickAction: (Printer, QuickAction) -> Unit = { _, _ -> },
 ) {
+    val density = HomeCardDensity.fromIndex(homeCardDensity)
+    val densityValues = density.layoutValues()
     val cachedCount = printers.size
     val printerCounts = printers.homePrinterDashboardCounts()
     val showHeaderMetadata = settingsReady && hasCredentials
@@ -410,6 +420,8 @@ private fun HomeScreenContent(
                             searchFilter = searchFilter,
                             serverUrl = serverUrl,
                             cameraToken = cameraToken,
+                            densityValues = densityValues,
+                            cardVisibility = cardVisibility,
                             onPrinterClick = onPrinterClick,
                             onClearPrinterHms = onClearPrinterHms,
                             onQuickAction = onQuickAction,
@@ -434,6 +446,8 @@ private fun HomePrinterCardsList(
     searchFilter: HomePrinterSearchFilter,
     serverUrl: String,
     cameraToken: String,
+    densityValues: HomeCardDensityValues,
+    cardVisibility: Map<Int, PrinterCardVisibility>,
     onPrinterClick: (Printer) -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
     onQuickAction: (Printer, QuickAction) -> Unit,
@@ -451,7 +465,7 @@ private fun HomePrinterCardsList(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(densityValues.listItemSpacing),
         ) {
             if (showSearchEmpty) {
                 item(key = "search_empty") {
@@ -466,6 +480,8 @@ private fun HomePrinterCardsList(
                     printer = printer,
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
+                    densityValues = densityValues,
+                    visibility = cardVisibility[printer.id] ?: PrinterCardVisibility(),
                     onPrinterClick = onPrinterClick,
                     onClearPrinterHms = onClearPrinterHms,
                     onQuickAction = onQuickAction,
@@ -478,8 +494,8 @@ private fun HomePrinterCardsList(
             columns = GridCells.Fixed(gridColumns),
             modifier = Modifier.fillMaxSize(),
             contentPadding = contentPadding,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(densityValues.listItemSpacing),
+            verticalArrangement = Arrangement.spacedBy(densityValues.listItemSpacing),
         ) {
             if (showSearchEmpty) {
                 item(
@@ -497,6 +513,8 @@ private fun HomePrinterCardsList(
                     printer = printer,
                     serverUrl = serverUrl,
                     cameraToken = cameraToken,
+                    densityValues = densityValues,
+                    visibility = cardVisibility[printer.id] ?: PrinterCardVisibility(),
                     onPrinterClick = onPrinterClick,
                     onClearPrinterHms = onClearPrinterHms,
                     onQuickAction = onQuickAction,
@@ -524,6 +542,8 @@ private fun HomePrinterCardItem(
     printer: Printer,
     serverUrl: String,
     cameraToken: String,
+    densityValues: HomeCardDensityValues,
+    visibility: PrinterCardVisibility,
     onPrinterClick: (Printer) -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
     onQuickAction: (Printer, QuickAction) -> Unit,
@@ -535,6 +555,8 @@ private fun HomePrinterCardItem(
         liveStatus = printer.liveStatus,
         serverUrl = serverUrl,
         cameraToken = cameraToken,
+        densityValues = densityValues,
+        visibility = visibility,
         onClick = { onPrinterClick(printer) },
         onClearPrinterHms = onClearPrinterHms,
         onQuickAction = { action -> onQuickAction(printer, action) },
@@ -550,6 +572,8 @@ private fun GlancePrinterCard(
     liveStatus: PrinterStatus?,
     serverUrl: String,
     cameraToken: String,
+    densityValues: HomeCardDensityValues,
+    visibility: PrinterCardVisibility = PrinterCardVisibility(),
     onClick: () -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
     onQuickAction: (QuickAction) -> Unit,
@@ -669,8 +693,8 @@ private fun GlancePrinterCard(
             border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
         ) {
             Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(densityValues.cardPadding),
+                verticalArrangement = Arrangement.spacedBy(densityValues.contentSpacing),
             ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -695,9 +719,9 @@ private fun GlancePrinterCard(
                 activityKind = labels.activityKind,
                 progressCompact = labels.progressCompact,
                 plateKind = labels.plateKind,
-                maintenanceIndicator = labels.maintenanceIndicator,
+                maintenanceIndicator = if (visibility.showMaintenanceChip) labels.maintenanceIndicator else MaintenanceHomeIndicator.None,
                 pendingQueueCount = labels.pendingQueueCount,
-                hmsAlertSeverity = labels.hmsAlertSeverity,
+                hmsAlertSeverity = if (visibility.showHmsChip) labels.hmsAlertSeverity else HmsSeverity.Ok,
                 onHmsChipClick = if (hasHms && !hasMaintenance) {
                     { alertSheet = HomePrinterAlertSheet.Hms }
                 } else {
@@ -719,13 +743,13 @@ private fun GlancePrinterCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        .padding(top = densityValues.contentSpacing / 2),
+                    horizontalArrangement = Arrangement.spacedBy(densityValues.cameraSpacing),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(densityValues.contentSpacing),
                     ) {
                         labels.progressFraction?.let { fraction ->
                             MicroMotionProgressBar(
@@ -748,16 +772,18 @@ private fun GlancePrinterCard(
                             )
                         }
                     }
-                    MicroMotionThumbnailFrame(
-                        motion = labels.cardMicroMotion,
-                        modifier = Modifier.padding(start = 4.dp, end = 2.dp),
-                    ) {
-                        PrinterCoverImage(
-                            serverUrl = serverUrl,
-                            cameraToken = cameraToken,
-                            thumbnailIdentity = printThumbnailIdentity,
-                            size = 64.dp,
-                        )
+                    if (visibility.showCameraPreview) {
+                        MicroMotionThumbnailFrame(
+                            motion = labels.cardMicroMotion,
+                            modifier = Modifier.padding(start = 4.dp, end = 2.dp),
+                        ) {
+                            PrinterCoverImage(
+                                serverUrl = serverUrl,
+                                cameraToken = cameraToken,
+                                thumbnailIdentity = printThumbnailIdentity,
+                                size = densityValues.thumbnailSize,
+                            )
+                        }
                     }
                 }
             } else {
@@ -781,7 +807,7 @@ private fun GlancePrinterCard(
                 }
             }
 
-            if (labels.tempsLine != null) {
+            if (labels.tempsLine != null && visibility.showTemperatures) {
                 PrintTempsRow(
                     nozzleTemp = labels.nozzleTemp,
                     bedTemp = labels.bedTemp,

@@ -56,6 +56,7 @@ import com.chronoswing.buddydash.data.SpoolDetailCacheRepository
 import com.chronoswing.buddydash.data.SpoolsCacheRepository
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.DeepLinkActionActivity
+import com.chronoswing.buddydash.data.PrinterCardPrefsRepository
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.ui.components.AppForegroundResumeEffect
 import com.chronoswing.buddydash.ui.components.BuddyDashBottomNav
@@ -233,6 +234,7 @@ fun BuddyDashNav(
     archivesCacheRepository: ArchivesCacheRepository,
     printerDetailCacheRepository: PrinterDetailCacheRepository,
     spoolDetailCacheRepository: SpoolDetailCacheRepository,
+    printerCardPrefsRepository: PrinterCardPrefsRepository,
     apiClient: BambuddyApiClient,
     settingsNavigationNonce: Int = 0,
 ) {
@@ -361,6 +363,7 @@ fun BuddyDashNav(
                             apiClient,
                             homePrintersCacheRepository,
                             spoolsCacheRepository,
+                            printerCardPrefsRepository,
                         )
                     },
                 )
