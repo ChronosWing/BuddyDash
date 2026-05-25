@@ -249,7 +249,7 @@
     <string name="maintenance_snooze_tomorrow">Tomorrow</string>
     <string name="maintenance_snooze_dismiss">Dismiss for now</string>
     <!-- Printer card visibility -->
-    <string name="card_visibility_title">Card visibility</string>
+    <string name="card_visibility_title">Home card display</string>
     <string name="card_visibility_camera">Camera preview</string>
     <string name="card_visibility_power">Power chip</string>
     <string name="card_visibility_hms">HMS chip</string>

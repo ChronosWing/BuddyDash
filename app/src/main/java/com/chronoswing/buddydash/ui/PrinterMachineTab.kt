@@ -29,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.chronoswing.buddydash.R
+import androidx.compose.material3.Switch
+import com.chronoswing.buddydash.data.PrinterCardVisibility
 import com.chronoswing.buddydash.data.model.PrinterMachineInfo
 import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
 import com.chronoswing.buddydash.data.model.PrinterStatus
@@ -78,6 +80,8 @@ fun MachineTab(
     onStopCameraStream: () -> Unit = {},
     hasSmartOutlet: Boolean = false,
     onCopyNfcLink: (String) -> Unit = {},
+    cardVisibility: PrinterCardVisibility = PrinterCardVisibility(),
+    onCardVisibilityChange: (PrinterCardVisibility) -> Unit = {},
 ) {
     val caps = labels.machineTabCapabilities(cameraTokenConfigured = cameraToken.isNotBlank())
     val isExpandedWidth = rememberIsBuddyDashExpandedWidth()
@@ -285,6 +289,11 @@ fun MachineTab(
                 hasSmartOutlet = hasSmartOutlet,
                 onCopyLink = onCopyNfcLink,
             )
+
+            MachineCardVisibilityCard(
+                visibility = cardVisibility,
+                onVisibilityChange = onCardVisibilityChange,
+            )
         } else {
             smartPlugState?.let { plug ->
                 SmartPlugPowerCard(
@@ -311,6 +320,11 @@ fun MachineTab(
                 printerId = printerId,
                 hasSmartOutlet = hasSmartOutlet,
                 onCopyLink = onCopyNfcLink,
+            )
+
+            MachineCardVisibilityCard(
+                visibility = cardVisibility,
+                onVisibilityChange = onCardVisibilityChange,
             )
         }
     }
@@ -520,6 +534,59 @@ private fun MachineNfcActionsCard(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
             modifier = Modifier.padding(top = 2.dp, start = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun MachineCardVisibilityCard(
+    visibility: PrinterCardVisibility,
+    onVisibilityChange: (PrinterCardVisibility) -> Unit,
+) {
+    DetailInfoCard {
+        SectionHeader(stringResource(R.string.card_visibility_title))
+        CardVisibilityToggle(
+            label = stringResource(R.string.card_visibility_camera),
+            checked = visibility.showCameraPreview,
+            onCheckedChange = { onVisibilityChange(visibility.copy(showCameraPreview = it)) },
+        )
+        CardVisibilityToggle(
+            label = stringResource(R.string.card_visibility_hms),
+            checked = visibility.showHmsChip,
+            onCheckedChange = { onVisibilityChange(visibility.copy(showHmsChip = it)) },
+        )
+        CardVisibilityToggle(
+            label = stringResource(R.string.card_visibility_maintenance),
+            checked = visibility.showMaintenanceChip,
+            onCheckedChange = { onVisibilityChange(visibility.copy(showMaintenanceChip = it)) },
+        )
+        CardVisibilityToggle(
+            label = stringResource(R.string.card_visibility_temps),
+            checked = visibility.showTemperatures,
+            onCheckedChange = { onVisibilityChange(visibility.copy(showTemperatures = it)) },
+        )
+    }
+}
+
+@Composable
+private fun CardVisibilityToggle(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
         )
     }
 }

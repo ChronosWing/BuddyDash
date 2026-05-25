@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chronoswing.buddydash.data.HomePrintersCacheRepository
+import com.chronoswing.buddydash.data.PrinterCardPrefsRepository
+import com.chronoswing.buddydash.data.PrinterCardVisibility
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.SpoolsCacheRepository
 import com.chronoswing.buddydash.data.model.Printer
@@ -69,6 +71,10 @@ data class HomeUiState(
     val printGlowMultiplier: Float = 1f,
     val debugForcePrintGlow: Boolean = false,
     val debugShowLogoGlowBounds: Boolean = false,
+    /** Home card density: 0=Comfortable, 1=Compact, 2=Dense */
+    val homeCardDensity: Int = 0,
+    /** Per-printer card visibility overrides (printer ID → visibility). */
+    val cardVisibility: Map<Int, PrinterCardVisibility> = emptyMap(),
 )
 
 class HomeViewModel(
@@ -76,6 +82,7 @@ class HomeViewModel(
     private val apiClient: BambuddyApiClient,
     private val homePrintersCacheRepository: HomePrintersCacheRepository,
     private val spoolsCacheRepository: SpoolsCacheRepository,
+    private val printerCardPrefsRepository: PrinterCardPrefsRepository? = null,
 ) : ViewModel() {
 
     private var spoolCountJob: Job? = null
@@ -175,6 +182,11 @@ class HomeViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            settingsRepository.homeCardDensity.collect { density ->
+                _uiState.update { it.copy(homeCardDensity = density) }
+            }
+        }
     }
 
     private data class VisualTuningSnapshot(
@@ -225,6 +237,7 @@ class HomeViewModel(
                 else -> state
             }
         }
+        refreshCardVisibility()
     }
 
     private suspend fun hydrateSpoolCountFromDiskCache(serverUrl: String) {
@@ -647,6 +660,7 @@ class HomeViewModel(
                     }
                     HomeLoadTiming.log("secondary data applied to printer cards")
                     refreshLoadedSpoolCount()
+                    refreshCardVisibility()
                     flushPendingRefresh()
                 },
                 onFailure = { error ->
@@ -679,6 +693,19 @@ class HomeViewModel(
             )
         } catch (e: CancellationException) {
             throw e
+        }
+    }
+
+    private fun refreshCardVisibility() {
+        val repo = printerCardPrefsRepository ?: return
+        val printerIds = _uiState.value.printers.map { it.id }
+        if (printerIds.isEmpty()) return
+        viewModelScope.launch {
+            val map = mutableMapOf<Int, PrinterCardVisibility>()
+            for (id in printerIds) {
+                map[id] = repo.loadVisibility(id)
+            }
+            _uiState.update { it.copy(cardVisibility = map) }
         }
     }
 

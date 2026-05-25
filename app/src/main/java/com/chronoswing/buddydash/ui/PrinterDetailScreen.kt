@@ -50,8 +50,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalClipboardManager
+import com.chronoswing.buddydash.data.PrinterCardPrefsRepository
+import com.chronoswing.buddydash.data.PrinterCardVisibility
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -138,6 +141,15 @@ fun PrinterDetailScreen(
 ) {
     LaunchedEffect(printerId, printerName, printerModel) {
         viewModel.init(printerId, printerName, printerModel)
+    }
+
+    val context = LocalContext.current
+    val cardPrefsRepo = remember { PrinterCardPrefsRepository(context) }
+    var cardVisibility by remember { mutableStateOf(PrinterCardVisibility()) }
+    val cardPrefsScope = rememberCoroutineScope()
+
+    LaunchedEffect(printerId) {
+        cardVisibility = cardPrefsRepo.loadVisibility(printerId)
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -242,6 +254,11 @@ fun PrinterDetailScreen(
         onFilamentAssignSnackbarShown = viewModel::onFilamentAssignSnackbarShown,
         pickerAssignmentConflict = viewModel::pickerAssignmentConflict,
         pickerCardUsageFor = viewModel::pickerCardUsageFor,
+        cardVisibility = cardVisibility,
+        onCardVisibilityChange = { newVis ->
+            cardVisibility = newVis
+            cardPrefsScope.launch { cardPrefsRepo.saveVisibility(printerId, newVis) }
+        },
     )
 }
 
@@ -338,6 +355,8 @@ private fun PrinterDetailScreenContent(
     onPowerOffSmartPlug: () -> Unit,
     onPerformMaintenanceReset: (Int) -> Unit,
     onMaintenanceResetSnackbarShown: () -> Unit,
+    cardVisibility: PrinterCardVisibility = PrinterCardVisibility(),
+    onCardVisibilityChange: (PrinterCardVisibility) -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val hasCachedData = labels != null
@@ -724,6 +743,8 @@ private fun PrinterDetailScreenContent(
                                             snackbarHostState.showSnackbar(nfcLinkCopiedMessage)
                                         }
                                     },
+                                    cardVisibility = cardVisibility,
+                                    onCardVisibilityChange = onCardVisibilityChange,
                                 )
                             }
                             }

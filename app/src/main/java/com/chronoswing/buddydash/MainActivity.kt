@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import com.chronoswing.buddydash.data.ArchivesCacheRepository
 import com.chronoswing.buddydash.data.HomePrintersCacheRepository
+import com.chronoswing.buddydash.data.PrinterCardPrefsRepository
 import com.chronoswing.buddydash.data.PrinterDetailCacheRepository
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.SpoolDetailCacheRepository
@@ -33,6 +34,7 @@ class MainActivity : ComponentActivity() {
     private val archivesCacheRepository by lazy { ArchivesCacheRepository(applicationContext) }
     private val printerDetailCacheRepository by lazy { PrinterDetailCacheRepository(applicationContext) }
     private val spoolDetailCacheRepository by lazy { SpoolDetailCacheRepository(applicationContext) }
+    private val printerCardPrefsRepository by lazy { PrinterCardPrefsRepository(applicationContext) }
     private val apiClient by lazy { BambuddyApiClient() }
     private var settingsNavigationNonce by mutableIntStateOf(0)
 
@@ -50,6 +52,7 @@ class MainActivity : ComponentActivity() {
                     archivesCacheRepository = archivesCacheRepository,
                     printerDetailCacheRepository = printerDetailCacheRepository,
                     spoolDetailCacheRepository = spoolDetailCacheRepository,
+                    printerCardPrefsRepository = printerCardPrefsRepository,
                     apiClient = apiClient,
                     settingsNavigationNonce = settingsNavigationNonce,
                 )
