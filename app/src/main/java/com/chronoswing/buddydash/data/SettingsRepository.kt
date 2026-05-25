@@ -16,6 +16,7 @@ import com.chronoswing.buddydash.util.ValidatedConnectionSettings
 import com.chronoswing.buddydash.util.validateConnectionSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.catch
@@ -33,6 +34,8 @@ class SettingsRepository(private val context: Context) {
     private val recoveryMessages = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val settingsRecoveryMessage: SharedFlow<String> = recoveryMessages.asSharedFlow()
 
+    val encryptedStore = EncryptedCredentialStore(context)
+
     private val safePreferences: Flow<Preferences> = context.settingsDataStore.data
         .catch { error ->
             Log.w(TAG, "Settings DataStore read failed; resetting to defaults", error)
@@ -41,16 +44,50 @@ class SettingsRepository(private val context: Context) {
             emit(emptyPreferences())
         }
 
-    val serverUrl: Flow<String> = safePreferences.map { preferences ->
-        preferences.safeString(SERVER_URL_KEY)
+    val serverUrl: Flow<String> = safePreferences.map {
+        encryptedStore.readServerUrl().ifEmpty { it.safeString(SERVER_URL_KEY) }
     }
 
-    val apiKey: Flow<String> = safePreferences.map { preferences ->
-        preferences.safeString(API_KEY_KEY)
+    val apiKey: Flow<String> = safePreferences.map {
+        encryptedStore.readApiKey().ifEmpty { it.safeString(API_KEY_KEY) }
     }
 
-    val cameraToken: Flow<String> = safePreferences.map { preferences ->
-        preferences.safeString(CAMERA_TOKEN_KEY)
+    val cameraToken: Flow<String> = safePreferences.map {
+        encryptedStore.readCameraToken().ifEmpty { it.safeString(CAMERA_TOKEN_KEY) }
+    }
+
+    /**
+     * Migrate legacy plain-text credentials from DataStore to encrypted storage.
+     * Safe to call multiple times; no-ops after first successful migration.
+     */
+    suspend fun migrateCredentialsIfNeeded() {
+        if (!encryptedStore.isAvailable) return
+        if (encryptedStore.hasMigrated()) return
+
+        val prefs = runCatching { context.settingsDataStore.data.first() }.getOrNull() ?: return
+        val legacyUrl = prefs.safeString(SERVER_URL_KEY)
+        val legacyKey = prefs.safeString(API_KEY_KEY)
+        val legacyToken = prefs.safeString(CAMERA_TOKEN_KEY)
+
+        if (legacyUrl.isBlank() && legacyKey.isBlank() && legacyToken.isBlank()) {
+            encryptedStore.markMigrated()
+            return
+        }
+
+        if (!encryptedStore.hasCredentials()) {
+            val saved = encryptedStore.saveCredentials(legacyUrl, legacyKey, legacyToken)
+            if (!saved) return
+        }
+
+        encryptedStore.markMigrated()
+
+        runCatching {
+            context.settingsDataStore.edit { preferences ->
+                preferences.remove(SERVER_URL_KEY)
+                preferences.remove(API_KEY_KEY)
+                preferences.remove(CAMERA_TOKEN_KEY)
+            }
+        }
     }
 
     val homeIdleGlowMultiplier: Flow<Float> = safePreferences.map { preferences ->
@@ -191,10 +228,26 @@ class SettingsRepository(private val context: Context) {
     }
 
     private suspend fun persistConnectionSettings(settings: ValidatedConnectionSettings) {
-        context.settingsDataStore.edit { preferences ->
-            preferences[SERVER_URL_KEY] = settings.serverUrl
-            preferences[API_KEY_KEY] = settings.apiKey
-            preferences[CAMERA_TOKEN_KEY] = settings.cameraToken
+        if (encryptedStore.isAvailable) {
+            val saved = encryptedStore.saveCredentials(
+                settings.serverUrl,
+                settings.apiKey,
+                settings.cameraToken,
+            )
+            if (!saved) throw IllegalStateException("Failed to save encrypted credentials")
+            runCatching {
+                context.settingsDataStore.edit { preferences ->
+                    preferences.remove(SERVER_URL_KEY)
+                    preferences.remove(API_KEY_KEY)
+                    preferences.remove(CAMERA_TOKEN_KEY)
+                }
+            }
+        } else {
+            context.settingsDataStore.edit { preferences ->
+                preferences[SERVER_URL_KEY] = settings.serverUrl
+                preferences[API_KEY_KEY] = settings.apiKey
+                preferences[CAMERA_TOKEN_KEY] = settings.cameraToken
+            }
         }
     }
 

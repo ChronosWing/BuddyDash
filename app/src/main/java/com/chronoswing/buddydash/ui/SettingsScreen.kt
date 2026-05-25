@@ -29,6 +29,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -51,11 +53,13 @@ import com.chronoswing.buddydash.ui.layout.rememberBuddyDashExpandedGridColumnCo
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    settingsRepository: com.chronoswing.buddydash.data.SettingsRepository? = null,
     onBack: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     SettingsScreenContent(
         uiState = uiState,
+        settingsRepository = settingsRepository,
         onServerUrlChange = viewModel::onServerUrlChange,
         onApiKeyChange = viewModel::onApiKeyChange,
         onCameraTokenChange = viewModel::onCameraTokenChange,
@@ -80,6 +84,7 @@ fun SettingsScreen(
 @Composable
 private fun SettingsScreenContent(
     uiState: SettingsUiState,
+    settingsRepository: com.chronoswing.buddydash.data.SettingsRepository? = null,
     onServerUrlChange: (String) -> Unit,
     onApiKeyChange: (String) -> Unit,
     onCameraTokenChange: (String) -> Unit,
@@ -236,7 +241,7 @@ private fun SettingsScreenContent(
                 onKeepAwakeChange = onKeepScreenAwakeChange,
             )
 
-            SettingsAboutSection()
+            SettingsAboutSection(settingsRepository = settingsRepository)
 
             if (BuddyDashDebug.enabled) {
                 HomeHeaderVisualDebugSection(
@@ -262,9 +267,14 @@ private fun SettingsScreenContent(
 private const val GITHUB_REPO_URL = "https://github.com/ChronosWing/BuddyDash"
 
 @Composable
-private fun SettingsAboutSection() {
+private fun SettingsAboutSection(
+    settingsRepository: com.chronoswing.buddydash.data.SettingsRepository? = null,
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     val failMessage = stringResource(R.string.about_open_failed)
+    val exportedMessage = stringResource(R.string.about_diagnostics_exported)
+    val exportFailedMessage = stringResource(R.string.about_diagnostics_failed)
     fun openUrl(url: String) {
         try {
             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -309,6 +319,28 @@ private fun SettingsAboutSection() {
             }
             OutlinedButton(onClick = { openUrl("$GITHUB_REPO_URL/issues") }) {
                 Text(stringResource(R.string.about_report_issue))
+            }
+        }
+
+        if (settingsRepository != null) {
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        val report = runCatching {
+                            com.chronoswing.buddydash.util.DiagnosticsExport.generate(context, settingsRepository)
+                        }.getOrNull()
+                        if (report != null) {
+                            val shared = com.chronoswing.buddydash.util.DiagnosticsExport.shareReport(context, report)
+                            val msg = if (shared) exportedMessage else exportFailedMessage
+                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            android.widget.Toast.makeText(context, exportFailedMessage, android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                modifier = Modifier.padding(top = 4.dp),
+            ) {
+                Text(stringResource(R.string.about_export_diagnostics))
             }
         }
 
