@@ -11,6 +11,10 @@ import com.chronoswing.buddydash.ui.motion.HomeLogoGlowLayer
 import com.chronoswing.buddydash.ui.motion.HomeLogoGlowState
 import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
 import com.chronoswing.buddydash.ui.motion.HomeHeaderBackground
+import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.platform.LocalView
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import com.chronoswing.buddydash.ui.motion.refreshSpinning
 import androidx.compose.foundation.Image
@@ -101,6 +105,8 @@ import com.chronoswing.buddydash.ui.components.PrintFileNameText
 import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterCoverImage
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
+import com.chronoswing.buddydash.ui.components.QuickAction
+import com.chronoswing.buddydash.ui.components.QuickActionsSheet
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.layout.rememberHomePrinterGridColumnCount
 import com.chronoswing.buddydash.util.HOME_PRINTER_SEARCH_MIN_COUNT
@@ -123,6 +129,7 @@ import com.chronoswing.buddydash.ui.theme.OfflineRed
 fun HomeScreen(
     viewModel: HomeViewModel,
     onPrinterClick: (Printer) -> Unit,
+    onQuickAction: (Printer, QuickAction) -> Unit = { _, _ -> },
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -159,6 +166,7 @@ fun HomeScreen(
         debugShowLogoGlowBounds = uiState.debugShowLogoGlowBounds,
         onPrinterClick = onPrinterClick,
         onClearPrinterHms = viewModel::clearPrinterHmsErrors,
+        onQuickAction = onQuickAction,
     )
 }
 
@@ -189,6 +197,7 @@ private fun HomeScreenContent(
     debugShowLogoGlowBounds: Boolean,
     onPrinterClick: (Printer) -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
+    onQuickAction: (Printer, QuickAction) -> Unit = { _, _ -> },
 ) {
     val cachedCount = printers.size
     val printerCounts = printers.homePrinterDashboardCounts()
@@ -403,6 +412,7 @@ private fun HomeScreenContent(
                             cameraToken = cameraToken,
                             onPrinterClick = onPrinterClick,
                             onClearPrinterHms = onClearPrinterHms,
+                            onQuickAction = onQuickAction,
                         )
                     }
                 }
@@ -426,6 +436,7 @@ private fun HomePrinterCardsList(
     cameraToken: String,
     onPrinterClick: (Printer) -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
+    onQuickAction: (Printer, QuickAction) -> Unit,
 ) {
     val contentPadding = PaddingValues(
         start = 12.dp,
@@ -457,6 +468,7 @@ private fun HomePrinterCardsList(
                     cameraToken = cameraToken,
                     onPrinterClick = onPrinterClick,
                     onClearPrinterHms = onClearPrinterHms,
+                    onQuickAction = onQuickAction,
                 )
             }
         }
@@ -487,6 +499,7 @@ private fun HomePrinterCardsList(
                     cameraToken = cameraToken,
                     onPrinterClick = onPrinterClick,
                     onClearPrinterHms = onClearPrinterHms,
+                    onQuickAction = onQuickAction,
                 )
             }
         }
@@ -513,8 +526,10 @@ private fun HomePrinterCardItem(
     cameraToken: String,
     onPrinterClick: (Printer) -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
+    onQuickAction: (Printer, QuickAction) -> Unit,
 ) {
     GlancePrinterCard(
+        printer = printer,
         labels = printer.toCardLabels(),
         printerId = printer.id,
         liveStatus = printer.liveStatus,
@@ -522,11 +537,14 @@ private fun HomePrinterCardItem(
         cameraToken = cameraToken,
         onClick = { onPrinterClick(printer) },
         onClearPrinterHms = onClearPrinterHms,
+        onQuickAction = { action -> onQuickAction(printer, action) },
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GlancePrinterCard(
+    printer: Printer,
     labels: PrinterCardLabels,
     printerId: Int,
     liveStatus: PrinterStatus?,
@@ -534,6 +552,7 @@ private fun GlancePrinterCard(
     cameraToken: String,
     onClick: () -> Unit,
     onClearPrinterHms: (Int, (Result<Unit>) -> Unit) -> Unit,
+    onQuickAction: (QuickAction) -> Unit,
 ) {
     val printThumbnailIdentity = rememberCurrentPrintThumbnailIdentity(
         printerId = printerId,
@@ -613,6 +632,22 @@ private fun GlancePrinterCard(
         null -> Unit
     }
 
+    var showQuickActions by remember { mutableStateOf(false) }
+    val view = LocalView.current
+
+    if (showQuickActions) {
+        QuickActionsSheet(
+            printer = printer,
+            hasSmartOutlet = false,
+            hasLight = liveStatus?.chamberLightOn != null,
+            onAction = { action ->
+                showQuickActions = false
+                onQuickAction(action)
+            },
+            onDismiss = { showQuickActions = false },
+        )
+    }
+
     HomeCardMicroMotionFrame(
         animateIdleBreath = false,
         motion = labels.cardMicroMotion,
@@ -621,7 +656,13 @@ private fun GlancePrinterCard(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .buddyDashClickable(onClick = onClick),
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        showQuickActions = true
+                    },
+                ),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),

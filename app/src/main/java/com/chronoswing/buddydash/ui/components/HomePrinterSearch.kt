@@ -131,6 +131,8 @@ fun HomePrinterSearchFilterChips(
                         HomePrinterSearchFilter.Active -> stringResource(R.string.filter_active)
                         HomePrinterSearchFilter.NeedsAttention ->
                             stringResource(R.string.filter_needs_attention)
+                        HomePrinterSearchFilter.Printing -> stringResource(R.string.filter_printing)
+                        HomePrinterSearchFilter.Offline -> stringResource(R.string.filter_offline)
                     }
                     val selected = selectedFilter == filter
                     FilterChip(

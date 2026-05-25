@@ -1,6 +1,10 @@
 package com.chronoswing.buddydash.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -51,8 +55,11 @@ import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.SpoolDetailCacheRepository
 import com.chronoswing.buddydash.data.SpoolsCacheRepository
 import com.chronoswing.buddydash.network.BambuddyApiClient
+import com.chronoswing.buddydash.DeepLinkActionActivity
+import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.ui.components.AppForegroundResumeEffect
 import com.chronoswing.buddydash.ui.components.BuddyDashBottomNav
+import com.chronoswing.buddydash.ui.components.QuickAction
 import com.chronoswing.buddydash.util.RefreshSource
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -346,6 +353,7 @@ fun BuddyDashNav(
             popExitTransition = { buddyDashSectionExit(navContext) },
         ) {
             composable(Routes.HOME) {
+                val context = LocalContext.current
                 val viewModel: HomeViewModel = viewModel(
                     factory = viewModelFactory {
                         HomeViewModel(
@@ -377,6 +385,9 @@ fun BuddyDashNav(
                         navController.navigate(
                             Routes.printerDetail(printer.id, printer.name, printer.model),
                         )
+                    },
+                    onQuickAction = { printer, action ->
+                        handleHomeQuickAction(context, navController, printer, action)
                     },
                 )
             }
@@ -739,6 +750,36 @@ fun BuddyDashNav(
             }
         }
     }
+}
+
+private fun handleHomeQuickAction(
+    context: Context,
+    navController: NavHostController,
+    printer: Printer,
+    action: QuickAction,
+) {
+    when (action) {
+        QuickAction.OpenDetail -> {
+            navController.navigate(
+                Routes.printerDetail(printer.id, printer.name, printer.model),
+            )
+        }
+        QuickAction.ClearPlate -> launchNfcDeepLink(context, printer.id, "clear-plate")
+        QuickAction.TogglePower -> launchNfcDeepLink(context, printer.id, "toggle-power")
+        QuickAction.Finish -> launchNfcDeepLink(context, printer.id, "finish")
+        QuickAction.ToggleLight, QuickAction.PauseResume -> {
+            navController.navigate(
+                Routes.printerDetail(printer.id, printer.name, printer.model),
+            )
+        }
+    }
+}
+
+private fun launchNfcDeepLink(context: Context, printerId: Int, action: String) {
+    val uri = Uri.parse("buddydash://printer/$printerId/$action")
+    val intent = Intent(Intent.ACTION_VIEW, uri, context, DeepLinkActionActivity::class.java)
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    context.startActivity(intent)
 }
 
 private inline fun <reified VM : ViewModel> viewModelFactory(
