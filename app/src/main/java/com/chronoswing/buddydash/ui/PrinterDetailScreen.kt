@@ -118,7 +118,6 @@ import com.chronoswing.buddydash.util.staleBannerShowsRefreshFailed
 import com.chronoswing.buddydash.util.ListLoadUi
 import com.chronoswing.buddydash.util.HmsSeverity
 import com.chronoswing.buddydash.util.PrinterDetailLabels
-import com.chronoswing.buddydash.util.buildNfcClearPlateUri
 import com.chronoswing.buddydash.util.buildPrintHeadline
 import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
 import com.chronoswing.buddydash.util.toDetailLabels
@@ -718,8 +717,9 @@ private fun PrinterDetailScreenContent(
                                     onToggleLight = onToggleLight,
                                     onOpenPrinterArchives = onOpenPrinterArchives,
                                     onStopCameraStream = onStopCameraStream,
-                                    onCopyNfcClearPlateLink = {
-                                        clipboard.setText(AnnotatedString(buildNfcClearPlateUri(printerId)))
+                                    hasSmartOutlet = smartPlugState != null,
+                                    onCopyNfcLink = { link ->
+                                        clipboard.setText(AnnotatedString(link))
                                         snackbarScope.launch {
                                             snackbarHostState.showSnackbar(nfcLinkCopiedMessage)
                                         }

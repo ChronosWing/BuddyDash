@@ -27,12 +27,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -197,13 +195,8 @@ private fun SettingsScreenContent(
                 )
             }
 
-            val context = LocalContext.current
-            val nfcCopiedMessage = stringResource(R.string.nfc_link_copied)
             NfcStickersSettingsCard(
                 examplePrinter = uiState.nfcExamplePrinter,
-                onNfcLinkCopied = {
-                    Toast.makeText(context, nfcCopiedMessage, Toast.LENGTH_SHORT).show()
-                },
                 modifier = Modifier.padding(top = 4.dp),
             )
 
