@@ -16,11 +16,34 @@ Whether you run a single printer or a small farm, BuddyDash focuses on fast stat
 
 ## Screenshots
 
-> Coming soon
-
-*Add screenshots of Home, printer details, NFC workflows, archives, fold/tablet layouts, etc.*
-
----
+<div align="center">
+  <div style="display: flex; overflow-x: auto; gap: 12px; padding: 8px 0;">
+    <a href="assets/screenshots/Home.png">
+      <img src="assets/screenshots/Home.png" height="420" />
+    </a>
+    <a href="assets/screenshots/Printer Details.png">
+      <img src="assets/screenshots/Printer Details.png" height="420" />
+    </a>
+    <a href="assets/screenshots/Archives.png">
+      <img src="assets/screenshots/Archives.png" height="420" />
+    </a>
+    <a href="assets/screenshots/Spools.png">
+      <img src="assets/screenshots/Spools.png" height="420" />
+    </a>
+    <a href="assets/screenshots/Filament Loaded.png">
+      <img src="assets/screenshots/Filament Loaded.png" height="420" />
+    </a>
+    <a href="assets/screenshots/Settings.png">
+      <img src="assets/screenshots/Settings.png" height="420" />
+    </a>
+    <a href="assets/screenshots/FoldLayoutPrintDetails.png">
+      <img src="assets/screenshots/FoldLayoutPrintDetails.png" height="420" />
+    </a>
+    <a href="assets/screenshots/FoldLayoutSpool.png">
+      <img src="assets/screenshots/FoldLayoutSpool.png" height="420" />
+    </a>
+  </div>
+</div>
 
 ## What is BuddyDash?
 
