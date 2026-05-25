@@ -63,6 +63,12 @@ fun SettingsScreen(
         onPrintGlowMultiplierSelected = viewModel::onPrintGlowMultiplierSelected,
         onDebugForcePrintGlowChange = viewModel::onDebugForcePrintGlowChange,
         onDebugShowLogoGlowBoundsChange = viewModel::onDebugShowLogoGlowBoundsChange,
+        onHomeCardDensityChange = viewModel::onHomeCardDensityChange,
+        onFinishClearPlateChange = viewModel::onFinishClearPlateChange,
+        onFinishPowerOffChange = viewModel::onFinishPowerOffChange,
+        onFinishShowConfirmationChange = viewModel::onFinishShowConfirmationChange,
+        onRememberLastDetailTabChange = viewModel::onRememberLastDetailTabChange,
+        onKeepScreenAwakeChange = viewModel::onKeepScreenAwakeChange,
         onBack = onBack,
     )
 }
@@ -81,6 +87,12 @@ private fun SettingsScreenContent(
     onPrintGlowMultiplierSelected: (Float) -> Unit,
     onDebugForcePrintGlowChange: (Boolean) -> Unit,
     onDebugShowLogoGlowBoundsChange: (Boolean) -> Unit,
+    onHomeCardDensityChange: (Int) -> Unit,
+    onFinishClearPlateChange: (Boolean) -> Unit,
+    onFinishPowerOffChange: (Boolean) -> Unit,
+    onFinishShowConfirmationChange: (Boolean) -> Unit,
+    onRememberLastDetailTabChange: (Boolean) -> Unit,
+    onKeepScreenAwakeChange: (Boolean) -> Unit,
     onBack: (() -> Unit)?,
 ) {
     val gridColumns = rememberBuddyDashExpandedGridColumnCount()
@@ -198,6 +210,27 @@ private fun SettingsScreenContent(
             NfcStickersSettingsCard(
                 examplePrinter = uiState.nfcExamplePrinter,
                 modifier = Modifier.padding(top = 4.dp),
+            )
+
+            SettingsFinishWorkflowSection(
+                clearPlate = uiState.finishClearPlate,
+                powerOff = uiState.finishPowerOff,
+                showConfirmation = uiState.finishShowConfirmation,
+                onClearPlateChange = onFinishClearPlateChange,
+                onPowerOffChange = onFinishPowerOffChange,
+                onShowConfirmationChange = onFinishShowConfirmationChange,
+            )
+
+            SettingsCardDensitySection(
+                density = uiState.homeCardDensity,
+                onDensityChange = onHomeCardDensityChange,
+            )
+
+            SettingsQolSection(
+                rememberTab = uiState.rememberLastDetailTab,
+                keepAwake = uiState.keepScreenAwake,
+                onRememberTabChange = onRememberLastDetailTabChange,
+                onKeepAwakeChange = onKeepScreenAwakeChange,
             )
 
             if (BuddyDashDebug.enabled) {
@@ -419,4 +452,126 @@ private fun visualMultiplierLabel(preset: Float): String = when (preset) {
     1f -> "1×"
     2f -> "2×"
     else -> "3×"
+}
+
+@Composable
+private fun SettingsFinishWorkflowSection(
+    clearPlate: Boolean,
+    powerOff: Boolean,
+    showConfirmation: Boolean,
+    onClearPlateChange: (Boolean) -> Unit,
+    onPowerOffChange: (Boolean) -> Unit,
+    onShowConfirmationChange: (Boolean) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_finish_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SettingsToggleRow(
+            label = stringResource(R.string.settings_finish_clear_plate),
+            checked = clearPlate,
+            onCheckedChange = onClearPlateChange,
+        )
+        SettingsToggleRow(
+            label = stringResource(R.string.settings_finish_power_off),
+            checked = powerOff,
+            onCheckedChange = onPowerOffChange,
+        )
+        SettingsToggleRow(
+            label = stringResource(R.string.settings_finish_confirmation),
+            checked = showConfirmation,
+            onCheckedChange = onShowConfirmationChange,
+        )
+    }
+}
+
+@Composable
+private fun SettingsCardDensitySection(
+    density: Int,
+    onDensityChange: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_density_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            val labels = listOf(
+                R.string.settings_density_comfortable,
+                R.string.settings_density_compact,
+                R.string.settings_density_dense,
+            )
+            labels.forEachIndexed { index, labelRes ->
+                FilterChip(
+                    selected = density == index,
+                    onClick = { onDensityChange(index) },
+                    label = { Text(stringResource(labelRes)) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsQolSection(
+    rememberTab: Boolean,
+    keepAwake: Boolean,
+    onRememberTabChange: (Boolean) -> Unit,
+    onKeepAwakeChange: (Boolean) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_qol_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SettingsToggleRow(
+            label = stringResource(R.string.settings_remember_tab),
+            checked = rememberTab,
+            onCheckedChange = onRememberTabChange,
+        )
+        SettingsToggleRow(
+            label = stringResource(R.string.settings_keep_awake),
+            checked = keepAwake,
+            onCheckedChange = onKeepAwakeChange,
+        )
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
+    }
 }

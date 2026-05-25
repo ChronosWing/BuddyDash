@@ -29,6 +29,13 @@ data class SettingsUiState(
     val debugForcePrintGlow: Boolean = false,
     val debugShowLogoGlowBounds: Boolean = false,
     val nfcExamplePrinter: NfcSettingsExamplePrinter? = null,
+    // QoL settings
+    val homeCardDensity: Int = 0,
+    val finishClearPlate: Boolean = true,
+    val finishPowerOff: Boolean = true,
+    val finishShowConfirmation: Boolean = false,
+    val rememberLastDetailTab: Boolean = false,
+    val keepScreenAwake: Boolean = false,
 )
 
 class SettingsViewModel(
@@ -67,6 +74,28 @@ class SettingsViewModel(
             settingsRepository.cameraToken.collect { token ->
                 _uiState.update { it.copy(cameraToken = token) }
             }
+        }
+        viewModelScope.launch {
+            combine(
+                settingsRepository.homeCardDensity,
+                settingsRepository.finishClearPlate,
+                settingsRepository.finishPowerOff,
+                settingsRepository.finishShowConfirmation,
+                settingsRepository.rememberLastDetailTab,
+            ) { density, clearPlate, powerOff, confirmation, rememberTab ->
+                QolSnapshot(density, clearPlate, powerOff, confirmation, rememberTab)
+            }.combine(settingsRepository.keepScreenAwake) { qol, keepAwake ->
+                _uiState.update {
+                    it.copy(
+                        homeCardDensity = qol.density,
+                        finishClearPlate = qol.clearPlate,
+                        finishPowerOff = qol.powerOff,
+                        finishShowConfirmation = qol.confirmation,
+                        rememberLastDetailTab = qol.rememberTab,
+                        keepScreenAwake = keepAwake,
+                    )
+                }
+            }.collect { }
         }
         if (BuddyDashDebug.enabled) {
             viewModelScope.launch {
@@ -140,6 +169,50 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.saveHomeDebugShowLogoGlowBounds(enabled)
             _uiState.update { it.copy(debugShowLogoGlowBounds = enabled) }
+        }
+    }
+
+    private data class QolSnapshot(
+        val density: Int,
+        val clearPlate: Boolean,
+        val powerOff: Boolean,
+        val confirmation: Boolean,
+        val rememberTab: Boolean,
+    )
+
+    fun onHomeCardDensityChange(density: Int) {
+        viewModelScope.launch {
+            settingsRepository.saveHomeCardDensity(density)
+        }
+    }
+
+    fun onFinishClearPlateChange(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.saveFinishClearPlate(enabled)
+        }
+    }
+
+    fun onFinishPowerOffChange(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.saveFinishPowerOff(enabled)
+        }
+    }
+
+    fun onFinishShowConfirmationChange(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.saveFinishShowConfirmation(enabled)
+        }
+    }
+
+    fun onRememberLastDetailTabChange(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.saveRememberLastDetailTab(enabled)
+        }
+    }
+
+    fun onKeepScreenAwakeChange(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.saveKeepScreenAwake(enabled)
         }
     }
 

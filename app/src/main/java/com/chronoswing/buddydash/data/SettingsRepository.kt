@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.chronoswing.buddydash.util.ValidatedConnectionSettings
@@ -72,6 +73,33 @@ class SettingsRepository(private val context: Context) {
         preferences.safeBoolean(HOME_DEBUG_SHOW_LOGO_GLOW_BOUNDS_KEY, false)
     }
 
+    // ── QoL settings ──────────────────────────────────────────────
+
+    /** 0 = Comfortable (default), 1 = Compact, 2 = Dense */
+    val homeCardDensity: Flow<Int> = safePreferences.map { preferences ->
+        preferences.safeInt(HOME_CARD_DENSITY_KEY, 0)
+    }
+
+    val finishClearPlate: Flow<Boolean> = safePreferences.map { preferences ->
+        preferences.safeBoolean(FINISH_CLEAR_PLATE_KEY, true)
+    }
+
+    val finishPowerOff: Flow<Boolean> = safePreferences.map { preferences ->
+        preferences.safeBoolean(FINISH_POWER_OFF_KEY, true)
+    }
+
+    val finishShowConfirmation: Flow<Boolean> = safePreferences.map { preferences ->
+        preferences.safeBoolean(FINISH_SHOW_CONFIRMATION_KEY, false)
+    }
+
+    val rememberLastDetailTab: Flow<Boolean> = safePreferences.map { preferences ->
+        preferences.safeBoolean(REMEMBER_LAST_DETAIL_TAB_KEY, false)
+    }
+
+    val keepScreenAwake: Flow<Boolean> = safePreferences.map { preferences ->
+        preferences.safeBoolean(KEEP_SCREEN_AWAKE_KEY, false)
+    }
+
     suspend fun saveConnectionSettings(
         serverUrl: String,
         apiKey: String,
@@ -110,6 +138,42 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
+    suspend fun saveHomeCardDensity(density: Int) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[HOME_CARD_DENSITY_KEY] = density.coerceIn(0, 2)
+        }
+    }
+
+    suspend fun saveFinishClearPlate(enabled: Boolean) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[FINISH_CLEAR_PLATE_KEY] = enabled
+        }
+    }
+
+    suspend fun saveFinishPowerOff(enabled: Boolean) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[FINISH_POWER_OFF_KEY] = enabled
+        }
+    }
+
+    suspend fun saveFinishShowConfirmation(enabled: Boolean) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[FINISH_SHOW_CONFIRMATION_KEY] = enabled
+        }
+    }
+
+    suspend fun saveRememberLastDetailTab(enabled: Boolean) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[REMEMBER_LAST_DETAIL_TAB_KEY] = enabled
+        }
+    }
+
+    suspend fun saveKeepScreenAwake(enabled: Boolean) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[KEEP_SCREEN_AWAKE_KEY] = enabled
+        }
+    }
+
     suspend fun saveHomeHeaderAmbientMultiplier(multiplier: Float) {
         context.settingsDataStore.edit { preferences ->
             preferences[HOME_HEADER_AMBIENT_MULTIPLIER_KEY] = multiplier
@@ -144,6 +208,12 @@ class SettingsRepository(private val context: Context) {
         private val HOME_PRINT_GLOW_MULTIPLIER_KEY = floatPreferencesKey("home_print_glow_multiplier")
         private val HOME_DEBUG_FORCE_PRINT_GLOW_KEY = booleanPreferencesKey("home_debug_force_print_glow")
         private val HOME_DEBUG_SHOW_LOGO_GLOW_BOUNDS_KEY = booleanPreferencesKey("home_debug_show_logo_glow_bounds")
+        private val HOME_CARD_DENSITY_KEY = intPreferencesKey("home_card_density")
+        private val FINISH_CLEAR_PLATE_KEY = booleanPreferencesKey("finish_clear_plate")
+        private val FINISH_POWER_OFF_KEY = booleanPreferencesKey("finish_power_off")
+        private val FINISH_SHOW_CONFIRMATION_KEY = booleanPreferencesKey("finish_show_confirmation")
+        private val REMEMBER_LAST_DETAIL_TAB_KEY = booleanPreferencesKey("remember_last_detail_tab")
+        private val KEEP_SCREEN_AWAKE_KEY = booleanPreferencesKey("keep_screen_awake")
     }
 }
 
@@ -151,6 +221,9 @@ private fun Preferences.safeString(key: Preferences.Key<String>): String =
     runCatching { this[key].orEmpty() }.getOrElse { "" }
 
 private fun Preferences.safeFloat(key: Preferences.Key<Float>, default: Float): Float =
+    runCatching { this[key] ?: default }.getOrElse { default }
+
+private fun Preferences.safeInt(key: Preferences.Key<Int>, default: Int): Int =
     runCatching { this[key] ?: default }.getOrElse { default }
 
 private fun Preferences.safeBoolean(key: Preferences.Key<Boolean>, default: Boolean): Boolean =

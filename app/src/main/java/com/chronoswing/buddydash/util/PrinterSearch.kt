@@ -12,6 +12,8 @@ enum class HomePrinterSearchFilter {
     All,
     Active,
     NeedsAttention,
+    Printing,
+    Offline,
 }
 
 fun applyHomePrinterSearch(
@@ -24,6 +26,8 @@ fun applyHomePrinterSearch(
         HomePrinterSearchFilter.All -> searched
         HomePrinterSearchFilter.Active -> searched.filter { printerMatchesActiveFilter(it) }
         HomePrinterSearchFilter.NeedsAttention -> searched.filter { printerMatchesNeedsAttentionFilter(it) }
+        HomePrinterSearchFilter.Printing -> searched.filter { printerMatchesPrintingFilter(it) }
+        HomePrinterSearchFilter.Offline -> searched.filter { printerMatchesOfflineFilter(it) }
     }
 }
 
@@ -75,6 +79,16 @@ fun printerMatchesNeedsAttentionFilter(printer: Printer): Boolean {
     }
 }
 
+fun printerMatchesPrintingFilter(printer: Printer): Boolean {
+    val status = printer.liveStatus ?: return false
+    return status.resolveActivityKind() == PrinterActivityKind.Printing
+}
+
+fun printerMatchesOfflineFilter(printer: Printer): Boolean {
+    val status = printer.liveStatus ?: return true
+    return !status.connected
+}
+
 private fun PrinterStatus.hasFilamentOrAmsIssue(): Boolean =
     filamentSlots.any { !it.isLoaded }
 
@@ -89,5 +103,7 @@ fun homeSearchEmptyMessageRes(
         HomePrinterSearchFilter.All -> R.string.no_printers_match_search
         HomePrinterSearchFilter.Active -> R.string.no_active_printers
         HomePrinterSearchFilter.NeedsAttention -> R.string.no_printers_need_attention
+        HomePrinterSearchFilter.Printing -> R.string.no_printers_printing
+        HomePrinterSearchFilter.Offline -> R.string.no_printers_offline
     }
 }

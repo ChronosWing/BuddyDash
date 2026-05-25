@@ -218,6 +218,31 @@
     <string name="nfc_action_finish">Copy finish link</string>
     <string name="nfc_link_copied">NFC link copied</string>
     <string name="machine_info_printer_id">Printer ID</string>
+    <!-- Quick Actions -->
+    <string name="quick_action_clear_plate">Clear plate</string>
+    <string name="quick_action_toggle_power">Toggle power</string>
+    <string name="quick_action_finish">Finish</string>
+    <string name="quick_action_toggle_light">Toggle chamber light</string>
+    <string name="quick_action_open_detail">Open printer details</string>
+    <!-- Settings: Finish workflow -->
+    <string name="settings_finish_title">Finish workflow</string>
+    <string name="settings_finish_clear_plate">Clear plate</string>
+    <string name="settings_finish_power_off">Power off smart outlet</string>
+    <string name="settings_finish_confirmation">Show confirmation</string>
+    <!-- Settings: Home card density -->
+    <string name="settings_density_title">Home card density</string>
+    <string name="settings_density_comfortable">Comfortable</string>
+    <string name="settings_density_compact">Compact</string>
+    <string name="settings_density_dense">Dense</string>
+    <!-- Settings: QoL -->
+    <string name="settings_qol_title">Preferences</string>
+    <string name="settings_remember_tab">Remember last detail tab</string>
+    <string name="settings_keep_awake">Keep screen awake while monitoring</string>
+    <!-- Home filters -->
+    <string name="filter_printing">Printing</string>
+    <string name="filter_offline">Offline</string>
+    <string name="no_printers_printing">No printers are printing</string>
+    <string name="no_printers_offline">No offline printers</string>
     <string name="eta">ETA</string>
     <string name="nozzle_temp">Nozzle temp</string>
     <string name="bed_temp">Bed temp</string>
