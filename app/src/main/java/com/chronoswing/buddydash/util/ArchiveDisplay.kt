@@ -10,12 +10,12 @@ import java.time.format.DateTimeParseException
 
 const val ARCHIVE_DISPLAY_NAME_FALLBACK = "Unnamed print"
 
-/** Temporary: log archive API field discovery. Set false before release. */
+/** Debug-only: log archive API field discovery. */
 val DEBUG_LOG_ARCHIVES: Boolean get() = BuddyDashDebug.enabled
 
 const val TAG_ARCHIVES = "BuddyDash/Archives"
 
-/** Temporary: archive detail config + field mapping. Set false before release. */
+/** Debug-only: archive detail config + field mapping. */
 val DEBUG_LOG_ARCHIVE_DETAIL: Boolean get() = BuddyDashDebug.enabled
 
 const val TAG_ARCHIVE_DETAIL = "BuddyDash/ArchiveDetail"

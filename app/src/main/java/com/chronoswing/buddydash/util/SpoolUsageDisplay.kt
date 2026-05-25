@@ -7,7 +7,7 @@ import com.chronoswing.buddydash.data.model.SpoolUsageEntry
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Temporary: spool usage history diagnostics. Set false before release. */
+/** Debug-only: spool usage history diagnostics. */
 val DEBUG_LOG_SPOOL_USAGE: Boolean get() = BuddyDashDebug.enabled
 
 const val TAG_SPOOL_USAGE = "BuddyDash/SpoolUsage"

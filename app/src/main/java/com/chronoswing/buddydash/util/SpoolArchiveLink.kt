@@ -6,7 +6,7 @@ import com.chronoswing.buddydash.data.model.SpoolInventoryItem
 import kotlin.math.sqrt
 import org.json.JSONObject
 
-/** Temporary: spool ↔ archive linking diagnostics. Set false before release. */
+/** Debug-only: spool ↔ archive linking diagnostics. */
 val DEBUG_LOG_SPOOL_ARCHIVE_LINK: Boolean get() = BuddyDashDebug.enabled
 
 const val TAG_SPOOL_ARCHIVE_LINK = "BuddyDash/SpoolArchiveLink"

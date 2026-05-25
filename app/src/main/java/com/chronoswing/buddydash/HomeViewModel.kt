@@ -157,30 +157,32 @@ class HomeViewModel(
                 }
             }
         }
-        viewModelScope.launch {
-            combine(
-                settingsRepository.homeIdleGlowMultiplier,
-                settingsRepository.homeHeaderAmbientMultiplier,
-                settingsRepository.homePrintGlowMultiplier,
-                settingsRepository.homeDebugForcePrintGlow,
-                settingsRepository.homeDebugShowLogoGlowBounds,
-            ) { idleGlow, headerAmbient, printGlow, forcePrintGlow, showGlowBounds ->
-                VisualTuningSnapshot(
-                    idleGlow,
-                    headerAmbient,
-                    printGlow,
-                    forcePrintGlow,
-                    showGlowBounds,
-                )
-            }.collect { tuning ->
-                _uiState.update {
-                    it.copy(
-                        idleGlowMultiplier = tuning.idleGlowMultiplier,
-                        headerAmbientMultiplier = tuning.headerAmbientMultiplier,
-                        printGlowMultiplier = tuning.printGlowMultiplier,
-                        debugForcePrintGlow = tuning.debugForcePrintGlow,
-                        debugShowLogoGlowBounds = tuning.debugShowLogoGlowBounds,
+        if (BuddyDashDebug.enabled) {
+            viewModelScope.launch {
+                combine(
+                    settingsRepository.homeIdleGlowMultiplier,
+                    settingsRepository.homeHeaderAmbientMultiplier,
+                    settingsRepository.homePrintGlowMultiplier,
+                    settingsRepository.homeDebugForcePrintGlow,
+                    settingsRepository.homeDebugShowLogoGlowBounds,
+                ) { idleGlow, headerAmbient, printGlow, forcePrintGlow, showGlowBounds ->
+                    VisualTuningSnapshot(
+                        idleGlow,
+                        headerAmbient,
+                        printGlow,
+                        forcePrintGlow,
+                        showGlowBounds,
                     )
+                }.collect { tuning ->
+                    _uiState.update {
+                        it.copy(
+                            idleGlowMultiplier = tuning.idleGlowMultiplier,
+                            headerAmbientMultiplier = tuning.headerAmbientMultiplier,
+                            printGlowMultiplier = tuning.printGlowMultiplier,
+                            debugForcePrintGlow = tuning.debugForcePrintGlow,
+                            debugShowLogoGlowBounds = tuning.debugShowLogoGlowBounds,
+                        )
+                    }
                 }
             }
         }

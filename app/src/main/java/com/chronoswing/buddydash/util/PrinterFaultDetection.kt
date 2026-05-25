@@ -6,7 +6,7 @@ import com.chronoswing.buddydash.data.model.PrinterStatus
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Temporary: trace raw Bambuddy status → BuddyDash activity mapping. Set false before release. */
+/** Debug-only: trace raw Bambuddy status → BuddyDash activity mapping. */
 val DEBUG_LOG_STATUS_MAP: Boolean get() = BuddyDashDebug.enabled
 
 const val TAG_STATUS_MAP = "BuddyDash/StatusMap"
@@ -216,7 +216,7 @@ private fun statusMappingFieldSample(json: JSONObject): String = buildString {
         when (val value = json.opt(key)) {
             is JSONArray -> append("$key[len=${value.length()}] ")
             is JSONObject -> append("$key{…} ")
-            else -> append("$key=${value.toString().take(48)} ")
+            else -> append("$key=${value?.toString()?.take(48)} ")
         }
     }
     listOf(
