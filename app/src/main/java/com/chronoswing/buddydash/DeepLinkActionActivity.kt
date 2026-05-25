@@ -51,6 +51,8 @@ class DeepLinkActionActivity : ComponentActivity() {
                     showToast(getString(R.string.nfc_clear_plate_printer_not_found))
                 ClearPlateActionOutcome.ApiFailed ->
                     showToast(getString(R.string.nfc_clear_plate_api_failed))
+                ClearPlateActionOutcome.AlreadyCleared ->
+                    showToast(getString(R.string.nfc_clear_plate_already_cleared))
                 is ClearPlateActionOutcome.Success ->
                     showToast(getString(R.string.nfc_clear_plate_success, outcome.printerName))
             }

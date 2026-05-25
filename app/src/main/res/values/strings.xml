@@ -186,6 +186,7 @@
     <string name="plate_clear_success">Plate marked clear ✓</string>
     <string name="plate_clear_failed">Failed to mark plate clear</string>
     <string name="nfc_clear_plate_success">Plate cleared for %1$s</string>
+    <string name="nfc_clear_plate_already_cleared">Plate already cleared</string>
     <string name="nfc_clear_plate_printer_active">Printer active. Plate not cleared.</string>
     <string name="nfc_clear_plate_connection_required">Connection required to clear plate.</string>
     <string name="nfc_clear_plate_configure_first">Configure BuddyDash before using NFC actions.</string>

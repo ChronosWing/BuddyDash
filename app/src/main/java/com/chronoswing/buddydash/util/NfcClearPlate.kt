@@ -17,6 +17,7 @@ sealed class ClearPlateActionOutcome {
     data object PrinterActive : ClearPlateActionOutcome()
     data object PrinterNotFound : ClearPlateActionOutcome()
     data object ApiFailed : ClearPlateActionOutcome()
+    data object AlreadyCleared : ClearPlateActionOutcome()
     data class Success(val printerName: String) : ClearPlateActionOutcome()
 }
 
@@ -70,6 +71,27 @@ fun blocksNfcPlateClear(status: PrinterStatus): Boolean {
     if (raw == "RUNNING" || raw == "PAUSE") return true
     if (raw.contains("HEAT")) return true
     return false
+}
+
+/**
+ * True when the plate is known to be cleared (`awaiting_plate_clear == false`).
+ * Returns false when state is unknown (`null`) or the printer is actively printing.
+ */
+fun isPlateKnownCleared(status: PrinterStatus): Boolean {
+    if (!status.connected || blocksNfcPlateClear(status)) return false
+    return status.awaitingPlateClear == false
+}
+
+/** Detects API success/error text that indicates clear-plate was already acknowledged. */
+fun isClearPlateAlreadyAcknowledged(message: String): Boolean {
+    val normalized = message.lowercase()
+    return normalized.contains("already") && normalized.contains("clear") ||
+        normalized.contains("already cleared") ||
+        normalized.contains("already clear") ||
+        normalized.contains("not awaiting") ||
+        normalized.contains("no-op") ||
+        normalized.contains("noop") ||
+        normalized.contains("nothing to do")
 }
 
 /**
