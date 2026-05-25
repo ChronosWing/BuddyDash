@@ -58,7 +58,7 @@ BuddyDash uses Bambuddy as its backend and connects directly to your existing in
 
 If you are not already using Bambuddy, start there first.
 
-*(Add Bambuddy link here)*
+https://github.com/maziggy/bambuddy
 
 ---
 
