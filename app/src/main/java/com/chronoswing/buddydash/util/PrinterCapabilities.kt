@@ -98,8 +98,8 @@ fun isAmsLiteModule(moduleType: String?): Boolean {
 }
 
 fun isMeaningfulAmsTemp(tempC: Double?, isAmsLite: Boolean): Boolean {
-    if (tempC == null) return false
-    if (isAmsLite && tempC <= 0.0) return false
+    val temp = tempC.finiteOrNull() ?: return false
+    if (isAmsLite && temp <= 0.0) return false
     return true
 }
 

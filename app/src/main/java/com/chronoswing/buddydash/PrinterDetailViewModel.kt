@@ -1171,6 +1171,6 @@ private fun nextSmartPlugPowerHistory(
     plugState: PrinterSmartPlugState?,
 ): List<Float> {
     val watts = plugState?.energy?.powerWatts ?: return if (plugState == null) emptyList() else current
-    if (watts.isNaN() || watts < 0) return current
+    if (!watts.isFinite() || watts < 0) return current
     return (current + watts.toFloat()).takeLast(SMART_PLUG_POWER_HISTORY_MAX)
 }

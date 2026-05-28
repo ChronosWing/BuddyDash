@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import com.chronoswing.buddydash.ui.motion.AnimatedLinearProgressIndicator
+import com.chronoswing.buddydash.util.clampFinite
 import com.chronoswing.buddydash.ui.motion.FadeValueText
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import com.chronoswing.buddydash.ui.motion.refreshSpinning
@@ -310,7 +311,7 @@ fun InlineProgress(
             Text(text = value, style = MaterialTheme.typography.labelMedium)
         }
         AnimatedLinearProgressIndicator(
-            targetFraction = fraction.coerceIn(0f, 1f),
+            targetFraction = fraction.clampFinite(0f, 1f),
             modifier = Modifier.fillMaxWidth(),
         )
     }

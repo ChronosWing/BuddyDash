@@ -109,16 +109,18 @@ fun formatFilamentUsageCompact(usage: FilamentUsage?): String? {
 
 /** Archives / queue / detail — integer grams (86g, not 86.000g). */
 fun formatFilamentWeightGrams(grams: Double): String {
-    val rounded = grams.roundToInt().coerceAtLeast(1)
+    val safe = grams.finiteOrNull()?.takeIf { it > 0.0 } ?: return "—"
+    val rounded = safe.roundToInt().coerceAtLeast(1)
     return "${rounded}g"
 }
 
 /** Meters with at most one decimal when under 100m (2.4m, 28.1m). */
 fun formatFilamentLengthMeters(meters: Double): String {
-    val text = if (meters >= 100) {
-        meters.roundToInt().toString()
+    val safe = meters.finiteOrNull()?.takeIf { it > 0.0 } ?: return "—"
+    val text = if (safe >= 100) {
+        safe.roundToInt().toString()
     } else {
-        val tenths = (meters * 10).roundToInt() / 10.0
+        val tenths = (safe * 10).roundToInt() / 10.0
         if (tenths == tenths.roundToInt().toDouble()) {
             tenths.roundToInt().toString()
         } else {

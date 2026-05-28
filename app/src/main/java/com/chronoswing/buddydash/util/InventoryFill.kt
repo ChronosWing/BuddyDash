@@ -42,8 +42,8 @@ const val EXTERNAL_AMS_ID = 255
 
 fun inventoryFillPercent(labelWeight: Int, weightUsed: Double?): Int? {
     if (labelWeight <= 0) return null
-    if (weightUsed == null) return null
-    val remaining = (labelWeight - weightUsed).coerceAtLeast(0.0)
+    val used = weightUsed.finiteOrNull() ?: return null
+    val remaining = (labelWeight - used).coerceAtLeast(0.0)
     return (remaining / labelWeight * 100.0).roundToInt().coerceIn(0, 100)
 }
 

@@ -122,11 +122,7 @@ fun Printer.toCardLabels(): PrinterCardLabels {
         } else {
             null
         },
-        progressFraction = if (isActivePrint) {
-            (status.progress ?: 0f).coerceIn(0f, 100f) / 100f
-        } else {
-            null
-        },
+        progressFraction = if (isActivePrint) status.progress.percentToUnitFractionOrNull() else null,
         fileLine = fileLine,
         etaLine = if (showEta) "ETA $etaFormatted" else null,
         tempsLine = if (status.showHomeCardTemps()) {

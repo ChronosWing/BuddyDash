@@ -78,6 +78,7 @@ import com.chronoswing.buddydash.ui.components.HmsDetailSheet
 import com.chronoswing.buddydash.ui.components.MaintenanceDetailSheet
 import com.chronoswing.buddydash.ui.components.PrinterAlertsSheet
 import com.chronoswing.buddydash.util.HmsSeverity
+import com.chronoswing.buddydash.util.clampFinite
 import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -801,7 +802,7 @@ private fun GlancePrinterCard(
                         ) {
                             labels.progressFraction?.let { fraction ->
                                 MicroMotionProgressBar(
-                                    progress = { fraction.coerceIn(0f, 1f) },
+                                    progress = { fraction.clampFinite(0f, 1f) },
                                     motion = labels.cardMicroMotion,
                                     modifier = Modifier.height(3.dp),
                                 )

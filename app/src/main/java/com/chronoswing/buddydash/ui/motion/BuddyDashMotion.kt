@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
+import com.chronoswing.buddydash.util.clampFinite
 
 object BuddyDashMotion {
     const val PROGRESS_DURATION_MS = 400
@@ -59,7 +60,7 @@ private fun Context.isReducedMotionEnabled(): Boolean =
 @Composable
 fun rememberAnimatedProgressFraction(target: Float): Float {
     val reduced = rememberPrefersReducedMotion()
-    val clamped = target.coerceIn(0f, 1f)
+    val clamped = target.clampFinite(0f, 1f)
     val animatable = remember { Animatable(clamped) }
     LaunchedEffect(clamped, reduced) {
         if (reduced) {

@@ -32,7 +32,7 @@ fun parseDegradedPrinterStatus(json: JSONObject): PrinterStatus = PrinterStatus(
     connected = json.optBoolean("connected", false),
     rawState = json.optString("state").takeIf { it.isNotBlank() },
     progress = json.optDouble("progress")
-        .takeIf { json.has("progress") && !json.isNull("progress") }
+        .takeIf { json.has("progress") && !json.isNull("progress") && it.isFinite() }
         ?.toFloat(),
     fileName = null,
     remainingTimeSeconds = null,
