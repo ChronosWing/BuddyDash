@@ -47,20 +47,10 @@ fun formatSmartPlugPowerFactor(reading: SmartPlugEnergyReading?): String? {
     return String.format(Locale.US, "%.2f", factor.coerceAtMost(1.0))
 }
 
-/** True when cutting power could interrupt an active print or motion. */
-fun PrinterStatus?.requiresActivePowerOffConfirmation(): Boolean {
-    if (this == null || !connected) return false
-    return when (resolveActivityKind()) {
-        PrinterActivityKind.Printing,
-        PrinterActivityKind.Paused,
-        PrinterActivityKind.Busy,
-        -> true
-        else -> {
-            val raw = rawState?.uppercase().orEmpty()
-            raw.contains("UNLOAD") ||
-                raw.contains("LOAD") ||
-                raw.contains("HEAT") ||
-                raw.contains("COOL")
-        }
-    }
-}
+/** True when in-app power-off should require user confirmation before proceeding. */
+fun PrinterStatus?.requiresUnsafePowerOffConfirmation(): Boolean =
+    !isPrinterSafeToPowerOff(this)
+
+/** @see requiresUnsafePowerOffConfirmation */
+fun PrinterStatus?.requiresActivePowerOffConfirmation(): Boolean =
+    requiresUnsafePowerOffConfirmation()

@@ -42,6 +42,7 @@ import com.chronoswing.buddydash.ui.components.MachineUtilityButton
 import com.chronoswing.buddydash.ui.components.MotionControlsSection
 import com.chronoswing.buddydash.ui.components.PrinterCameraFullscreenDialog
 import com.chronoswing.buddydash.ui.components.SectionHeader
+import com.chronoswing.buddydash.ui.components.SmartPlugBusyPowerOffDialog
 import com.chronoswing.buddydash.ui.components.SmartPlugPowerCard
 import com.chronoswing.buddydash.ui.layout.rememberIsBuddyDashExpandedWidth
 import com.chronoswing.buddydash.util.BED_JOG_STEP_OPTIONS_MM
@@ -49,7 +50,7 @@ import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildMachineInfoRows
 import com.chronoswing.buddydash.util.machineTabCapabilities
 import com.chronoswing.buddydash.util.MachineTabCapabilities
-import com.chronoswing.buddydash.util.requiresActivePowerOffConfirmation
+import com.chronoswing.buddydash.util.isPrinterSafeToPowerOff
 import androidx.compose.ui.Alignment
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -128,48 +129,23 @@ fun MachineTab(
     }
 
     if (showPowerOffConfirm) {
-        val activeConfirm = printerStatus.requiresActivePowerOffConfirmation()
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showPowerOffConfirm = false },
-            title = {
-                Text(
-                    stringResource(
-                        if (activeConfirm) {
-                            R.string.machine_power_off_active_confirm_title
-                        } else {
-                            R.string.machine_power_off_confirm_title
-                        },
-                    ),
-                )
+        SmartPlugBusyPowerOffDialog(
+            onConfirm = {
+                showPowerOffConfirm = false
+                onPowerOff()
             },
-            text = {
-                Text(
-                    stringResource(
-                        if (activeConfirm) {
-                            R.string.machine_power_off_active_confirm_message
-                        } else {
-                            R.string.machine_power_off_confirm_message
-                        },
-                    ),
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showPowerOffConfirm = false
-                        onPowerOff()
-                    },
-                ) {
-                    Text(stringResource(R.string.machine_power_turn_off))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPowerOffConfirm = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { showPowerOffConfirm = false },
         )
     }
+
+    val requestPowerOff: () -> Unit = {
+        if (isPrinterSafeToPowerOff(printerStatus)) {
+            onPowerOff()
+        } else {
+            showPowerOffConfirm = true
+        }
+    }
+    val powerActionsEnabled = !isControlBusy && !showPowerOffConfirm
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (useDashboardRow) {
@@ -241,10 +217,10 @@ fun MachineTab(
                         SmartPlugPowerCard(
                             plug = smartPlugState,
                             powerHistory = smartPlugPowerHistory,
-                            actionsEnabled = !isControlBusy,
+                            actionsEnabled = powerActionsEnabled,
                             powerControlsEnabled = powerControlsEnabled,
                             onTurnOn = onPowerOn,
-                            onTurnOff = { showPowerOffConfirm = true },
+                            onTurnOff = requestPowerOff,
                             onRequiresConnectionTap = onRequiresConnectionTap,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             dashboardCompact = true,
@@ -264,10 +240,10 @@ fun MachineTab(
                     SmartPlugPowerCard(
                         plug = smartPlugState,
                         powerHistory = smartPlugPowerHistory,
-                        actionsEnabled = !isControlBusy,
+                        actionsEnabled = powerActionsEnabled,
                         powerControlsEnabled = powerControlsEnabled,
                         onTurnOn = onPowerOn,
-                        onTurnOff = { showPowerOffConfirm = true },
+                        onTurnOff = requestPowerOff,
                         onRequiresConnectionTap = onRequiresConnectionTap,
                         dashboardCompact = true,
                     )
@@ -299,10 +275,10 @@ fun MachineTab(
                 SmartPlugPowerCard(
                     plug = plug,
                     powerHistory = smartPlugPowerHistory,
-                    actionsEnabled = !isControlBusy,
+                    actionsEnabled = powerActionsEnabled,
                     powerControlsEnabled = powerControlsEnabled,
                     onTurnOn = onPowerOn,
-                    onTurnOff = { showPowerOffConfirm = true },
+                    onTurnOff = requestPowerOff,
                     onRequiresConnectionTap = onRequiresConnectionTap,
                 )
             }

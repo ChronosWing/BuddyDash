@@ -120,6 +120,7 @@ import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.ui.components.PrinterCoverImage
 import com.chronoswing.buddydash.ui.components.PrinterQuickStatusRow
 import com.chronoswing.buddydash.ui.components.QuickAction
+import com.chronoswing.buddydash.ui.components.SmartPlugBusyPowerOffDialog
 import com.chronoswing.buddydash.ui.components.QuickActionsSheet
 import com.chronoswing.buddydash.ui.components.LifecyclePollingEffect
 import com.chronoswing.buddydash.ui.layout.rememberHomePrinterGridColumnCount
@@ -167,6 +168,13 @@ fun HomeScreen(
         viewModel.consumePowerToggleOutcome()
     }
 
+    uiState.powerOffConfirmPrinterId?.let { confirmPrinterId ->
+        SmartPlugBusyPowerOffDialog(
+            onConfirm = { viewModel.confirmSmartPlugPowerOff(confirmPrinterId) },
+            onDismiss = { viewModel.dismissSmartPlugPowerOffConfirm() },
+        )
+    }
+
     LifecyclePollingEffect(
         enabled = uiState.settingsReady && uiState.hasCredentials && uiState.hasCompletedLoad,
         intervalMs = 15_000L,
@@ -207,6 +215,7 @@ fun HomeScreen(
         onQuickAction = onQuickAction,
         snackbarHostState = snackbarHostState,
         powerToggleInFlightIds = uiState.powerToggleInFlightIds,
+        powerOffConfirmPrinterId = uiState.powerOffConfirmPrinterId,
         onToggleSmartPlugPower = viewModel::toggleSmartPlugPower,
     )
 }
@@ -245,6 +254,7 @@ private fun HomeScreenContent(
     onQuickAction: (Printer, QuickAction) -> Unit = { _, _ -> },
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     powerToggleInFlightIds: Set<Int> = emptySet(),
+    powerOffConfirmPrinterId: Int? = null,
     onToggleSmartPlugPower: (Int) -> Unit = {},
 ) {
     val viewMode = HomeCardViewMode.fromIndex(homeCardDensity)
@@ -471,6 +481,7 @@ private fun HomeScreenContent(
                             onQuickAction = onQuickAction,
                             hasCredentials = hasCredentials,
                             powerToggleInFlightIds = powerToggleInFlightIds,
+                            powerOffConfirmPrinterId = powerOffConfirmPrinterId,
                             onToggleSmartPlugPower = onToggleSmartPlugPower,
                         )
                     }
@@ -503,6 +514,7 @@ private fun HomePrinterCardsList(
     onQuickAction: (Printer, QuickAction) -> Unit,
     hasCredentials: Boolean,
     powerToggleInFlightIds: Set<Int>,
+    powerOffConfirmPrinterId: Int?,
     onToggleSmartPlugPower: (Int) -> Unit,
 ) {
     val contentPadding = PaddingValues(
@@ -543,6 +555,7 @@ private fun HomePrinterCardsList(
                     onQuickAction = onQuickAction,
                     hasCredentials = hasCredentials,
                     powerToggleInFlight = printer.id in powerToggleInFlightIds,
+                    powerOffConfirmPending = powerOffConfirmPrinterId == printer.id,
                     onToggleSmartPlugPower = { onToggleSmartPlugPower(printer.id) },
                 )
             }
@@ -582,6 +595,7 @@ private fun HomePrinterCardsList(
                     onQuickAction = onQuickAction,
                     hasCredentials = hasCredentials,
                     powerToggleInFlight = printer.id in powerToggleInFlightIds,
+                    powerOffConfirmPending = powerOffConfirmPrinterId == printer.id,
                     onToggleSmartPlugPower = { onToggleSmartPlugPower(printer.id) },
                 )
             }
@@ -617,6 +631,7 @@ private fun HomePrinterCardItem(
     onQuickAction: (Printer, QuickAction) -> Unit,
     hasCredentials: Boolean,
     powerToggleInFlight: Boolean,
+    powerOffConfirmPending: Boolean,
     onToggleSmartPlugPower: () -> Unit,
 ) {
     GlancePrinterCard(
@@ -637,6 +652,7 @@ private fun HomePrinterCardItem(
         onQuickAction = { action -> onQuickAction(printer, action) },
         hasCredentials = hasCredentials,
         smartOutletPowerLoading = powerToggleInFlight,
+        smartOutletPowerConfirmPending = powerOffConfirmPending,
         onToggleSmartPlugPower = onToggleSmartPlugPower,
     )
 }
@@ -661,6 +677,7 @@ private fun GlancePrinterCard(
     onQuickAction: (QuickAction) -> Unit,
     hasCredentials: Boolean,
     smartOutletPowerLoading: Boolean,
+    smartOutletPowerConfirmPending: Boolean,
     onToggleSmartPlugPower: () -> Unit,
 ) {
     val printThumbnailIdentity = rememberCurrentPrintThumbnailIdentity(
@@ -838,7 +855,9 @@ private fun GlancePrinterCard(
                     showSmartOutletPower = showSmartOutletPower,
                     smartOutletPowerState = smartOutletPowerState,
                     smartOutletPowerLoading = smartOutletPowerLoading,
-                    smartOutletPowerEnabled = hasCredentials,
+                    smartOutletPowerEnabled = hasCredentials &&
+                        !smartOutletPowerConfirmPending &&
+                        !smartOutletPowerLoading,
                     onSmartOutletPowerClick = if (showSmartOutletPower && hasCredentials) {
                         onToggleSmartPlugPower
                     } else {
