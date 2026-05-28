@@ -66,12 +66,13 @@ fun formatPrintSpeedLevel(level: Int?): String? =
     PrintSpeedMode.fromApi(level)?.label
 
 fun formatChamberTempCompact(tempC: Double?): String? =
-    tempC?.let { "${it.roundToInt()}°" }
+    tempC.roundToIntOrNull()?.let { "$it°" }
 
 /** Compact lifetime print time from Bambuddy `total_print_hours`, e.g. 3h 12m or 2d 4h. */
 fun formatTotalPrintTimeCompact(hours: Double?): String? {
-    if (hours == null || hours <= 0.0) return null
-    val totalMinutes = (hours * 60.0).roundToInt()
+    val safeHours = hours.finiteOrNull() ?: return null
+    if (safeHours <= 0.0) return null
+    val totalMinutes = (safeHours * 60.0).roundToInt()
     if (totalMinutes < 1) return null
     val days = totalMinutes / (24 * 60)
     val hoursPart = (totalMinutes % (24 * 60)) / 60
@@ -98,7 +99,7 @@ fun formatNozzleDiameterDisplay(raw: String?): String? {
 }
 
 fun formatAmsTempCompact(tempC: Double?): String? =
-    tempC?.let { "${it.roundToInt()}°" }
+    tempC.roundToIntOrNull()?.let { "$it°" }
 
 fun formatAmsHumidityCompact(humidityPercent: Int?): String? =
     humidityPercent?.let { "$it%" }
@@ -181,19 +182,18 @@ fun formatMaintenanceRemainingText(item: MaintenanceItem, kind: MaintenanceLineK
 }
 
 private fun maintenanceHoursUntilDue(item: MaintenanceItem): Double? {
-    val hours = item.hoursUntilDue
-    if (hours != null && !hours.isNaN()) return hours
-    val days = item.daysUntilDue
-    if (days != null && !days.isNaN()) return days * 24.0
+    item.hoursUntilDue.finiteOrNull()?.let { return it }
+    item.daysUntilDue.finiteOrNull()?.let { return it * 24.0 }
     return null
 }
 
 /** e.g. 49m, 3d, 1.0w — from hours until due. */
 fun formatMaintenanceDuration(hours: Double): String? {
-    if (hours.isNaN() || hours <= 0.0) return null
+    val safeHours = hours.finiteOrNull() ?: return null
+    if (safeHours <= 0.0) return null
     return when {
-        hours >= 168.0 -> {
-            val weeks = hours / 168.0
+        safeHours >= 168.0 -> {
+            val weeks = safeHours / 168.0
             val numeric = when {
                 weeks >= 10.0 -> weeks.roundToInt().toString()
                 weeks >= 2.0 && kotlin.math.abs(weeks - weeks.roundToInt()) < 0.15 ->
@@ -202,18 +202,18 @@ fun formatMaintenanceDuration(hours: Double): String? {
             }
             "${numeric}w"
         }
-        hours >= 24.0 -> "${(hours / 24.0).roundToInt()}d"
-        hours >= 1.0 -> "${hours.roundToInt()}h"
-        else -> "${(hours * 60.0).roundToInt().coerceAtLeast(1)}m"
+        safeHours >= 24.0 -> "${(safeHours / 24.0).roundToInt()}d"
+        safeHours >= 1.0 -> "${safeHours.roundToInt()}h"
+        else -> "${(safeHours * 60.0).roundToInt().coerceAtLeast(1)}m"
     }
 }
 
 /** Thin micro-bar progress from `hours_since_maintenance` / `interval_hours`. */
 fun maintenanceProgressFraction(item: MaintenanceItem, kind: MaintenanceLineKind): Float? {
-    val interval = item.intervalHours ?: return null
+    val interval = item.intervalHours.finiteOrNull() ?: return null
     if (interval <= 0.0) return null
-    val since = item.hoursSinceMaintenance ?: return null
-    val fraction = (since / interval).toFloat().coerceIn(0f, 1f)
+    val since = item.hoursSinceMaintenance.finiteOrNull() ?: return null
+    val fraction = (since / interval).toFloat().clampFinite(0f, 1f)
     return when (kind) {
         MaintenanceLineKind.Due,
         MaintenanceLineKind.DueSoon,

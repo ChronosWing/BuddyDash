@@ -69,6 +69,7 @@ import com.chronoswing.buddydash.util.formatAmsHumidityCompact
 import com.chronoswing.buddydash.util.formatAmsTempCompact
 import com.chronoswing.buddydash.ui.components.PrintTempsRow
 import com.chronoswing.buddydash.util.HmsSeverity
+import com.chronoswing.buddydash.util.clampFinite
 import com.chronoswing.buddydash.util.PrinterMotionLayout
 import com.chronoswing.buddydash.util.formatFanPercentCompact
 import com.chronoswing.buddydash.util.maintenanceDisplayLines
@@ -295,7 +296,7 @@ private fun MaintenanceStatusRow(
         }
         line.progressFraction?.let { fraction ->
             AnimatedLinearProgressIndicator(
-                targetFraction = fraction.coerceIn(0f, 1f),
+                targetFraction = fraction.clampFinite(0f, 1f),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 22.dp)

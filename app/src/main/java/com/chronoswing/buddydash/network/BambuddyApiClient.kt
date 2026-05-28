@@ -29,6 +29,7 @@ import com.chronoswing.buddydash.util.resolveMaintenanceHomeIndicator
 import com.chronoswing.buddydash.util.isAmsLiteModule
 import com.chronoswing.buddydash.util.isMeaningfulAmsHumidity
 import com.chronoswing.buddydash.util.isMeaningfulAmsTemp
+import com.chronoswing.buddydash.util.finiteOrNull
 import com.chronoswing.buddydash.util.formatNozzleDiameterDisplay
 import com.chronoswing.buddydash.util.resolveActiveFilamentSlot
 import com.chronoswing.buddydash.util.isTrayLoaded
@@ -966,7 +967,7 @@ class BambuddyApiClient {
 
     private fun JSONObject.optNullableDouble(key: String): Double? {
         if (!has(key) || isNull(key)) return null
-        return optDouble(key).takeIf { !it.isNaN() }
+        return optDouble(key).finiteOrNull()
     }
 
     suspend fun homeAxes(
@@ -1137,9 +1138,7 @@ class BambuddyApiClient {
         val status = PrinterStatus(
             connected = json.optBoolean("connected", false),
             rawState = json.optString("state").takeIf { it.isNotBlank() },
-            progress = json.optDouble("progress")
-                .takeIf { json.has("progress") && !json.isNull("progress") }
-                ?.toFloat(),
+            progress = json.optNullableDouble("progress")?.toFloat(),
             fileName = resolveFileName(json),
             currentPrint = json.optString("current_print").takeIf { it.isNotBlank() },
             subtaskName = json.optString("subtask_name").takeIf { it.isNotBlank() },
@@ -1155,8 +1154,8 @@ class BambuddyApiClient {
                 }
                 seconds
             },
-            nozzleTemp = temperatures?.optDouble("nozzle"),
-            bedTemp = temperatures?.optDouble("bed"),
+            nozzleTemp = temperatures?.optNullableDouble("nozzle"),
+            bedTemp = temperatures?.optNullableDouble("bed"),
             chamberTemp = operational.chamberTemp,
             hmsErrors = hmsErrors,
             statusFaultMessages = statusFaultMessages,
@@ -1312,7 +1311,7 @@ class BambuddyApiClient {
         if (temperatures == null) return null
         for (key in listOf("chamber", "chamber_temp", "chamber_temperature")) {
             if (temperatures.has(key) && !temperatures.isNull(key)) {
-                return temperatures.optDouble(key)
+                return temperatures.optNullableDouble(key)
             }
         }
         return null

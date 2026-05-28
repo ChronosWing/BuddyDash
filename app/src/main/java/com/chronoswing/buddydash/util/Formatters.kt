@@ -16,14 +16,14 @@ fun formatEta(seconds: Int?): String? {
 
 /** UI display only — rounds to whole degrees. */
 fun formatTemp(value: Double?): String {
-    if (value == null) return "—"
-    return "${value.roundToInt()}°C"
+    val rounded = value.roundToIntOrNull() ?: return "—"
+    return "${rounded}°C"
 }
 
 /** UI display only — rounds to whole degrees. */
 fun formatTempShort(value: Double?): String {
-    if (value == null) return "—"
-    return "${value.roundToInt()}°"
+    val rounded = value.roundToIntOrNull() ?: return "—"
+    return "${rounded}°"
 }
 
 /** Seconds since last successful status refresh; null if never updated. */
@@ -95,11 +95,11 @@ fun formatHmsSummary(errorCount: Int): String =
     if (errorCount == 0) "HMS OK" else "HMS $errorCount"
 
 fun formatProgress(progress: Float?): String {
-    if (progress == null) return "—"
-    return if (progress % 1f == 0f) {
-        "${progress.toInt()}%"
+    val safe = progress.percentOrNull() ?: return "—"
+    return if (safe % 1f == 0f) {
+        "${safe.toInt()}%"
     } else {
-        String.format("%.1f%%", progress)
+        String.format("%.1f%%", safe)
     }
 }
 

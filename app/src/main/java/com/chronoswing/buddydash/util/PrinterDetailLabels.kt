@@ -97,11 +97,7 @@ fun PrinterStatus.toDetailLabels(
     val showProgress = isActivePrint
     val progressTitle = "Progress"
     val progressValue = formatProgress(progress)
-    val progressFraction = if (isActivePrint) {
-        (progress ?: 0f).coerceIn(0f, 100f) / 100f
-    } else {
-        null
-    }
+    val progressFraction = if (isActivePrint) progress.percentToUnitFractionOrNull() else null
 
     val plateStatus = awaitingPlateClear?.let { awaiting ->
         if (awaiting) "Not clear" else "Clear"

@@ -44,6 +44,7 @@ import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.ui.components.SectionHeaderRow
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildPrintHeadline
+import com.chronoswing.buddydash.util.clampFinite
 import kotlin.math.roundToInt
 
 private val DashboardGutter = 8.dp
@@ -329,7 +330,7 @@ private fun ActivePrintProgressDashboardCard(
         )
         labels.progressFraction?.let { fraction ->
             MicroMotionProgressBar(
-                progress = { fraction.coerceIn(0f, 1f) },
+                progress = { fraction.clampFinite(0f, 1f) },
                 motion = labels.cardMicroMotion,
                 modifier = Modifier.height(3.dp),
             )

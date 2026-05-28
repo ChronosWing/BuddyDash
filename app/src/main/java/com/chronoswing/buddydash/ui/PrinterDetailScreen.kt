@@ -124,6 +124,7 @@ import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildPrintHeadline
 import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
 import com.chronoswing.buddydash.util.disconnectedPrinterStatus
+import com.chronoswing.buddydash.util.clampFinite
 import com.chronoswing.buddydash.util.toDetailLabels
 
 private val detailTabs = listOf("Status", "Filament", "Machine")
@@ -986,7 +987,7 @@ private fun ActivePrintStatusTab(
         )
         labels.progressFraction?.let { fraction ->
             MicroMotionProgressBar(
-                progress = { fraction.coerceIn(0f, 1f) },
+                progress = { fraction.clampFinite(0f, 1f) },
                 motion = labels.cardMicroMotion,
                 modifier = Modifier.height(3.dp),
             )

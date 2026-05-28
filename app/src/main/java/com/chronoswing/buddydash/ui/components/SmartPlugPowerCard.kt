@@ -26,6 +26,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -50,6 +51,8 @@ import com.chronoswing.buddydash.util.formatHeroPowerWatts
 import com.chronoswing.buddydash.util.formatSmartPlugPowerFactor
 import com.chronoswing.buddydash.util.formatSmartPlugStatCurrent
 import com.chronoswing.buddydash.util.formatSmartPlugStatVoltage
+import com.chronoswing.buddydash.util.clampFinite
+import com.chronoswing.buddydash.util.finiteSamplesOrEmpty
 import kotlin.math.ceil
 import kotlin.math.max
 
@@ -72,7 +75,8 @@ fun SmartPlugPowerCard(
     val voltage = formatSmartPlugStatVoltage(energy)
     val current = formatSmartPlugStatCurrent(energy)
     val powerFactor = formatSmartPlugPowerFactor(energy)
-    val showGraph = powerHistory.size >= 2
+    val cleanSamples = remember(powerHistory) { powerHistory.finiteSamplesOrEmpty() }
+    val showGraph = cleanSamples.size >= 2
     val cardAlpha = if (powerControlsEnabled) 1f else 0.88f
     val outletSize = if (dashboardCompact) 56.dp else 72.dp
     val heroFontSize = if (dashboardCompact) 26.sp else 32.sp
@@ -152,7 +156,7 @@ fun SmartPlugPowerCard(
 
         if (showGraph) {
             PowerSparkline(
-                samples = powerHistory,
+                samples = cleanSamples,
                 lineColor = primary,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -383,8 +387,10 @@ private fun PowerSparkline(
     lineColor: Color,
     modifier: Modifier = Modifier,
 ) {
-    val maxSample = samples.maxOrNull()?.coerceAtLeast(1f) ?: 1f
-    val yMax = max(60f, ceil(maxSample / 30f) * 30f)
+    val cleanSamples = remember(samples) { samples.finiteSamplesOrEmpty() }
+    if (cleanSamples.size < 2) return
+    val maxSample = cleanSamples.maxOrNull()?.coerceAtLeast(1f) ?: 1f
+    val yMax = max(60f, ceil(maxSample / 30f) * 30f).clampFinite(60f, Float.MAX_VALUE, 60f)
     val yMid = yMax / 2f
 
     Column(modifier = modifier) {
@@ -441,20 +447,20 @@ private fun PowerSparkline(
                         )
                     }
 
-                    if (samples.size < 2) return@Canvas
+                    if (cleanSamples.size < 2) return@Canvas
 
-                    val stepX = (chartRight - chartLeft) / (samples.size - 1).coerceAtLeast(1)
+                    val stepX = (chartRight - chartLeft) / (cleanSamples.size - 1).coerceAtLeast(1)
                     fun yFor(value: Float): Float {
-                        val clamped = value.coerceIn(0f, yMax)
+                        val clamped = value.clampFinite(0f, yMax)
                         return chartBottom - (clamped / yMax) * chartHeight
                     }
 
                     val fillPath = Path().apply {
-                        moveTo(chartLeft, yFor(samples.first()))
-                        samples.forEachIndexed { index, sample ->
+                        moveTo(chartLeft, yFor(cleanSamples.first()))
+                        cleanSamples.forEachIndexed { index, sample ->
                             lineTo(chartLeft + stepX * index, yFor(sample))
                         }
-                        lineTo(chartLeft + stepX * (samples.lastIndex), chartBottom)
+                        lineTo(chartLeft + stepX * (cleanSamples.lastIndex), chartBottom)
                         lineTo(chartLeft, chartBottom)
                         close()
                     }
@@ -471,8 +477,8 @@ private fun PowerSparkline(
                     )
 
                     val linePath = Path().apply {
-                        moveTo(chartLeft, yFor(samples.first()))
-                        samples.forEachIndexed { index, sample ->
+                        moveTo(chartLeft, yFor(cleanSamples.first()))
+                        cleanSamples.forEachIndexed { index, sample ->
                             if (index == 0) return@forEachIndexed
                             lineTo(chartLeft + stepX * index, yFor(sample))
                         }

@@ -14,14 +14,14 @@ fun SmartOutletPowerState.displayLabel(): String = when (this) {
 
 fun formatSmartPlugPowerWatts(reading: SmartPlugEnergyReading?): String? {
     val watts = reading?.powerWatts ?: return null
-    if (watts.isNaN() || watts < 0) return null
+    if (watts.isNaN() || !watts.isFinite() || watts < 0) return null
     return "${watts.roundToInt()} W"
 }
 
 /** Hero wattage label for the Power dashboard card, e.g. "28.4W". */
 fun formatHeroPowerWatts(reading: SmartPlugEnergyReading?): String? {
     val watts = reading?.powerWatts ?: return null
-    if (watts.isNaN() || watts < 0) return null
+    if (watts.isNaN() || !watts.isFinite() || watts < 0) return null
     return if (watts < 100) {
         String.format(Locale.US, "%.1fW", watts)
     } else {
@@ -31,19 +31,19 @@ fun formatHeroPowerWatts(reading: SmartPlugEnergyReading?): String? {
 
 fun formatSmartPlugStatVoltage(reading: SmartPlugEnergyReading?): String? {
     val volts = reading?.voltageVolts ?: return null
-    if (volts.isNaN() || volts <= 0) return null
+    if (volts.isNaN() || !volts.isFinite() || volts <= 0) return null
     return String.format(Locale.US, "%.1fV", volts)
 }
 
 fun formatSmartPlugStatCurrent(reading: SmartPlugEnergyReading?): String? {
     val amps = reading?.currentAmps ?: return null
-    if (amps.isNaN() || amps < 0) return null
+    if (amps.isNaN() || !amps.isFinite() || amps < 0) return null
     return String.format(Locale.US, "%.2fA", amps)
 }
 
 fun formatSmartPlugPowerFactor(reading: SmartPlugEnergyReading?): String? {
     val factor = reading?.powerFactor ?: return null
-    if (factor.isNaN() || factor <= 0) return null
+    if (factor.isNaN() || !factor.isFinite() || factor <= 0) return null
     return String.format(Locale.US, "%.2f", factor.coerceAtMost(1.0))
 }
 

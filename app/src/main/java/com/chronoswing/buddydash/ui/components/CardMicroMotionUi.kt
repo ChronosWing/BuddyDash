@@ -33,6 +33,7 @@ import com.chronoswing.buddydash.ui.theme.CyanAccent
 import com.chronoswing.buddydash.ui.theme.OfflineRed
 import com.chronoswing.buddydash.ui.theme.OnlineGreen
 import com.chronoswing.buddydash.util.CardMicroMotion
+import com.chronoswing.buddydash.util.clampFinite
 
 private const val COMPLETED_GLOW_MS = 2_600
 private val CardCorner = 12.dp
@@ -164,7 +165,7 @@ fun MicroMotionProgressBar(
 ) {
     val trackShape = RoundedCornerShape(2.dp)
     val sheenEnabled = motion == CardMicroMotion.Printing && !rememberPrefersReducedMotion()
-    val target = progress().coerceIn(0f, 1f)
+    val target = progress().clampFinite(0f, 1f)
 
     Box(
         modifier = modifier

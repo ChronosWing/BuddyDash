@@ -36,6 +36,7 @@ import com.chronoswing.buddydash.data.model.MaintenanceItem
 import com.chronoswing.buddydash.ui.motion.AnimatedLinearProgressIndicator
 import com.chronoswing.buddydash.ui.theme.OfflineRed
 import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
+import com.chronoswing.buddydash.util.clampFinite
 import com.chronoswing.buddydash.util.MaintenanceLine
 import com.chronoswing.buddydash.util.MaintenanceLineKind
 import com.chronoswing.buddydash.util.formatMaintenanceDetailMeta
@@ -281,7 +282,7 @@ private fun MaintenanceAlertEntryRow(
             }
             line.progressFraction?.let { fraction ->
                 AnimatedLinearProgressIndicator(
-                    targetFraction = fraction.coerceIn(0f, 1f),
+                    targetFraction = fraction.clampFinite(0f, 1f),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 2.dp)
