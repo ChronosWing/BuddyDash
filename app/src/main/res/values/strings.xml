@@ -295,6 +295,10 @@
     <string name="cd_hms_chip_warning">HMS warning active — tap for details</string>
     <string name="cd_hms_chip_error">HMS error active — tap for details</string>
     <string name="cd_hms_chip_unknown">HMS alert active — tap for details</string>
+    <string name="cd_smart_outlet_power_on">Smart outlet on — tap to toggle power</string>
+    <string name="cd_smart_outlet_power_off">Smart outlet off — tap to toggle power</string>
+    <string name="cd_smart_outlet_power_unknown">Smart outlet state unknown</string>
+    <string name="cd_smart_outlet_power_loading">Toggling smart outlet power</string>
     <string name="last_print_result_short">Last print</string>
     <string name="last_print_line">Last print: %1$s</string>
     <string name="printing">Printing</string>

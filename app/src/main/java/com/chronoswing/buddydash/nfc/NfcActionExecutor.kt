@@ -6,6 +6,7 @@ import com.chronoswing.buddydash.data.HomePrintersCacheRepository
 import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
 import com.chronoswing.buddydash.data.model.SmartOutletPowerState
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.NfcActionDebounce
@@ -16,6 +17,7 @@ import com.chronoswing.buddydash.util.blocksNfcPlateClear
 import com.chronoswing.buddydash.util.isClearPlateAlreadyAcknowledged
 import com.chronoswing.buddydash.util.isPlateKnownCleared
 import com.chronoswing.buddydash.util.isPrinterSafeToPowerOff
+import com.chronoswing.buddydash.util.toggleSmartPlugPower
 import com.chronoswing.buddydash.util.parseNfcDeepLink
 import com.chronoswing.buddydash.util.resolvePrinterByKey
 import kotlinx.coroutines.flow.first
@@ -92,44 +94,22 @@ class NfcActionExecutor(
         apiKey: String,
         printer: Printer,
     ): NfcActionOutcome {
-        val plugState = apiClient.fetchPrinterSmartPlugState(serverUrl, apiKey, printer.id)
-            .getOrNull()
-            ?: return NfcActionOutcome.SmartOutletUnavailable
-
-        val currentPower = plugState.displayPowerState
-        if (currentPower == SmartOutletPowerState.Unknown) {
-            return NfcActionOutcome.SmartOutletStateUnknown
-        }
-
-        val plugId = plugState.config.id
-
-        return if (currentPower == SmartOutletPowerState.Off) {
-            apiClient.controlSmartPlug(serverUrl, apiKey, plugId, action = "on").fold(
-                onSuccess = {
-                    refreshCache(serverUrl, apiKey, printer)
-                    NfcActionOutcome.PowerOn(printer.name)
-                },
-                onFailure = { error ->
-                    logWarn("toggle-power/on", printer.id, error)
-                    error.toConnectionOrApiFailed()
-                },
-            )
-        } else {
-            val status = fetchStatusOrNull(serverUrl, apiKey, printer.id)
-            if (!isPrinterSafeToPowerOff(status)) {
-                return NfcActionOutcome.PrinterBusyPowerUnchanged
-            }
-            apiClient.controlSmartPlug(serverUrl, apiKey, plugId, action = "off").fold(
-                onSuccess = {
-                    refreshCache(serverUrl, apiKey, printer)
-                    NfcActionOutcome.PowerOff(printer.name)
-                },
-                onFailure = { error ->
-                    logWarn("toggle-power/off", printer.id, error)
-                    error.toConnectionOrApiFailed()
-                },
+        val result = toggleSmartPlugPower(
+            apiClient = apiClient,
+            serverUrl = serverUrl,
+            apiKey = apiKey,
+            printer = printer,
+        )
+        if (result.outcome.tier == NfcActionOutcome.Tier.Success) {
+            refreshCacheAfterPowerToggle(
+                serverUrl = serverUrl,
+                apiKey = apiKey,
+                printerId = printer.id,
+                updatedPlugState = result.updatedPlugState,
+                updatedLiveStatus = result.updatedLiveStatus,
             )
         }
+        return result.outcome
     }
 
     // ── Finish ─────────────────────────────────────────────────────
@@ -195,6 +175,31 @@ class NfcActionExecutor(
         }
         val cached = homePrintersCacheRepository.load(serverUrl)?.printers.orEmpty()
         return resolvePrinterByKey(cached, printerKey)
+    }
+
+    private suspend fun refreshCacheAfterPowerToggle(
+        serverUrl: String,
+        apiKey: String,
+        printerId: Int,
+        updatedPlugState: PrinterSmartPlugState?,
+        updatedLiveStatus: PrinterStatus?,
+    ) {
+        val snapshot = homePrintersCacheRepository.load(serverUrl)
+        val basePrinters = snapshot?.printers
+            ?: apiClient.fetchPrinters(serverUrl, apiKey).getOrNull()
+        if (basePrinters.isNullOrEmpty()) return
+        val updated = basePrinters.map { cached ->
+            if (cached.id != printerId) cached
+            else cached.copy(
+                smartPlugState = updatedPlugState ?: cached.smartPlugState,
+                liveStatus = updatedLiveStatus ?: cached.liveStatus,
+            )
+        }
+        homePrintersCacheRepository.save(
+            serverUrl = serverUrl,
+            printers = updated,
+            lastUpdatedAtMillis = System.currentTimeMillis(),
+        )
     }
 
     private suspend fun refreshCache(
