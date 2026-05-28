@@ -82,10 +82,16 @@ import com.chronoswing.buddydash.util.queueJsonPlateId
 import com.chronoswing.buddydash.util.resolveQueueThumbnailSource
 import com.chronoswing.buddydash.network.queueJobThumbnailUrl
 import com.chronoswing.buddydash.util.HomeLoadTiming
+import com.chronoswing.buddydash.util.disconnectedPrinterStatus
+import com.chronoswing.buddydash.util.logPrinterEnrichFailure
+import com.chronoswing.buddydash.util.parseDegradedPrinterStatus
+import com.chronoswing.buddydash.util.withEnrichFallback
+import com.chronoswing.buddydash.util.optSafeInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -155,10 +161,7 @@ class BambuddyApiClient {
     suspend fun fetchPrinters(serverUrl: String, apiKey: String): Result<List<Printer>> =
         withContext(Dispatchers.IO) {
             runApiCall(serverUrl, apiKey, BambuddyApi.LIST_PRINTERS_PATH) { body ->
-                val array = JSONArray(body)
-                List(array.length()) { index ->
-                    parsePrinterFromConfig(array.getJSONObject(index))
-                }
+                parsePrintersListSafely(body)
             }.also { result ->
                 if (BuddyDashDebug.enabled) {
                     result.fold(
@@ -220,22 +223,26 @@ class BambuddyApiClient {
             if (printers.isEmpty()) return@withContext Result.success(emptyList())
             runCatching {
                 HomeLoadTiming.log("secondary enrichment started (count=${printers.size})")
-                coroutineScope {
-                    val inventoryDeferred = async {
+                supervisorScope {
+                    val inventoryByPrinter = async {
                         fetchInventoryByPrinter(serverUrl, apiKey, printerId = null)
                             .getOrElse { emptyMap() }
-                    }
-                    val inventoryByPrinter = inventoryDeferred.await()
+                    }.await()
                     val concurrency = Semaphore(4)
                     printers.map { printer ->
                         async {
                             concurrency.withPermit {
-                                enrichPrinterForHome(
-                                    serverUrl = serverUrl,
-                                    apiKey = apiKey,
-                                    printer = printer,
-                                    inventoryBySlot = inventoryByPrinter[printer.id],
-                                )
+                                runCatching {
+                                    enrichPrinterForHome(
+                                        serverUrl = serverUrl,
+                                        apiKey = apiKey,
+                                        printer = printer,
+                                        inventoryBySlot = inventoryByPrinter[printer.id],
+                                    )
+                                }.getOrElse { error ->
+                                    logPrinterEnrichFailure(printer.id, "enrich", error)
+                                    printer.withEnrichFallback()
+                                }
                             }
                         }
                     }.awaitAll()
@@ -275,7 +282,7 @@ class BambuddyApiClient {
             0
         }
         return printer.copy(
-            liveStatus = statusResult.getOrNull(),
+            liveStatus = statusResult.getOrNull() ?: disconnectedPrinterStatus(),
             maintenanceIndicator = maintenanceIndicator,
             maintenanceItems = maintenanceOverview?.items.orEmpty(),
             maintenanceTotalPrintHours = maintenanceOverview?.totalPrintHours,
@@ -294,7 +301,7 @@ class BambuddyApiClient {
                 .getOrElse { emptyMap() }
                 .getOrElse(printerId) { emptyMap() }
             runApiCall(serverUrl, apiKey, BambuddyApi.printerStatusPath(printerId)) { body ->
-                parsePrinterStatus(JSONObject(body), inventory)
+                safeParsePrinterStatus(body, inventory)
             }
         }
 
@@ -357,11 +364,47 @@ class BambuddyApiClient {
     }
 
     /** Config row from GET /api/v1/printers — no live connection/state fields. */
-    private fun parsePrinterFromConfig(json: JSONObject): Printer = Printer(
-        id = json.getInt("id"),
-        name = json.optString("name", "Printer ${json.getInt("id")}"),
-        model = json.optString("model").takeIf { it.isNotBlank() },
-    )
+    private fun parsePrinterFromConfig(json: JSONObject): Printer? {
+        val id = json.optInt("id", -1)
+        if (id < 0) return null
+        return Printer(
+            id = id,
+            name = json.optString("name", "Printer $id"),
+            model = json.optString("model").takeIf { it.isNotBlank() },
+        )
+    }
+
+    private fun parsePrintersListSafely(body: String): List<Printer> {
+        val array = JSONArray(body)
+        return buildList {
+            for (index in 0 until array.length()) {
+                val parsed = runCatching {
+                    val json = array.optJSONObject(index) ?: error("missing printer object at index $index")
+                    parsePrinterFromConfig(json)
+                }.onFailure { error ->
+                    if (BuddyDashDebug.enabled) {
+                        Log.w(TAG_DETAIL, "parsePrinterFromConfig failed at index=$index", error)
+                    }
+                }.getOrNull()
+                if (parsed != null) add(parsed)
+            }
+        }
+    }
+
+    private fun safeParsePrinterStatus(
+        body: String,
+        inventoryBySlot: Map<SlotInventoryKey, SlotInventoryInfo>,
+    ): PrinterStatus {
+        val json = JSONObject(body)
+        return runCatching {
+            parsePrinterStatus(json, inventoryBySlot)
+        }.getOrElse { error ->
+            if (BuddyDashDebug.enabled) {
+                Log.w(TAG_DETAIL, "parsePrinterStatus failed printer=${json.optInt("id", -1)}", error)
+            }
+            parseDegradedPrinterStatus(json)
+        }
+    }
 
     private fun parsePrinterMachineInfo(json: JSONObject): PrinterMachineInfo =
         PrinterMachineInfo(
@@ -1310,43 +1353,47 @@ class BambuddyApiClient {
 
     private fun parseMaintenanceOverview(json: JSONObject): PrinterMaintenanceOverview {
         val itemsArray = json.optJSONArray("maintenance_items") ?: JSONArray()
-        val items = List(itemsArray.length()) { index ->
-            val item = itemsArray.getJSONObject(index)
-            val isDue = item.optBoolean("is_due", false)
-            val isWarning = item.optBoolean("is_warning", false)
-            val hoursUntilDue = item.optDouble("hours_until_due").takeIf {
-                item.has("hours_until_due") && !item.isNull("hours_until_due")
-            }
-            val daysUntilDue = item.optDouble("days_until_due").takeIf {
-                item.has("days_until_due") && !item.isNull("days_until_due")
-            }
-            val intervalHours = item.optDouble("interval_hours").takeIf {
-                item.has("interval_hours") && !item.isNull("interval_hours")
-            }
-            val hoursSinceMaintenance = item.optDouble("hours_since_maintenance").takeIf {
-                item.has("hours_since_maintenance") && !item.isNull("hours_since_maintenance")
-            }
-            val intervalType = item.optString("interval_type").takeIf { it.isNotBlank() }
-            if (debugLogDetailRaw) {
-                Log.d(
-                    TAG_DETAIL,
-                    "maintenance raw id=${item.optInt("id")} name=${item.optString("maintenance_type_name")} " +
-                        "is_due=$isDue is_warning=$isWarning hours_until_due=$hoursUntilDue days_until_due=$daysUntilDue " +
-                        "interval_hours=$intervalHours hours_since=$hoursSinceMaintenance interval_type=$intervalType",
+        val items = buildList {
+            for (index in 0 until itemsArray.length()) {
+                val item = itemsArray.optJSONObject(index) ?: continue
+                val isDue = item.optBoolean("is_due", false)
+                val isWarning = item.optBoolean("is_warning", false)
+                val hoursUntilDue = item.optDouble("hours_until_due").takeIf {
+                    item.has("hours_until_due") && !item.isNull("hours_until_due")
+                }
+                val daysUntilDue = item.optDouble("days_until_due").takeIf {
+                    item.has("days_until_due") && !item.isNull("days_until_due")
+                }
+                val intervalHours = item.optDouble("interval_hours").takeIf {
+                    item.has("interval_hours") && !item.isNull("interval_hours")
+                }
+                val hoursSinceMaintenance = item.optDouble("hours_since_maintenance").takeIf {
+                    item.has("hours_since_maintenance") && !item.isNull("hours_since_maintenance")
+                }
+                val intervalType = item.optString("interval_type").takeIf { it.isNotBlank() }
+                if (debugLogDetailRaw) {
+                    Log.d(
+                        TAG_DETAIL,
+                        "maintenance raw id=${item.optInt("id")} name=${item.optString("maintenance_type_name")} " +
+                            "is_due=$isDue is_warning=$isWarning hours_until_due=$hoursUntilDue days_until_due=$daysUntilDue " +
+                            "interval_hours=$intervalHours hours_since=$hoursSinceMaintenance interval_type=$intervalType",
+                    )
+                }
+                add(
+                    MaintenanceItem(
+                        id = item.optInt("id", -1),
+                        name = item.optString("maintenance_type_name", "Maintenance"),
+                        isDue = isDue,
+                        isWarning = isWarning,
+                        enabled = item.optBoolean("enabled", true),
+                        hoursUntilDue = hoursUntilDue,
+                        daysUntilDue = daysUntilDue,
+                        intervalHours = intervalHours,
+                        hoursSinceMaintenance = hoursSinceMaintenance,
+                        intervalType = intervalType,
+                    ),
                 )
             }
-            MaintenanceItem(
-                id = item.optInt("id", -1),
-                name = item.optString("maintenance_type_name", "Maintenance"),
-                isDue = isDue,
-                isWarning = isWarning,
-                enabled = item.optBoolean("enabled", true),
-                hoursUntilDue = hoursUntilDue,
-                daysUntilDue = daysUntilDue,
-                intervalHours = intervalHours,
-                hoursSinceMaintenance = hoursSinceMaintenance,
-                intervalType = intervalType,
-            )
         }
         val totalPrintHours = json.optDouble("total_print_hours")
             .takeIf { json.has("total_print_hours") && !json.isNull("total_print_hours") && it > 0.0 }
@@ -1459,11 +1506,7 @@ class BambuddyApiClient {
                 "tray $label ams=$amsId tray=$trayId loaded=$loaded type=$type remainRaw=${trayJson.opt("remain")}",
             )
         }
-        val mqttTrayId = if (trayJson.has("id") && !trayJson.isNull("id")) {
-            trayJson.getInt("id")
-        } else {
-            null
-        }
+        val mqttTrayId = trayJson.optSafeInt("id")
         return FilamentSlot(
             label = label,
             filamentType = type,
@@ -1493,9 +1536,9 @@ class BambuddyApiClient {
         val array = JSONArray(body)
         val parsed = mutableListOf<Triple<PrintQueueJob, String, JSONObject>>()
         for (index in 0 until array.length()) {
-            val json = array.getJSONObject(index)
+            val json = array.optJSONObject(index) ?: continue
             val status = json.optString("status", "")
-            val job = parsePrintQueueItem(json)
+            val job = parsePrintQueueItem(json) ?: continue
             parsed.add(Triple(job, status, json))
         }
         if (debugLogQueue) {
@@ -1557,17 +1600,21 @@ class BambuddyApiClient {
         return PrinterQueueSnapshot(upcoming = upcoming, printing = printing)
     }
 
-    private fun parsePrintQueueItem(json: JSONObject): PrintQueueJob = PrintQueueJob(
-        id = json.getInt("id"),
-        position = json.optInt("position", 0),
-        displayName = resolveQueueDisplayName(json),
-        hasLibraryThumbnail = queueHasThumbnailHint(json, "library_file_thumbnail"),
-        hasArchiveThumbnail = queueHasThumbnailHint(json, "archive_thumbnail"),
-        libraryFileId = queueJsonPositiveInt(json, "library_file_id"),
-        archiveId = queueJsonPositiveInt(json, "archive_id"),
-        plateId = queueJsonPlateId(json),
-        estimatedDurationSeconds = resolveQueueDurationSeconds(json),
-        filamentUsage = resolveQueueFilamentUsage(json),
-    )
+    private fun parsePrintQueueItem(json: JSONObject): PrintQueueJob? {
+        val id = json.optInt("id", -1)
+        if (id < 0) return null
+        return PrintQueueJob(
+            id = id,
+            position = json.optInt("position", 0),
+            displayName = resolveQueueDisplayName(json),
+            hasLibraryThumbnail = queueHasThumbnailHint(json, "library_file_thumbnail"),
+            hasArchiveThumbnail = queueHasThumbnailHint(json, "archive_thumbnail"),
+            libraryFileId = queueJsonPositiveInt(json, "library_file_id"),
+            archiveId = queueJsonPositiveInt(json, "archive_id"),
+            plateId = queueJsonPlateId(json),
+            estimatedDurationSeconds = resolveQueueDurationSeconds(json),
+            filamentUsage = resolveQueueFilamentUsage(json),
+        )
+    }
 
 }

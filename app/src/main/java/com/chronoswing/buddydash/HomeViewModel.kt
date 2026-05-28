@@ -13,6 +13,7 @@ import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.BuddyDashDebug
 import com.chronoswing.buddydash.util.HomeLoadTiming
 import com.chronoswing.buddydash.util.RefreshGuard
+import com.chronoswing.buddydash.util.withEnrichFallbacks
 import com.chronoswing.buddydash.util.RefreshIntervals
 import com.chronoswing.buddydash.util.RefreshSource
 import com.chronoswing.buddydash.util.cancelsInFlightRefresh
@@ -565,6 +566,38 @@ class HomeViewModel(
                 )
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: Exception) {
+                if (BuddyDashDebug.enabled) {
+                    Log.w(TAG_HOME_VM, "HomeVM: loadPrinters failed unexpectedly", e)
+                }
+                val message = e.toUserNetworkMessage(
+                    if (hadPrinters) "Could not refresh printers" else "Failed to load printers",
+                )
+                _uiState.update { current ->
+                    if (current.printers.isNotEmpty()) {
+                        current.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            isEnriching = false,
+                            error = null,
+                            refreshError = message,
+                            isStaleCachedData = true,
+                            hasCompletedLoad = true,
+                            hasAttemptedNetworkLoad = true,
+                        )
+                    } else {
+                        current.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            isEnriching = false,
+                            error = message,
+                            refreshError = null,
+                            hasCompletedLoad = true,
+                            hasAttemptedNetworkLoad = true,
+                        )
+                    }
+                }
+                flushPendingRefresh()
             }
         }
     }
@@ -679,13 +712,16 @@ class HomeViewModel(
                     refreshLoadedSpoolCount()
                     _uiState.update { current ->
                         val message = error.toUserNetworkMessage("Could not refresh printers")
-                        if (current.printers.isNotEmpty()) {
+                        val fallbackPrinters = current.printers.withEnrichFallbacks()
+                        if (fallbackPrinters.isNotEmpty()) {
                             current.copy(
+                                printers = fallbackPrinters,
                                 isEnriching = false,
                                 isRefreshing = false,
                                 error = null,
                                 refreshError = message,
                                 isStaleCachedData = true,
+                                hasCompletedLoad = true,
                                 hasAttemptedNetworkLoad = true,
                             )
                         } else {
@@ -702,6 +738,31 @@ class HomeViewModel(
             )
         } catch (e: CancellationException) {
             throw e
+        } catch (e: Exception) {
+            if (BuddyDashDebug.enabled) {
+                Log.w(TAG_HOME_VM, "HomeVM: enrichPrinters failed unexpectedly source=$refreshSource", e)
+            }
+            refreshLoadedSpoolCount()
+            _uiState.update { current ->
+                val fallbackPrinters = current.printers.withEnrichFallbacks()
+                if (fallbackPrinters.isNotEmpty()) {
+                    current.copy(
+                        printers = fallbackPrinters,
+                        isEnriching = false,
+                        isRefreshing = false,
+                        isStaleCachedData = true,
+                        hasCompletedLoad = true,
+                        hasAttemptedNetworkLoad = true,
+                    )
+                } else {
+                    current.copy(
+                        isEnriching = false,
+                        isRefreshing = false,
+                        hasAttemptedNetworkLoad = true,
+                    )
+                }
+            }
+            flushPendingRefresh()
         }
     }
 
