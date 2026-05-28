@@ -63,16 +63,8 @@ fun resolveActiveFilamentSlot(
     slots: List<FilamentSlot>,
     logRaw: Boolean = false,
 ): SlotInventoryKey? {
-    val trayNow = if (statusJson.has("tray_now") && !statusJson.isNull("tray_now")) {
-        statusJson.getInt("tray_now")
-    } else {
-        null
-    }
-    val stgCur = if (statusJson.has("stg_cur") && !statusJson.isNull("stg_cur")) {
-        statusJson.getInt("stg_cur")
-    } else {
-        null
-    }
+    val trayNow = statusJson.optSafeInt("tray_now")
+    val stgCur = statusJson.optSafeInt("stg_cur")
     val stgCurName = statusJson.optString("stg_cur_name").takeIf { it.isNotBlank() }
 
     if (logRaw) {
