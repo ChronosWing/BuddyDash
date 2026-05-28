@@ -15,6 +15,8 @@ import com.chronoswing.buddydash.util.HomeLoadTiming
 import com.chronoswing.buddydash.util.RefreshGuard
 import com.chronoswing.buddydash.util.toggleSmartPlugPower
 import com.chronoswing.buddydash.util.NfcActionOutcome
+import com.chronoswing.buddydash.util.isPrinterSafeToPowerOff
+import com.chronoswing.buddydash.data.model.SmartOutletPowerState
 import com.chronoswing.buddydash.util.withEnrichFallbacks
 import com.chronoswing.buddydash.util.RefreshIntervals
 import com.chronoswing.buddydash.util.RefreshSource
@@ -84,6 +86,8 @@ data class HomeUiState(
     val powerToggleInFlightIds: Set<Int> = emptySet(),
     /** One-shot outcome for home power toggle toast/snackbar. */
     val powerToggleOutcome: NfcActionOutcome? = null,
+    /** Printer awaiting in-app confirmation before an unsafe power-off. */
+    val powerOffConfirmPrinterId: Int? = null,
 )
 
 class HomeViewModel(
@@ -780,6 +784,33 @@ class HomeViewModel(
     fun toggleSmartPlugPower(printerId: Int) {
         val state = _uiState.value
         if (!state.hasCredentials || printerId in state.powerToggleInFlightIds) return
+        if (state.powerOffConfirmPrinterId != null) return
+        val printer = state.printers.find { it.id == printerId } ?: return
+        if (printer.smartPlugState == null) return
+
+        val currentPower = printer.smartPlugState.displayPowerState
+        if (currentPower == SmartOutletPowerState.On &&
+            !isPrinterSafeToPowerOff(printer.liveStatus)
+        ) {
+            _uiState.update { it.copy(powerOffConfirmPrinterId = printerId) }
+            return
+        }
+        executeSmartPlugPowerToggle(printerId, forceUnsafePowerOff = false)
+    }
+
+    fun confirmSmartPlugPowerOff(printerId: Int) {
+        if (_uiState.value.powerOffConfirmPrinterId != printerId) return
+        _uiState.update { it.copy(powerOffConfirmPrinterId = null) }
+        executeSmartPlugPowerToggle(printerId, forceUnsafePowerOff = true)
+    }
+
+    fun dismissSmartPlugPowerOffConfirm() {
+        _uiState.update { it.copy(powerOffConfirmPrinterId = null) }
+    }
+
+    private fun executeSmartPlugPowerToggle(printerId: Int, forceUnsafePowerOff: Boolean) {
+        val state = _uiState.value
+        if (!state.hasCredentials || printerId in state.powerToggleInFlightIds) return
         val printer = state.printers.find { it.id == printerId } ?: return
         if (printer.smartPlugState == null) return
 
@@ -792,6 +823,7 @@ class HomeViewModel(
                 serverUrl = state.serverUrl,
                 apiKey = state.apiKey,
                 printer = printer,
+                forceUnsafePowerOff = forceUnsafePowerOff,
             )
             _uiState.update { current ->
                 val updatedPrinters = current.printers.map { p ->

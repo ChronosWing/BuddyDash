@@ -451,8 +451,9 @@
     <string name="machine_power_state_unknown_upper">—</string>
     <string name="machine_power_off_confirm_title">Turn off power?</string>
     <string name="machine_power_off_confirm_message">This will cut power to the printer outlet.</string>
-    <string name="machine_power_off_active_confirm_title">Printer appears active</string>
-    <string name="machine_power_off_active_confirm_message">Printer appears active. Turn off power anyway?</string>
+    <string name="machine_power_off_active_confirm_title">Printer is active</string>
+    <string name="machine_power_off_active_confirm_message">This printer appears to be busy. Turning off power could interrupt a print or damage the current job.</string>
+    <string name="machine_power_off_active_confirm_action">Power off anyway</string>
     <string name="machine_power_on_success">Power turned on</string>
     <string name="machine_power_off_success">Power turned off</string>
     <string name="machine_power_on_failed">Could not turn power on</string>

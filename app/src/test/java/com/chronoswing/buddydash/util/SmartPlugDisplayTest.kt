@@ -53,4 +53,32 @@ class SmartPlugDisplayTest {
         )
         assertFalse(status.requiresActivePowerOffConfirmation())
     }
+
+    @Test
+    fun requiresActivePowerOffConfirmation_trueWhenDisconnected() {
+        val status = PrinterStatus(
+            connected = false,
+            rawState = "IDLE",
+            progress = null,
+            fileName = null,
+            remainingTimeSeconds = null,
+            nozzleTemp = null,
+            bedTemp = null,
+        )
+        assertTrue(status.requiresActivePowerOffConfirmation())
+    }
+
+    @Test
+    fun requiresActivePowerOffConfirmation_trueWhenHeating() {
+        val status = PrinterStatus(
+            connected = true,
+            rawState = "HEATING",
+            progress = null,
+            fileName = null,
+            remainingTimeSeconds = null,
+            nozzleTemp = 180.0,
+            bedTemp = 60.0,
+        )
+        assertTrue(status.requiresActivePowerOffConfirmation())
+    }
 }

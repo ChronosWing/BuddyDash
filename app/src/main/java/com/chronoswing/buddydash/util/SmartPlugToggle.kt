@@ -16,14 +16,16 @@ data class SmartPlugToggleResult(
 )
 
 /**
- * Toggle smart-outlet power for [printer] using the same safety rules as NFC toggle-power.
- * Reuses [isPrinterSafeToPowerOff] before powering off.
+ * Toggle smart-outlet power for [printer].
+ * When [forceUnsafePowerOff] is false (NFC default), busy printers block power-off.
+ * In-app UI may set [forceUnsafePowerOff] after user confirmation.
  */
 suspend fun toggleSmartPlugPower(
     apiClient: BambuddyApiClient,
     serverUrl: String,
     apiKey: String,
     printer: Printer,
+    forceUnsafePowerOff: Boolean = false,
 ): SmartPlugToggleResult {
     val plugState = printer.smartPlugState
         ?: apiClient.fetchPrinterSmartPlugState(serverUrl, apiKey, printer.id).getOrNull()
@@ -56,7 +58,7 @@ suspend fun toggleSmartPlugPower(
     } else {
         val status = printer.liveStatus
             ?: apiClient.fetchPrinterStatus(serverUrl, apiKey, printer.id).getOrNull()
-        if (!isPrinterSafeToPowerOff(status)) {
+        if (!isPrinterSafeToPowerOff(status) && !forceUnsafePowerOff) {
             return SmartPlugToggleResult(NfcActionOutcome.PrinterBusyPowerUnchanged, plugState)
         }
         apiClient.controlSmartPlug(serverUrl, apiKey, plugId, action = "off").fold(
