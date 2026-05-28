@@ -15,6 +15,8 @@ data class Printer(
     val maintenanceTotalPrintHours: Double? = null,
     /** Count of pending queue jobs from GET /api/v1/queue (excludes currently printing). */
     val pendingQueueCount: Int = 0,
+    /** Smart outlet assigned in Bambuddy, with optional live power state from home enrich. */
+    val smartPlugState: PrinterSmartPlugState? = null,
 )
 
 data class PrinterStatus(

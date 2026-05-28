@@ -4,11 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import android.nfc.NdefMessage
 import android.nfc.NfcAdapter
-import android.os.Build
 import android.os.Bundle
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
+import com.chronoswing.buddydash.util.performNfcOutcomeHaptic
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -18,6 +15,7 @@ import com.chronoswing.buddydash.data.SettingsRepository
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.nfc.NfcActionExecutor
 import com.chronoswing.buddydash.util.NfcActionOutcome
+import com.chronoswing.buddydash.util.resolveNfcActionOutcomeMessage
 import kotlinx.coroutines.launch
 
 /**
@@ -75,7 +73,7 @@ class DeepLinkActionActivity : ComponentActivity() {
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "NFC result — uri=$uri outcome=$outcome")
             }
-            performHaptic(outcome.tier)
+            performNfcOutcomeHaptic(this@DeepLinkActionActivity, outcome.tier)
             presentOutcome(outcome)
             finish()
         }
@@ -85,90 +83,13 @@ class DeepLinkActionActivity : ComponentActivity() {
 
     private fun presentOutcome(outcome: NfcActionOutcome) {
         when (outcome) {
-            NfcActionOutcome.Debounced -> Unit
-
-            // clear-plate
-            is NfcActionOutcome.PlateCleared ->
-                showToast(getString(R.string.nfc_plate_cleared, outcome.printerName))
-            NfcActionOutcome.PlateAlreadyClear ->
-                showToast(getString(R.string.nfc_plate_already_clear))
-            NfcActionOutcome.PrinterBusyPlateUnchanged ->
-                showToast(getString(R.string.nfc_printer_busy_plate))
-
-            // toggle-power
-            is NfcActionOutcome.PowerOn ->
-                showToast(getString(R.string.nfc_power_on, outcome.printerName))
-            is NfcActionOutcome.PowerOff ->
-                showToast(getString(R.string.nfc_power_off, outcome.printerName))
-            NfcActionOutcome.PrinterBusyPowerUnchanged ->
-                showToast(getString(R.string.nfc_printer_busy_power))
-            NfcActionOutcome.SmartOutletUnavailable ->
-                showToast(getString(R.string.nfc_outlet_unavailable))
-            NfcActionOutcome.SmartOutletStateUnknown ->
-                showToast(getString(R.string.nfc_outlet_state_unknown))
-
-            // finish
-            NfcActionOutcome.FinishedWithPowerOff ->
-                showToast(getString(R.string.nfc_finished_power_off))
-            NfcActionOutcome.FinishedPlateClear ->
-                showToast(getString(R.string.nfc_finished_plate_clear))
-            NfcActionOutcome.PrinterBusyFinishSkipped ->
-                showToast(getString(R.string.nfc_printer_busy_finish))
-
-            // general
-            NfcActionOutcome.InvalidLink ->
-                showToast(getString(R.string.nfc_invalid_link))
             NfcActionOutcome.MissingCredentials ->
                 openSettingsWithMessage(getString(R.string.nfc_configure_first))
-            NfcActionOutcome.ConnectionRequired ->
-                showToast(getString(R.string.nfc_connection_required))
-            NfcActionOutcome.PrinterNotFound ->
-                showToast(getString(R.string.nfc_printer_not_found))
-            NfcActionOutcome.ApiFailed ->
-                showToast(getString(R.string.nfc_action_failed))
+            else -> resolveNfcActionOutcomeMessage(this, outcome)?.let { showToast(it) }
         }
     }
 
     // ── Haptics ───────────────────────────────────────────────────
-
-    private fun performHaptic(tier: NfcActionOutcome.Tier) {
-        if (tier == NfcActionOutcome.Tier.Noop && tier == NfcActionOutcome.Tier.Noop) {
-            // Debounced gets the lightest possible tick
-        }
-        val vibrator = getVibrator() ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val effect = when (tier) {
-                NfcActionOutcome.Tier.Success ->
-                    VibrationEffect.createOneShot(35, 80)
-                NfcActionOutcome.Tier.Noop ->
-                    VibrationEffect.createOneShot(20, 40)
-                NfcActionOutcome.Tier.Warning ->
-                    VibrationEffect.createOneShot(50, 140)
-                NfcActionOutcome.Tier.Failure ->
-                    VibrationEffect.createOneShot(60, 180)
-            }
-            vibrator.vibrate(effect)
-        } else {
-            @Suppress("DEPRECATION")
-            val ms = when (tier) {
-                NfcActionOutcome.Tier.Success -> 35L
-                NfcActionOutcome.Tier.Noop -> 20L
-                NfcActionOutcome.Tier.Warning -> 50L
-                NfcActionOutcome.Tier.Failure -> 60L
-            }
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(ms)
-        }
-    }
-
-    private fun getVibrator(): Vibrator? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            (getSystemService(VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            getSystemService(VIBRATOR_SERVICE) as? Vibrator
-        }
-    }
 
     // ── URI resolution ────────────────────────────────────────────
 

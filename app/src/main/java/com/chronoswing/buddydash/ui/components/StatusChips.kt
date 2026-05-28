@@ -14,12 +14,14 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,6 +47,7 @@ import com.chronoswing.buddydash.util.HmsSeverity
 import com.chronoswing.buddydash.util.PlateIndicatorKind
 import com.chronoswing.buddydash.util.MaintenanceHomeIndicator
 import com.chronoswing.buddydash.util.PrinterActivityKind
+import com.chronoswing.buddydash.data.model.SmartOutletPowerState
 
 @Composable
 fun PrinterQuickStatusRow(
@@ -59,6 +62,11 @@ fun PrinterQuickStatusRow(
     onHmsChipClick: (() -> Unit)? = null,
     onMaintenanceChipClick: (() -> Unit)? = null,
     onUnifiedAlertsClick: (() -> Unit)? = null,
+    smartOutletPowerState: SmartOutletPowerState? = null,
+    showSmartOutletPower: Boolean = false,
+    smartOutletPowerLoading: Boolean = false,
+    smartOutletPowerEnabled: Boolean = true,
+    onSmartOutletPowerClick: (() -> Unit)? = null,
 ) {
     val hasHms = hmsAlertSeverity != HmsSeverity.Ok
     val hasMaintenance = maintenanceIndicator != MaintenanceHomeIndicator.None
@@ -100,6 +108,14 @@ fun PrinterQuickStatusRow(
             }
         }
         QueueCountChip(count = pendingQueueCount)
+        if (showSmartOutletPower && smartOutletPowerState != null) {
+            SmartOutletPowerIcon(
+                powerState = smartOutletPowerState,
+                isLoading = smartOutletPowerLoading,
+                enabled = smartOutletPowerEnabled,
+                onClick = onSmartOutletPowerClick,
+            )
+        }
     }
 }
 
@@ -114,6 +130,56 @@ private val CompactAlertTouchTargetSize = 44.dp
  * from [MaintenanceHomeIndicatorIcon] which uses [Icons.Filled.Warning] (triangle).
  * Size matches the maintenance icon (16 dp). Tappable — opens the HMS detail sheet.
  */
+@Composable
+fun SmartOutletPowerIcon(
+    powerState: SmartOutletPowerState,
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
+    enabled: Boolean = true,
+    onClick: (() -> Unit)? = null,
+) {
+    val tint = when (powerState) {
+        SmartOutletPowerState.On -> CyanAccent
+        SmartOutletPowerState.Off -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+        SmartOutletPowerState.Unknown -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+    }
+    val contentDescription = when {
+        isLoading -> stringResource(R.string.cd_smart_outlet_power_loading)
+        powerState == SmartOutletPowerState.On -> stringResource(R.string.cd_smart_outlet_power_on)
+        powerState == SmartOutletPowerState.Off -> stringResource(R.string.cd_smart_outlet_power_off)
+        else -> stringResource(R.string.cd_smart_outlet_power_unknown)
+    }
+    val clickable = onClick != null && enabled && !isLoading
+
+    Box(
+        modifier = modifier.size(CompactAlertIconSize),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                strokeWidth = 2.dp,
+                color = tint,
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Filled.PowerSettingsNew,
+                contentDescription = if (clickable) null else contentDescription,
+                modifier = Modifier.size(CompactAlertIconSize),
+                tint = tint,
+            )
+        }
+        if (clickable) {
+            Box(
+                modifier = Modifier
+                    .size(CompactAlertTouchTargetSize)
+                    .buddyDashClickable(onClick = onClick)
+                    .semantics { this.contentDescription = contentDescription },
+            )
+        }
+    }
+}
+
 @Composable
 fun HmsStatusIcon(
     severity: HmsSeverity,

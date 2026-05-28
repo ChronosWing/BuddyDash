@@ -72,6 +72,7 @@ object HomePrintersCacheCodec {
             .put("maintenance_items", encodeMaintenanceItems(printer.maintenanceItems))
             .putOptDouble("maintenance_total_print_hours", printer.maintenanceTotalPrintHours)
             .putOptObject("live_status", printer.liveStatus?.let { encodeStatus(it) })
+            .putOptObject("smart_plug", printer.smartPlugState?.let { SmartPlugCacheCodec.encode(it) })
 
     private fun decodePrinter(obj: JSONObject): Printer? {
         val id = obj.optInt("id", -1)
@@ -89,6 +90,7 @@ object HomePrintersCacheCodec {
             maintenanceItems = decodeMaintenanceItems(obj.optJSONArray("maintenance_items")),
             maintenanceTotalPrintHours = obj.optNullableDouble("maintenance_total_print_hours"),
             pendingQueueCount = obj.optInt("pending_queue_count", 0),
+            smartPlugState = SmartPlugCacheCodec.decode(obj.optJSONObject("smart_plug")),
         )
     }
 

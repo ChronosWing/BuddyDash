@@ -13,6 +13,8 @@ import com.chronoswing.buddydash.network.BambuddyApiClient
 import com.chronoswing.buddydash.util.BuddyDashDebug
 import com.chronoswing.buddydash.util.HomeLoadTiming
 import com.chronoswing.buddydash.util.RefreshGuard
+import com.chronoswing.buddydash.util.toggleSmartPlugPower
+import com.chronoswing.buddydash.util.NfcActionOutcome
 import com.chronoswing.buddydash.util.withEnrichFallbacks
 import com.chronoswing.buddydash.util.RefreshIntervals
 import com.chronoswing.buddydash.util.RefreshSource
@@ -78,6 +80,10 @@ data class HomeUiState(
     val cardVisibility: Map<Int, PrinterCardVisibility> = emptyMap(),
     /** False until user has long-pressed a printer card at least once. */
     val hasUsedQuickActions: Boolean = false,
+    /** Printer IDs with an in-flight home smart-outlet toggle. */
+    val powerToggleInFlightIds: Set<Int> = emptySet(),
+    /** One-shot outcome for home power toggle toast/snackbar. */
+    val powerToggleOutcome: NfcActionOutcome? = null,
 )
 
 class HomeViewModel(
@@ -769,6 +775,52 @@ class HomeViewModel(
     fun markQuickActionsUsed() {
         if (_uiState.value.hasUsedQuickActions) return
         viewModelScope.launch { settingsRepository.saveHasUsedQuickActions() }
+    }
+
+    fun toggleSmartPlugPower(printerId: Int) {
+        val state = _uiState.value
+        if (!state.hasCredentials || printerId in state.powerToggleInFlightIds) return
+        val printer = state.printers.find { it.id == printerId } ?: return
+        if (printer.smartPlugState == null) return
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(powerToggleInFlightIds = it.powerToggleInFlightIds + printerId)
+            }
+            val result = toggleSmartPlugPower(
+                apiClient = apiClient,
+                serverUrl = state.serverUrl,
+                apiKey = state.apiKey,
+                printer = printer,
+            )
+            _uiState.update { current ->
+                val updatedPrinters = current.printers.map { p ->
+                    if (p.id != printerId) p
+                    else p.copy(
+                        smartPlugState = result.updatedPlugState ?: p.smartPlugState,
+                        liveStatus = result.updatedLiveStatus ?: p.liveStatus,
+                    )
+                }
+                current.copy(
+                    powerToggleInFlightIds = current.powerToggleInFlightIds - printerId,
+                    powerToggleOutcome = result.outcome,
+                    printers = updatedPrinters,
+                )
+            }
+            if (result.outcome.tier == NfcActionOutcome.Tier.Success) {
+                homePrintersCacheRepository.save(
+                    serverUrl = state.serverUrl,
+                    printers = _uiState.value.printers,
+                    lastUpdatedAtMillis = System.currentTimeMillis(),
+                )
+            }
+        }
+    }
+
+    fun consumePowerToggleOutcome(): NfcActionOutcome? {
+        val outcome = _uiState.value.powerToggleOutcome ?: return null
+        _uiState.update { it.copy(powerToggleOutcome = null) }
+        return outcome
     }
 
     private fun refreshCardVisibility() {

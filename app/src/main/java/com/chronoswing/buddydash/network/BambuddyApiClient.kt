@@ -282,12 +282,18 @@ class BambuddyApiClient {
         } else {
             0
         }
+        val smartPlugState = if (BambuddyApi.hasSmartPlugEndpoints) {
+            fetchPrinterSmartPlugState(serverUrl, apiKey, printer.id).getOrNull()
+        } else {
+            null
+        }
         return printer.copy(
             liveStatus = statusResult.getOrNull() ?: disconnectedPrinterStatus(),
             maintenanceIndicator = maintenanceIndicator,
             maintenanceItems = maintenanceOverview?.items.orEmpty(),
             maintenanceTotalPrintHours = maintenanceOverview?.totalPrintHours,
             pendingQueueCount = pendingQueueCount,
+            smartPlugState = smartPlugState,
         )
     }
 
