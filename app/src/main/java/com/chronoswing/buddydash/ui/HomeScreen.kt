@@ -11,10 +11,9 @@ import com.chronoswing.buddydash.ui.motion.HomeLogoGlowLayer
 import com.chronoswing.buddydash.ui.motion.HomeLogoGlowState
 import com.chronoswing.buddydash.ui.motion.HomeAtmosphericFade
 import com.chronoswing.buddydash.ui.motion.HomeHeaderBackground
-import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.chronoswing.buddydash.ui.motion.buddyDashClickable
 import com.chronoswing.buddydash.ui.motion.refreshSpinning
 import androidx.compose.foundation.Image
@@ -144,6 +143,7 @@ import com.chronoswing.buddydash.util.resolveActivityKind
 import com.chronoswing.buddydash.util.toCardLabels
 import com.chronoswing.buddydash.ui.theme.OfflineRed
 import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
+import com.chronoswing.buddydash.util.performLongPressHaptic
 import com.chronoswing.buddydash.util.performNfcOutcomeHaptic
 import com.chronoswing.buddydash.util.resolveNfcActionOutcomeMessage
 
@@ -156,10 +156,11 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(uiState.powerToggleOutcome) {
         val outcome = uiState.powerToggleOutcome ?: return@LaunchedEffect
-        performNfcOutcomeHaptic(context, outcome.tier)
+        performNfcOutcomeHaptic(haptic, outcome.tier)
         resolveNfcActionOutcomeMessage(context, outcome)?.let { message ->
             snackbarHostState.showSnackbar(message)
         }
@@ -741,7 +742,7 @@ private fun GlancePrinterCard(
     }
 
     var showQuickActions by remember { mutableStateOf(false) }
-    val view = LocalView.current
+    val haptic = LocalHapticFeedback.current
 
     if (showQuickActions) {
         QuickActionsSheet(
@@ -775,7 +776,7 @@ private fun GlancePrinterCard(
                 .combinedClickable(
                     onClick = onClick,
                     onLongClick = {
-                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        performLongPressHaptic(haptic)
                         showQuickActions = true
                         onQuickActionHintDismissed()
                     },

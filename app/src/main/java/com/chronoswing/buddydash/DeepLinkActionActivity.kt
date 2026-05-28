@@ -73,7 +73,7 @@ class DeepLinkActionActivity : ComponentActivity() {
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "NFC result — uri=$uri outcome=$outcome")
             }
-            performNfcOutcomeHaptic(this@DeepLinkActionActivity, outcome.tier)
+            performNfcOutcomeHaptic(window.decorView, outcome.tier)
             presentOutcome(outcome)
             finish()
         }
