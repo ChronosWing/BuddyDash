@@ -103,10 +103,11 @@ fun DetailStatusHeroImage(
             printerId >= 0 &&
             normalizeBambuddyBaseUrl(serverUrl) != null
     }
+    val printerConnected = status?.connected == true
     var cameraFailed by remember(printerId, serverUrl, cameraToken) {
         mutableStateOf(false)
     }
-    val showCamera = canTryCamera && !cameraFailed
+    val showCamera = canTryCamera && !cameraFailed && printerConnected
     var refreshTick by remember(printerId) {
         mutableLongStateOf(System.currentTimeMillis())
     }
