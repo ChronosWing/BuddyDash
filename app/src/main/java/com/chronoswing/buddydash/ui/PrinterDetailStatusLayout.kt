@@ -43,6 +43,7 @@ import com.chronoswing.buddydash.ui.components.SecondaryNote
 import com.chronoswing.buddydash.ui.components.SectionHeader
 import com.chronoswing.buddydash.ui.components.SectionHeaderRow
 import com.chronoswing.buddydash.util.PrinterDetailLabels
+import com.chronoswing.buddydash.util.OverviewSmartOutletPowerControl
 import com.chronoswing.buddydash.util.buildPrintHeadline
 import com.chronoswing.buddydash.util.clampFinite
 import kotlin.math.roundToInt
@@ -64,6 +65,7 @@ private fun StatusDashboardTopRow(
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
     headerTrailing: @Composable () -> Unit,
+    overviewSmartOutletPower: OverviewSmartOutletPowerControl?,
     errorDetailsExpanded: Boolean,
     onExpandErrorDetails: () -> Unit,
     onErrorChipClick: () -> Unit,
@@ -100,6 +102,7 @@ private fun StatusDashboardTopRow(
         StatusOverviewDashboardCard(
             labels = labels,
             headerTrailing = headerTrailing,
+            overviewSmartOutletPower = overviewSmartOutletPower,
             errorDetailsExpanded = errorDetailsExpanded,
             onExpandErrorDetails = onExpandErrorDetails,
             onErrorChipClick = onErrorChipClick,
@@ -125,6 +128,7 @@ internal fun ActivePrintStatusTabExpanded(
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
     headerTrailing: @Composable () -> Unit,
+    overviewSmartOutletPower: OverviewSmartOutletPowerControl?,
     errorDetailsExpanded: Boolean,
     onExpandErrorDetails: () -> Unit,
     onErrorChipClick: () -> Unit,
@@ -149,6 +153,7 @@ internal fun ActivePrintStatusTabExpanded(
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
             headerTrailing = headerTrailing,
+            overviewSmartOutletPower = overviewSmartOutletPower,
             errorDetailsExpanded = errorDetailsExpanded,
             onExpandErrorDetails = onExpandErrorDetails,
             onErrorChipClick = onErrorChipClick,
@@ -186,6 +191,7 @@ internal fun IdleStatusTabExpanded(
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
     headerTrailing: @Composable () -> Unit,
+    overviewSmartOutletPower: OverviewSmartOutletPowerControl?,
     errorDetailsExpanded: Boolean,
     onExpandErrorDetails: () -> Unit,
     onErrorChipClick: () -> Unit,
@@ -212,6 +218,7 @@ internal fun IdleStatusTabExpanded(
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
             headerTrailing = headerTrailing,
+            overviewSmartOutletPower = overviewSmartOutletPower,
             errorDetailsExpanded = errorDetailsExpanded,
             onExpandErrorDetails = onExpandErrorDetails,
             onErrorChipClick = onErrorChipClick,
@@ -255,6 +262,7 @@ internal fun IdleStatusTabExpanded(
 private fun StatusOverviewDashboardCard(
     labels: PrinterDetailLabels,
     headerTrailing: @Composable () -> Unit,
+    overviewSmartOutletPower: OverviewSmartOutletPowerControl?,
     errorDetailsExpanded: Boolean,
     onExpandErrorDetails: () -> Unit,
     onErrorChipClick: () -> Unit,
@@ -275,6 +283,11 @@ private fun StatusOverviewDashboardCard(
             progressCompact = labels.progressCompact,
             plateKind = labels.plateKind,
             onErrorChipClick = onErrorChipClick,
+            showSmartOutletPower = overviewSmartOutletPower != null,
+            smartOutletPowerState = overviewSmartOutletPower?.powerState,
+            smartOutletPowerLoading = overviewSmartOutletPower?.loading == true,
+            smartOutletPowerEnabled = overviewSmartOutletPower?.enabled == true,
+            onSmartOutletPowerClick = overviewSmartOutletPower?.onClick,
         )
         PrinterErrorDetailsCard(
             display = labels.printerErrorDisplay,

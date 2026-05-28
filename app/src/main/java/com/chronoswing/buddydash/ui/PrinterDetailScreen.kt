@@ -126,6 +126,13 @@ import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
 import com.chronoswing.buddydash.util.disconnectedPrinterStatus
 import com.chronoswing.buddydash.util.clampFinite
 import com.chronoswing.buddydash.util.toDetailLabels
+import com.chronoswing.buddydash.ui.components.SmartPlugBusyPowerOffDialog
+import com.chronoswing.buddydash.util.buildOverviewSmartOutletPowerControl
+import com.chronoswing.buddydash.util.OverviewSmartOutletPowerControl
+import com.chronoswing.buddydash.util.performNfcOutcomeHaptic
+import com.chronoswing.buddydash.util.resolveNfcActionOutcomeMessage
+import com.chronoswing.buddydash.util.NfcActionOutcome
+import androidx.compose.ui.platform.LocalHapticFeedback
 
 private val detailTabs = listOf("Status", "Filament", "Machine")
 private val HmsDetailAmber = androidx.compose.ui.graphics.Color(0xFFFBBF24)
@@ -173,6 +180,13 @@ fun PrinterDetailScreen(
         )
     } else {
         null
+    }
+
+    if (uiState.smartPlugPowerOffConfirmPending) {
+        SmartPlugBusyPowerOffDialog(
+            onConfirm = { viewModel.confirmOverviewSmartPlugPowerOff() },
+            onDismiss = { viewModel.dismissOverviewSmartPlugPowerOffConfirm() },
+        )
     }
 
     PrinterDetailScreenContent(
@@ -271,6 +285,11 @@ fun PrinterDetailScreen(
             cardVisibility = newVis
             cardPrefsScope.launch { cardPrefsRepo.saveVisibility(printerId, newVis) }
         },
+        smartPlugToggleInFlight = uiState.smartPlugToggleInFlight,
+        smartPlugPowerOffConfirmPending = uiState.smartPlugPowerOffConfirmPending,
+        smartPlugToggleOutcome = uiState.smartPlugToggleOutcome,
+        onToggleOverviewSmartPlugPower = viewModel::toggleOverviewSmartPlugPower,
+        onConsumeSmartPlugToggleOutcome = viewModel::consumeSmartPlugToggleOutcome,
     )
 }
 
@@ -369,8 +388,15 @@ private fun PrinterDetailScreenContent(
     onMaintenanceResetSnackbarShown: () -> Unit,
     cardVisibility: PrinterCardVisibility = PrinterCardVisibility(),
     onCardVisibilityChange: (PrinterCardVisibility) -> Unit = {},
+    smartPlugToggleInFlight: Boolean = false,
+    smartPlugPowerOffConfirmPending: Boolean = false,
+    smartPlugToggleOutcome: NfcActionOutcome? = null,
+    onToggleOverviewSmartPlugPower: () -> Unit = {},
+    onConsumeSmartPlugToggleOutcome: () -> NfcActionOutcome? = { null },
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
     val hasCachedData = labels != null
     val showStaleBanner = hasAttemptedNetworkLoad && showStaleDataBanner(
         hasCachedContent = hasCachedData,
@@ -436,6 +462,15 @@ private fun PrinterDetailScreenContent(
             val delta = target - scrollState.value
             if (delta > 0f) scrollState.animateScrollBy(delta)
         }
+    }
+
+    LaunchedEffect(smartPlugToggleOutcome) {
+        val outcome = smartPlugToggleOutcome ?: return@LaunchedEffect
+        performNfcOutcomeHaptic(haptic, outcome.tier)
+        resolveNfcActionOutcomeMessage(context, outcome)?.let { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+        onConsumeSmartPlugToggleOutcome()
     }
 
     LaunchedEffect(plateClearSnackbar) {
@@ -713,6 +748,12 @@ private fun PrinterDetailScreenContent(
                                     onPausePrint = onPausePrint,
                                     onResumePrint = onResumePrint,
                                     onStopPrint = onStopPrint,
+                                    smartPlugState = smartPlugState,
+                                    showPowerChip = cardVisibility.showPowerChip,
+                                    powerControlsEnabled = powerControlsEnabled,
+                                    smartPlugToggleInFlight = smartPlugToggleInFlight,
+                                    smartPlugPowerOffConfirmPending = smartPlugPowerOffConfirmPending,
+                                    onToggleOverviewSmartPlugPower = onToggleOverviewSmartPlugPower,
                                 )
                                 1 -> FilamentTab(
                                     labels = labels,
@@ -805,8 +846,22 @@ private fun StatusTab(
     onResumePrint: () -> Unit,
     onStopPrint: () -> Unit,
     isControlBusy: Boolean,
+    smartPlugState: com.chronoswing.buddydash.data.model.PrinterSmartPlugState?,
+    showPowerChip: Boolean,
+    powerControlsEnabled: Boolean,
+    smartPlugToggleInFlight: Boolean,
+    smartPlugPowerOffConfirmPending: Boolean,
+    onToggleOverviewSmartPlugPower: () -> Unit,
 ) {
     val isExpandedWidth = rememberIsBuddyDashExpandedWidth()
+    val overviewSmartOutletPower = buildOverviewSmartOutletPowerControl(
+        smartPlugState = smartPlugState,
+        showPowerChip = showPowerChip,
+        powerControlsEnabled = powerControlsEnabled,
+        toggleInFlight = smartPlugToggleInFlight,
+        confirmPending = smartPlugPowerOffConfirmPending,
+        onToggle = onToggleOverviewSmartPlugPower,
+    )
     val quickActions: @Composable () -> Unit = {
         PrinterStatusQuickActions(
             labels = labels,
@@ -839,6 +894,7 @@ private fun StatusTab(
                 isClearingPlate = isClearingPlate,
                 onMarkPlateClear = onMarkPlateClear,
                 headerTrailing = quickActions,
+                overviewSmartOutletPower = overviewSmartOutletPower,
                 errorDetailsExpanded = errorDetailsExpanded,
                 onExpandErrorDetails = onExpandErrorDetails,
                 onErrorChipClick = onErrorChipClick,
@@ -860,6 +916,7 @@ private fun StatusTab(
                 isClearingPlate = isClearingPlate,
                 onMarkPlateClear = onMarkPlateClear,
                 headerTrailing = quickActions,
+                overviewSmartOutletPower = overviewSmartOutletPower,
                 errorDetailsExpanded = errorDetailsExpanded,
                 onExpandErrorDetails = onExpandErrorDetails,
                 onErrorChipClick = onErrorChipClick,
@@ -916,6 +973,7 @@ private fun ActivePrintStatusTab(
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
     headerTrailing: @Composable () -> Unit,
+    overviewSmartOutletPower: OverviewSmartOutletPowerControl?,
     errorDetailsExpanded: Boolean,
     onExpandErrorDetails: () -> Unit,
     onErrorChipClick: () -> Unit,
@@ -937,6 +995,7 @@ private fun ActivePrintStatusTab(
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
             headerTrailing = headerTrailing,
+            overviewSmartOutletPower = overviewSmartOutletPower,
             errorDetailsExpanded = errorDetailsExpanded,
             onExpandErrorDetails = onExpandErrorDetails,
             onErrorChipClick = onErrorChipClick,
@@ -1050,6 +1109,7 @@ private fun IdleStatusTab(
     isClearingPlate: Boolean,
     onMarkPlateClear: () -> Unit,
     headerTrailing: @Composable () -> Unit,
+    overviewSmartOutletPower: OverviewSmartOutletPowerControl?,
     errorDetailsExpanded: Boolean,
     onExpandErrorDetails: () -> Unit,
     onErrorChipClick: () -> Unit,
@@ -1071,6 +1131,7 @@ private fun IdleStatusTab(
             isClearingPlate = isClearingPlate,
             onMarkPlateClear = onMarkPlateClear,
             headerTrailing = headerTrailing,
+            overviewSmartOutletPower = overviewSmartOutletPower,
             errorDetailsExpanded = errorDetailsExpanded,
             onExpandErrorDetails = onExpandErrorDetails,
             onErrorChipClick = onErrorChipClick,
@@ -1103,6 +1164,11 @@ private fun IdleStatusTab(
             onErrorChipClick = onErrorChipClick.takeIf {
                 labels.printerErrorDisplay.showCard
             },
+            showSmartOutletPower = overviewSmartOutletPower != null,
+            smartOutletPowerState = overviewSmartOutletPower?.powerState,
+            smartOutletPowerLoading = overviewSmartOutletPower?.loading == true,
+            smartOutletPowerEnabled = overviewSmartOutletPower?.enabled == true,
+            onSmartOutletPowerClick = overviewSmartOutletPower?.onClick,
         )
         PrinterErrorDetailsCard(
             display = labels.printerErrorDisplay,
