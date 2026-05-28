@@ -14,8 +14,10 @@ import com.chronoswing.buddydash.util.logPrinterDetailCacheRead
 import com.chronoswing.buddydash.util.logPrinterDetailCacheWrite
 import com.chronoswing.buddydash.util.isShowingStaleCachedContent
 import com.chronoswing.buddydash.data.model.MaintenanceItem
+import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.PrinterMachineInfo
 import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
+import com.chronoswing.buddydash.data.model.SmartOutletPowerState
 import com.chronoswing.buddydash.data.model.PrinterMaintenanceOverview
 import com.chronoswing.buddydash.data.model.FilamentUsage
 import com.chronoswing.buddydash.data.model.PrintQueueJob
@@ -27,6 +29,10 @@ import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
 import com.chronoswing.buddydash.util.DEBUG_LOG_ARCHIVE_REPRINT
 import com.chronoswing.buddydash.util.TAG_ARCHIVE_REPRINT
 import com.chronoswing.buddydash.util.evaluateStartNextQueuedPrintReadiness
+import com.chronoswing.buddydash.util.isPrinterSafeToPowerOff
+import com.chronoswing.buddydash.util.NfcActionOutcome
+import com.chronoswing.buddydash.util.refreshHomeCacheAfterSmartPlugToggle
+import com.chronoswing.buddydash.util.toggleSmartPlugPower
 import com.chronoswing.buddydash.util.ControlAction
 import com.chronoswing.buddydash.util.ControlFeedback
 import com.chronoswing.buddydash.util.logControlFailure
@@ -120,6 +126,9 @@ data class PrinterDetailUiState(
     val pendingSpoolDetailNavigationId: Int? = null,
     /** True after the first network load attempt completes (success or failure). Gates stale/error UI. */
     val hasAttemptedNetworkLoad: Boolean = false,
+    val smartPlugToggleInFlight: Boolean = false,
+    val smartPlugPowerOffConfirmPending: Boolean = false,
+    val smartPlugToggleOutcome: NfcActionOutcome? = null,
 )
 
 data class AssignSpoolConfirm(
@@ -992,6 +1001,81 @@ class PrinterDetailViewModel(
 
     fun homePrinter() = runControl(ControlAction.HomeAxes) {
         apiClient.homeAxes(it.serverUrl, it.apiKey, printerId)
+    }
+
+    fun toggleOverviewSmartPlugPower() {
+        val state = _uiState.value
+        if (!state.hasCredentials || state.smartPlugToggleInFlight) return
+        if (state.smartPlugPowerOffConfirmPending) return
+        if (state.smartPlugState == null) return
+
+        val currentPower = state.smartPlugState.displayPowerState
+        if (currentPower == SmartOutletPowerState.On &&
+            !isPrinterSafeToPowerOff(state.status)
+        ) {
+            _uiState.update { it.copy(smartPlugPowerOffConfirmPending = true) }
+            return
+        }
+        executeOverviewSmartPlugToggle(forceUnsafePowerOff = false)
+    }
+
+    fun confirmOverviewSmartPlugPowerOff() {
+        if (!_uiState.value.smartPlugPowerOffConfirmPending) return
+        _uiState.update { it.copy(smartPlugPowerOffConfirmPending = false) }
+        executeOverviewSmartPlugToggle(forceUnsafePowerOff = true)
+    }
+
+    fun dismissOverviewSmartPlugPowerOffConfirm() {
+        _uiState.update { it.copy(smartPlugPowerOffConfirmPending = false) }
+    }
+
+    fun consumeSmartPlugToggleOutcome(): NfcActionOutcome? {
+        val outcome = _uiState.value.smartPlugToggleOutcome ?: return null
+        _uiState.update { it.copy(smartPlugToggleOutcome = null) }
+        return outcome
+    }
+
+    private fun executeOverviewSmartPlugToggle(forceUnsafePowerOff: Boolean) {
+        val state = _uiState.value
+        if (!state.hasCredentials || state.smartPlugToggleInFlight) return
+        if (state.smartPlugState == null) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(smartPlugToggleInFlight = true) }
+            val result = toggleSmartPlugPower(
+                apiClient = apiClient,
+                serverUrl = state.serverUrl,
+                apiKey = state.apiKey,
+                printer = Printer(
+                    id = printerId,
+                    name = state.printerName,
+                    model = state.printerModel,
+                    liveStatus = state.status,
+                    smartPlugState = state.smartPlugState,
+                ),
+                forceUnsafePowerOff = forceUnsafePowerOff,
+            )
+            _uiState.update { current ->
+                current.copy(
+                    smartPlugToggleInFlight = false,
+                    smartPlugState = result.updatedPlugState ?: current.smartPlugState,
+                    status = result.updatedLiveStatus ?: current.status,
+                    smartPlugToggleOutcome = result.outcome,
+                )
+            }
+            if (result.outcome.tier == NfcActionOutcome.Tier.Success) {
+                refreshHomeCacheAfterSmartPlugToggle(
+                    homePrintersCacheRepository = homePrintersCacheRepository,
+                    apiClient = apiClient,
+                    serverUrl = state.serverUrl,
+                    apiKey = state.apiKey,
+                    printerId = printerId,
+                    updatedPlugState = result.updatedPlugState,
+                    updatedLiveStatus = result.updatedLiveStatus,
+                )
+                loadStatus(showLoading = false)
+            }
+        }
     }
 
     fun powerOnSmartPlug() = runControl(ControlAction.SmartPlugOn) {

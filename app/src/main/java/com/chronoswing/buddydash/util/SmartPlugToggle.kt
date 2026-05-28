@@ -4,6 +4,7 @@ import com.chronoswing.buddydash.data.model.Printer
 import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.data.model.SmartOutletPowerState
+import com.chronoswing.buddydash.data.HomePrintersCacheRepository
 import com.chronoswing.buddydash.network.BambuddyApiClient
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -99,3 +100,31 @@ private fun Throwable.isConnectivityFailure(): Boolean =
         message?.contains("Unable to resolve host", ignoreCase = true) == true ||
         message?.contains("Failed to connect", ignoreCase = true) == true ||
         message?.contains("timeout", ignoreCase = true) == true
+
+/** Keep Home cache in sync after a successful in-app smart-outlet toggle. */
+suspend fun refreshHomeCacheAfterSmartPlugToggle(
+    homePrintersCacheRepository: HomePrintersCacheRepository,
+    apiClient: BambuddyApiClient,
+    serverUrl: String,
+    apiKey: String,
+    printerId: Int,
+    updatedPlugState: PrinterSmartPlugState?,
+    updatedLiveStatus: PrinterStatus?,
+) {
+    val snapshot = homePrintersCacheRepository.load(serverUrl)
+    val basePrinters = snapshot?.printers
+        ?: apiClient.fetchPrinters(serverUrl, apiKey).getOrNull()
+    if (basePrinters.isNullOrEmpty()) return
+    val updated = basePrinters.map { cached ->
+        if (cached.id != printerId) cached
+        else cached.copy(
+            smartPlugState = updatedPlugState ?: cached.smartPlugState,
+            liveStatus = updatedLiveStatus ?: cached.liveStatus,
+        )
+    }
+    homePrintersCacheRepository.save(
+        serverUrl = serverUrl,
+        printers = updated,
+        lastUpdatedAtMillis = System.currentTimeMillis(),
+    )
+}

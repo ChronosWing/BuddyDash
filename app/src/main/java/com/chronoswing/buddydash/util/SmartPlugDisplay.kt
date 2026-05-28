@@ -1,5 +1,6 @@
 package com.chronoswing.buddydash.util
 
+import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
 import com.chronoswing.buddydash.data.model.PrinterStatus
 import com.chronoswing.buddydash.data.model.SmartOutletPowerState
 import com.chronoswing.buddydash.data.model.SmartPlugEnergyReading
@@ -45,6 +46,31 @@ fun formatSmartPlugPowerFactor(reading: SmartPlugEnergyReading?): String? {
     val factor = reading?.powerFactor ?: return null
     if (factor.isNaN() || !factor.isFinite() || factor <= 0) return null
     return String.format(Locale.US, "%.2f", factor.coerceAtMost(1.0))
+}
+
+/** Compact Overview/Home smart-outlet power control bindings. */
+data class OverviewSmartOutletPowerControl(
+    val powerState: SmartOutletPowerState,
+    val loading: Boolean,
+    val enabled: Boolean,
+    val onClick: () -> Unit,
+)
+
+fun buildOverviewSmartOutletPowerControl(
+    smartPlugState: PrinterSmartPlugState?,
+    showPowerChip: Boolean,
+    powerControlsEnabled: Boolean,
+    toggleInFlight: Boolean,
+    confirmPending: Boolean,
+    onToggle: () -> Unit,
+): OverviewSmartOutletPowerControl? {
+    if (!showPowerChip || smartPlugState == null) return null
+    return OverviewSmartOutletPowerControl(
+        powerState = smartPlugState.displayPowerState,
+        loading = toggleInFlight,
+        enabled = powerControlsEnabled && !confirmPending && !toggleInFlight,
+        onClick = onToggle,
+    )
 }
 
 /** True when in-app power-off should require user confirmation before proceeding. */

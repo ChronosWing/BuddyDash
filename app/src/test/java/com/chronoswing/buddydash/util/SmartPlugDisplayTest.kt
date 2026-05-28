@@ -1,6 +1,9 @@
 package com.chronoswing.buddydash.util
 
 import com.chronoswing.buddydash.data.model.PrinterStatus
+import com.chronoswing.buddydash.data.model.PrinterSmartPlugState
+import com.chronoswing.buddydash.data.model.SmartPlugConfig
+import com.chronoswing.buddydash.data.model.SmartPlugLiveStatus
 import com.chronoswing.buddydash.data.model.SmartOutletPowerState
 import com.chronoswing.buddydash.data.model.SmartPlugEnergyReading
 import com.chronoswing.buddydash.data.model.parseSmartOutletPowerState
@@ -80,5 +83,57 @@ class SmartPlugDisplayTest {
             bedTemp = 60.0,
         )
         assertTrue(status.requiresActivePowerOffConfirmation())
+    }
+
+    @Test
+    fun buildOverviewSmartOutletPowerControl_hiddenWithoutPlugOrPreference() {
+        val plug = PrinterSmartPlugState(
+            config = SmartPlugConfig(id = 1, name = "Outlet"),
+            liveStatus = SmartPlugLiveStatus(powerState = SmartOutletPowerState.On),
+        )
+        assertEquals(null, buildOverviewSmartOutletPowerControl(
+            smartPlugState = plug,
+            showPowerChip = false,
+            powerControlsEnabled = true,
+            toggleInFlight = false,
+            confirmPending = false,
+            onToggle = {},
+        ))
+        assertEquals(null, buildOverviewSmartOutletPowerControl(
+            smartPlugState = null,
+            showPowerChip = true,
+            powerControlsEnabled = true,
+            toggleInFlight = false,
+            confirmPending = false,
+            onToggle = {},
+        ))
+    }
+
+    @Test
+    fun buildOverviewSmartOutletPowerControl_disablesWhileBusyOrConfirming() {
+        val plug = PrinterSmartPlugState(
+            config = SmartPlugConfig(id = 1, name = "Outlet"),
+            liveStatus = SmartPlugLiveStatus(powerState = SmartOutletPowerState.On),
+        )
+        val inFlight = buildOverviewSmartOutletPowerControl(
+            smartPlugState = plug,
+            showPowerChip = true,
+            powerControlsEnabled = true,
+            toggleInFlight = true,
+            confirmPending = false,
+            onToggle = {},
+        )
+        assertEquals(false, inFlight?.enabled)
+        assertEquals(true, inFlight?.loading)
+
+        val confirming = buildOverviewSmartOutletPowerControl(
+            smartPlugState = plug,
+            showPowerChip = true,
+            powerControlsEnabled = true,
+            toggleInFlight = false,
+            confirmPending = true,
+            onToggle = {},
+        )
+        assertEquals(false, confirming?.enabled)
     }
 }
