@@ -123,6 +123,7 @@ import com.chronoswing.buddydash.util.HmsSeverity
 import com.chronoswing.buddydash.util.PrinterDetailLabels
 import com.chronoswing.buddydash.util.buildPrintHeadline
 import com.chronoswing.buddydash.util.StartNextQueuedPrintReadiness
+import com.chronoswing.buddydash.util.disconnectedPrinterStatus
 import com.chronoswing.buddydash.util.toDetailLabels
 
 private val detailTabs = listOf("Status", "Filament", "Machine")
@@ -161,7 +162,17 @@ fun PrinterDetailScreen(
         printerModel = uiState.printerModel ?: printerModel,
         activePrintFilamentUsage = uiState.activePrintFilamentUsage,
         printerErrorNoDetailsFallback = printerErrorNoDetails,
-    )
+    ) ?: if (uiState.hasCompletedLoad) {
+        disconnectedPrinterStatus().toDetailLabels(
+            maintenanceItems = uiState.maintenanceItems,
+            totalPrintHours = uiState.totalPrintHours,
+            printerModel = uiState.printerModel ?: printerModel,
+            activePrintFilamentUsage = uiState.activePrintFilamentUsage,
+            printerErrorNoDetailsFallback = printerErrorNoDetails,
+        )
+    } else {
+        null
+    }
 
     PrinterDetailScreenContent(
         title = uiState.printerName.ifBlank { printerName },
