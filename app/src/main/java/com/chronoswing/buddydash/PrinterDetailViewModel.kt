@@ -57,7 +57,10 @@ import com.chronoswing.buddydash.util.toUserNetworkMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.supervisorScope
+import com.chronoswing.buddydash.util.disconnectedPrinterStatus
+import com.chronoswing.buddydash.util.withEnrichFallback
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -202,13 +205,15 @@ class PrinterDetailViewModel(
         initJob = viewModelScope.launch {
             syncCredentialsFromSettings()
             val source = resolvePrinterCache()
-            val hasCache = source != PrinterDetailCacheSource.None
+            seedOfflinePlaceholderIfNeeded()
+            val hasCache = source != PrinterDetailCacheSource.None ||
+                _uiState.value.status != null
             logPrinterDetailCacheRead(printerId, hit = hasCache, source = source)
             _uiState.update {
                 it.copy(
                     hasCompletedLoad = true,
                     isLoading = false,
-                    error = if (!hasCache && !it.hasCredentials) "offline_no_cache" else null,
+                    error = null,
                 )
             }
             logOfflineLoadState(
@@ -216,15 +221,35 @@ class PrinterDetailViewModel(
                 onlineAttempt = _uiState.value.hasCredentials,
                 cacheResult = source.name,
                 finalState = when {
-                    !hasCache -> OfflineUiResolution.NoCacheOffline
+                    source == PrinterDetailCacheSource.None &&
+                        _uiState.value.isLimitedFromHomeCache ->
+                        OfflineUiResolution.LimitedFromCache
+                    source == PrinterDetailCacheSource.None ->
+                        OfflineUiResolution.NoCacheOffline
                     source == PrinterDetailCacheSource.HomeCard ->
                         OfflineUiResolution.LimitedFromCache
                     else -> OfflineUiResolution.StaleWithCache
                 },
             )
             if (_uiState.value.hasCredentials) {
-                loadStatus(showLoading = _uiState.value.status == null)
+                loadStatus(showLoading = source == PrinterDetailCacheSource.None)
             }
+        }
+    }
+
+    /** Ensures detail always has a render-safe offline shell when no cache/network status exists yet. */
+    private fun seedOfflinePlaceholderIfNeeded() {
+        if (_uiState.value.status != null) return
+        _uiState.update {
+            it.copy(
+                status = disconnectedPrinterStatus(),
+                isLoading = false,
+                error = null,
+                refreshError = null,
+                isStaleCachedData = true,
+                isLimitedFromHomeCache = true,
+                startNextQueuedPrintReadiness = StartNextQueuedPrintReadiness(canStart = false),
+            )
         }
     }
 
@@ -250,28 +275,28 @@ class PrinterDetailViewModel(
             return PrinterDetailCacheSource.FullDetail
         }
         homePrintersCacheRepository.findPrinter(serverUrl, printerId)?.let { printer ->
-            val status = printer.liveStatus
-            if (status != null) {
-                _uiState.update {
-                    it.copy(
-                        printerName = printer.name.ifBlank { it.printerName },
-                        printerModel = printer.model ?: it.printerModel,
+            val status = printer.withEnrichFallback().liveStatus ?: disconnectedPrinterStatus()
+            _uiState.update {
+                it.copy(
+                    printerName = printer.name.ifBlank { it.printerName },
+                    printerModel = printer.model ?: it.printerModel,
+                    status = status,
+                    maintenanceItems = printer.maintenanceItems,
+                    totalPrintHours = printer.maintenanceTotalPrintHours,
+                    isLoading = false,
+                    error = null,
+                    refreshError = null,
+                    isStaleCachedData = true,
+                    isLimitedFromHomeCache = true,
+                    activePrintFilamentUsage = status.filamentUsage,
+                    startNextQueuedPrintReadiness = evaluateStartNextQueuedPrintReadiness(
                         status = status,
-                        isLoading = false,
-                        error = null,
-                        refreshError = null,
-                        isStaleCachedData = true,
-                        isLimitedFromHomeCache = true,
-                        activePrintFilamentUsage = status.filamentUsage,
-                        startNextQueuedPrintReadiness = evaluateStartNextQueuedPrintReadiness(
-                            status = status,
-                            queuedItemCount = printer.pendingQueueCount,
-                        ),
-                    )
-                }
-                refreshFilamentSlotDisplays(status)
-                return PrinterDetailCacheSource.HomeCard
+                        queuedItemCount = printer.pendingQueueCount,
+                    ),
+                )
             }
+            refreshFilamentSlotDisplays(status)
+            return PrinterDetailCacheSource.HomeCard
         }
         return PrinterDetailCacheSource.None
     }
@@ -374,114 +399,132 @@ class PrinterDetailViewModel(
                 _uiState.update { it.copy(isLoading = true, error = null) }
             }
 
-            val statusResult = coroutineScope {
-                val statusDeferred = async {
-                    apiClient.fetchPrinterStatus(state.serverUrl, state.apiKey, printerId)
+            try {
+                val statusResult = supervisorScope {
+                    val statusDeferred = async {
+                        apiClient.fetchPrinterStatus(state.serverUrl, state.apiKey, printerId)
+                    }
+                    val maintenanceDeferred = async {
+                        runCatching {
+                            apiClient.fetchMaintenance(state.serverUrl, state.apiKey, printerId)
+                                .getOrNull()
+                        }.getOrNull()
+                    }
+                    val queueDeferred = async {
+                        runCatching {
+                            apiClient.fetchPrinterQueueSnapshot(state.serverUrl, state.apiKey, printerId)
+                                .getOrNull()
+                                ?: PrinterQueueSnapshot()
+                        }.getOrElse { PrinterQueueSnapshot() }
+                    }
+                    val machineInfoDeferred = async {
+                        runCatching {
+                            apiClient.fetchPrinterMachineInfo(state.serverUrl, state.apiKey, printerId)
+                                .getOrNull()
+                        }.getOrNull()
+                    }
+                    val smartPlugDeferred = async {
+                        runCatching {
+                            apiClient.fetchPrinterSmartPlugState(state.serverUrl, state.apiKey, printerId)
+                                .getOrNull()
+                        }.getOrNull()
+                    }
+                    StatusFetchBundle(
+                        status = statusDeferred.await(),
+                        maintenance = maintenanceDeferred.await(),
+                        queue = queueDeferred.await(),
+                        machineInfo = machineInfoDeferred.await(),
+                        smartPlugState = smartPlugDeferred.await(),
+                    )
                 }
-                val maintenanceDeferred = async {
-                    apiClient.fetchMaintenance(state.serverUrl, state.apiKey, printerId).getOrNull()
+
+                statusResult.status.fold(
+                    onSuccess = { status ->
+                        applyStatusFetchResult(status, statusResult)
+                    },
+                    onFailure = { error ->
+                        handleLoadStatusFailure(error)
+                    },
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (BuddyDashDebug.enabled) {
+                    Log.w("BuddyDash/PrinterDetail", "loadStatus failed unexpectedly id=$printerId", e)
                 }
-                val queueDeferred = async {
-                    apiClient.fetchPrinterQueueSnapshot(state.serverUrl, state.apiKey, printerId)
-                        .getOrNull()
-                        ?: PrinterQueueSnapshot()
-                }
-                val machineInfoDeferred = async {
-                    apiClient.fetchPrinterMachineInfo(state.serverUrl, state.apiKey, printerId)
-                        .getOrNull()
-                }
-                val smartPlugDeferred = async {
-                    apiClient.fetchPrinterSmartPlugState(state.serverUrl, state.apiKey, printerId)
-                        .getOrNull()
-                }
-                StatusFetchBundle(
-                    status = statusDeferred.await(),
-                    maintenance = maintenanceDeferred.await(),
-                    queue = queueDeferred.await(),
-                    machineInfo = machineInfoDeferred.await(),
-                    smartPlugState = smartPlugDeferred.await(),
+                handleLoadStatusFailure(
+                    Exception(e.toUserNetworkMessage("Could not load printer status")),
                 )
             }
+        }
+    }
 
-            statusResult.status.fold(
-                onSuccess = { status ->
-                    applyStatusFetchResult(status, statusResult)
-                },
-                onFailure = { error ->
-                    viewModelScope.launch {
-                        val current = _uiState.value
-                        val hadData = current.status != null
-                        if (hadData) {
-                            _uiState.update {
-                                it.copy(
-                                    isLoading = false,
-                                    isRefreshing = false,
-                                    refreshError = error.toUserNetworkMessage("Could not refresh"),
-                                    isStaleCachedData = true,
-                                    hasCompletedLoad = true,
-                                    hasAttemptedNetworkLoad = true,
-                                )
-                            }
-                            logOfflineLoadState(
-                                screen = "PrinterDetail",
-                                onlineAttempt = true,
-                                cacheResult = "failure_stale",
-                                finalState = OfflineUiResolution.StaleWithCache,
-                            )
-                        } else {
-                            when (resolvePrinterCache()) {
-                                PrinterDetailCacheSource.None -> {
-                                    _uiState.update {
-                                        it.copy(
-                                            isLoading = false,
-                                            isRefreshing = false,
-                                            status = null,
-                                            maintenanceItems = emptyList(),
-                                            totalPrintHours = null,
-                                            queueUpcoming = emptyList(),
-                                            startNextQueuedPrintReadiness =
-                                                StartNextQueuedPrintReadiness(canStart = false),
-                                            activePrintFilamentUsage = null,
-                                            printingQueueJobId = null,
-                                            error = "offline_no_cache",
-                                            hasCompletedLoad = true,
-                                            hasAttemptedNetworkLoad = true,
-                                        )
-                                    }
-                                    logOfflineLoadState(
-                                        screen = "PrinterDetail",
-                                        onlineAttempt = true,
-                                        cacheResult = "failure_no_cache",
-                                        finalState = OfflineUiResolution.NoCacheOffline,
-                                    )
-                                }
-                                else -> {
-                                    _uiState.update {
-                                        it.copy(
-                                            isLoading = false,
-                                            isRefreshing = false,
-                                            error = null,
-                                            hasCompletedLoad = true,
-                                            isStaleCachedData = true,
-                                            hasAttemptedNetworkLoad = true,
-                                        )
-                                    }
-                                    logOfflineLoadState(
-                                        screen = "PrinterDetail",
-                                        onlineAttempt = true,
-                                        cacheResult = "failure_with_fallback",
-                                        finalState = if (_uiState.value.isLimitedFromHomeCache) {
-                                            OfflineUiResolution.LimitedFromCache
-                                        } else {
-                                            OfflineUiResolution.StaleWithCache
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                },
+    private suspend fun handleLoadStatusFailure(error: Throwable) {
+        val current = _uiState.value
+        val hadData = current.status != null
+        if (hadData) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    refreshError = error.toUserNetworkMessage("Could not refresh"),
+                    isStaleCachedData = true,
+                    hasCompletedLoad = true,
+                    hasAttemptedNetworkLoad = true,
+                )
+            }
+            logOfflineLoadState(
+                screen = "PrinterDetail",
+                onlineAttempt = true,
+                cacheResult = "failure_stale",
+                finalState = OfflineUiResolution.StaleWithCache,
             )
+            return
+        }
+
+        when (resolvePrinterCache()) {
+            PrinterDetailCacheSource.None -> {
+                seedOfflinePlaceholderIfNeeded()
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        error = null,
+                        hasCompletedLoad = true,
+                        isStaleCachedData = true,
+                        isLimitedFromHomeCache = true,
+                        hasAttemptedNetworkLoad = true,
+                    )
+                }
+                logOfflineLoadState(
+                    screen = "PrinterDetail",
+                    onlineAttempt = true,
+                    cacheResult = "failure_no_cache",
+                    finalState = OfflineUiResolution.NoCacheOffline,
+                )
+            }
+            else -> {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        error = null,
+                        hasCompletedLoad = true,
+                        isStaleCachedData = true,
+                        hasAttemptedNetworkLoad = true,
+                    )
+                }
+                logOfflineLoadState(
+                    screen = "PrinterDetail",
+                    onlineAttempt = true,
+                    cacheResult = "failure_with_fallback",
+                    finalState = if (_uiState.value.isLimitedFromHomeCache) {
+                        OfflineUiResolution.LimitedFromCache
+                    } else {
+                        OfflineUiResolution.StaleWithCache
+                    },
+                )
+            }
         }
     }
 
@@ -555,38 +598,46 @@ class PrinterDetailViewModel(
     private fun refreshFilamentSlotDisplays(status: PrinterStatus) {
         filamentInventoryJob?.cancel()
         filamentInventoryJob = viewModelScope.launch {
-            val state = _uiState.value
-            if (!state.hasCredentials || printerId < 0) return@launch
-            val inventoryResult = apiClient.fetchInventoryForPrinter(
-                state.serverUrl,
-                state.apiKey,
-                printerId,
-            )
-            val spoolsResult = apiClient.fetchSpoolInventory(state.serverUrl, state.apiKey)
-            val inventoryBySlot = inventoryResult.getOrElse { emptyMap() }
-            val spools = spoolsResult.getOrElse { emptyList() }
-            val spoolsById = spools.associateBy { it.id }
-            val assignedToPrinter = spools.filter { it.assignment?.printerId == printerId }
-            val displays = buildFilamentSlotDisplays(
-                slots = status.filamentSlots,
-                activeKey = status.activeFilamentSlot,
-                printerId = printerId,
-                inventoryBySlot = inventoryBySlot,
-                spoolsById = spoolsById,
-                spoolsAssignedToPrinter = assignedToPrinter,
-            )
-            if (BuddyDashDebug.enabled) {
-                android.util.Log.d(
-                    "BuddyDash/FilamentTab",
-                    "slotDisplays=${displays.size} inventoryKeys=${inventoryBySlot.size} " +
-                        "spools=${spools.size} matched=${displays.count { it.isTappable }}",
+            try {
+                val state = _uiState.value
+                if (!state.hasCredentials || printerId < 0) return@launch
+                val inventoryResult = apiClient.fetchInventoryForPrinter(
+                    state.serverUrl,
+                    state.apiKey,
+                    printerId,
                 )
-            }
-            _uiState.update {
-                it.copy(
-                    filamentSlotDisplays = displays,
-                    inventorySpools = spools,
+                val spoolsResult = apiClient.fetchSpoolInventory(state.serverUrl, state.apiKey)
+                val inventoryBySlot = inventoryResult.getOrElse { emptyMap() }
+                val spools = spoolsResult.getOrElse { emptyList() }
+                val spoolsById = spools.associateBy { it.id }
+                val assignedToPrinter = spools.filter { it.assignment?.printerId == printerId }
+                val displays = buildFilamentSlotDisplays(
+                    slots = status.filamentSlots,
+                    activeKey = status.activeFilamentSlot,
+                    printerId = printerId,
+                    inventoryBySlot = inventoryBySlot,
+                    spoolsById = spoolsById,
+                    spoolsAssignedToPrinter = assignedToPrinter,
                 )
+                if (BuddyDashDebug.enabled) {
+                    android.util.Log.d(
+                        "BuddyDash/FilamentTab",
+                        "slotDisplays=${displays.size} inventoryKeys=${inventoryBySlot.size} " +
+                            "spools=${spools.size} matched=${displays.count { it.isTappable }}",
+                    )
+                }
+                _uiState.update {
+                    it.copy(
+                        filamentSlotDisplays = displays,
+                        inventorySpools = spools,
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (BuddyDashDebug.enabled) {
+                    Log.w("BuddyDash/FilamentTab", "refreshFilamentSlotDisplays failed id=$printerId", e)
+                }
             }
         }
     }

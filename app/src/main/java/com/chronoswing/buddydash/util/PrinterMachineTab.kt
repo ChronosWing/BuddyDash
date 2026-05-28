@@ -23,7 +23,7 @@ data class MachineTabCapabilities(
 fun PrinterDetailLabels.machineTabCapabilities(
     cameraTokenConfigured: Boolean,
 ): MachineTabCapabilities {
-    val connected = connection != "Offline"
+    val connected = connection == "Connected"
     val idle = activityKind == PrinterActivityKind.Idle
     val motionBlocked = !connected || !idle || motionLayout == PrinterMotionLayout.Hidden
     val motionReason = when {
@@ -51,7 +51,7 @@ fun PrinterDetailLabels.machineTabCapabilities(
         showHome = showHome,
         homeEnabled = showHome && connected && idle,
         showFiles = showFiles,
-        filesEnabled = showFiles,
+        filesEnabled = showFiles && connected,
         showUtilitiesSection = showUtilities,
         utilitiesEnabled = showUtilities && !utilityBlocked,
         utilitiesDisabledReason = utilityReason,
